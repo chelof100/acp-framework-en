@@ -1,14 +1,16 @@
-# ACP: A Byzantine-Resilient Decentralized Capability Authorization Architecture
+# ACP-D: A Byzantine-Resilient Decentralized Capability Authorization Architecture
 
 Submission Draft — IEEE S&P / NDSS
 
+> **Status note:** This paper describes **ACP-D**, the decentralized extension of the ACP specification, targeting the v2.0 architecture roadmap. The current production specification (ACP v1.x) uses a centralized issuer with Ed25519 unilateral signing and local cryptographic verification. ACP-D — with threshold signing, BFT consensus, and decentralized governance — is a planned architectural evolution, not yet implemented.
+
 ## Title
 
-ACP: A Byzantine-Resilient Decentralized Capability Authorization Architecture
+ACP-D: A Byzantine-Resilient Decentralized Capability Authorization Architecture
 
 ## Abstract
 
-We propose ACP, a capability-based authorization system that eliminates centralized issuers and replaces unilateral signing with Byzantine fault-tolerant cryptographic consensus. ACP integrates verifiable governance, adaptive reputation, and optional economic binding. We formally demonstrate its security under the n ≥ 3f+1 model and validate properties through TLA+ modeling.
+We propose ACP-D, a decentralized extension of the Agent Control Protocol (ACP) capability-based authorization architecture. Building on ACP v1.x's cryptographic capability model, ACP-D eliminates the centralized issuer and replaces unilateral signing with Byzantine fault-tolerant cryptographic consensus. ACP-D integrates verifiable governance, adaptive reputation, and optional economic binding. We formally demonstrate its security under the n ≥ 3f+1 model and validate properties through TLA+ modeling.
 
 ## 1. Introduction
 
@@ -98,4 +100,4 @@ Comparison against:
 
 ## 10. Conclusion
 
-ACP introduces Byzantine fault-tolerant authorization as a native primitive in distributed systems.
+ACP-D introduces Byzantine fault-tolerant authorization as a native primitive in distributed systems, extending the ACP v1.x capability model toward a fully decentralized governance architecture.
