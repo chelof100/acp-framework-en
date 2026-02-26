@@ -1,0 +1,7 @@
+Level,Name,Main characteristic,Key technologies,Typical time
+0,Basic automation,Decision and execution coupled,Scripts / Zapier,-
+1,Structural validation,Basic decision-execution separation,Basic guardrails,4-6 weeks
+2,Full traceability,Persistent structured logs,ACP + OpenTelemetry,8-12 weeks
+3,Dynamic control,Real-time configurable permissions,ACP + Policy Engine,12-16 weeks
+4,Multi-agent governance,Orchestration + delegation limits,ACP + GAT Registry,4-6 months
+5,Sovereign architecture,Full provider decoupling,ACP + full GAT,6-9 months

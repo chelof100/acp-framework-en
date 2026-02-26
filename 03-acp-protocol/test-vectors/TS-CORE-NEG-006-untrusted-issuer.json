@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "id": "TS-CORE-NEG-006",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L1",
+    "description": "Token issued by a DID not present in trusted_issuers — must be rejected",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["read"],
+      "exp": 1893456000,
+      "issuer": "did:example:rogue-authority",
+      "jti": "cap-neg-006",
+      "nonce": "09d4c8b7e5f36712a09d4c8b7e5f36712",
+      "resource": "doc:ceo:private",
+      "signature": "PLACEHOLDER:ed25519-sign(rogue-key, canonical-json-of-this-capability)",
+      "sub": "did:example:agent-mallory",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "payment_tokens": [],
+    "reputation_scores": {},
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "UNTRUSTED_ISSUER"
+  }
+}

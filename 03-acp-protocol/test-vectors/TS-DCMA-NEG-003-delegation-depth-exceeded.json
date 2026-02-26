@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "id": "TS-DCMA-NEG-003",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L2",
+    "description": "Delegation depth exceeded — chain a1→a2→a3→a4 with institutional max_depth=3",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["read"],
+      "delegation": {
+        "chain": [
+          "did:example:agent-a1",
+          "did:example:agent-a2",
+          "did:example:agent-a3",
+          "did:example:agent-a4"
+        ],
+        "constraints": {
+          "action_set": ["read"],
+          "resource": "doc:ops:runbook"
+        },
+        "delegatee": "did:example:agent-a4",
+        "delegator": "did:example:agent-a3",
+        "depth": 4,
+        "delegation_signature": "PLACEHOLDER:ed25519-sign(a3-key, canonical-json-of-delegation)",
+        "max_depth": 3
+      },
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "jti": "cap-dcma-neg-003",
+      "nonce": "4dh8g2f1e9c70356dh8g2f1e9c70356",
+      "resource": "doc:ops:runbook",
+      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
+      "sub": "did:example:agent-a4",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "delegation_registry": {
+      "did:example:agent-a1": {
+        "action_set": ["read"],
+        "institutional_max_depth": 3,
+        "resource": "doc:ops:runbook",
+        "revoked": false
+      },
+      "did:example:agent-a2": {
+        "action_set": ["read"],
+        "delegated_by": "did:example:agent-a1",
+        "depth": 2,
+        "resource": "doc:ops:runbook",
+        "revoked": false
+      },
+      "did:example:agent-a3": {
+        "action_set": ["read"],
+        "delegated_by": "did:example:agent-a2",
+        "depth": 3,
+        "resource": "doc:ops:runbook",
+        "revoked": false
+      }
+    },
+    "payment_tokens": [],
+    "reputation_scores": {},
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "DELEGATION_DEPTH"
+  }
+}

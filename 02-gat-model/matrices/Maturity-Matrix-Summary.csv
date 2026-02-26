@@ -1,0 +1,6 @@
+Level,Name,Key
+0–1,Basic,Decision = Execution
+2,Traceable,Structured logs
+3,Controlled,ACP + dynamic permissions
+4,Governed multi-agent,Orchestration + limits
+5,Sovereign,Replaceable + independent

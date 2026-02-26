@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "id": "TS-CORE-NEG-002",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L1",
+    "description": "Token missing required exp field — must be rejected as malformed",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["read"],
+      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "jti": "cap-neg-002",
+      "nonce": "d6a1f5e4b2c07389d6a1f5e4b2c07389",
+      "resource": "doc:legal:contracts",
+      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "payment_tokens": [],
+    "reputation_scores": {},
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "MALFORMED_INPUT"
+  }
+}

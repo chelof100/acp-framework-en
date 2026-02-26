@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "id": "TS-DCMA-NEG-001",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L2",
+    "description": "Privilege escalation attempt — Bob tries to delegate write access but Alice only delegated read to Bob",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["write"],
+      "delegation": {
+        "constraints": {
+          "action_set": ["write"],
+          "resource": "doc:finance:report-2024"
+        },
+        "delegatee": "did:example:agent-carol",
+        "delegator": "did:example:agent-bob",
+        "depth": 2,
+        "delegation_signature": "PLACEHOLDER:ed25519-sign(bob-key, canonical-json-of-delegation)",
+        "max_depth": 3
+      },
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "jti": "cap-dcma-neg-001",
+      "nonce": "2bf6e0d9c7a58134bf6e0d9c7a58134",
+      "resource": "doc:finance:report-2024",
+      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
+      "sub": "did:example:agent-carol",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "delegation_registry": {
+      "did:example:agent-alice": {
+        "action_set": ["read", "write"],
+        "resource": "doc:finance:report-2024",
+        "revoked": false
+      },
+      "did:example:agent-bob": {
+        "action_set": ["read"],
+        "delegated_by": "did:example:agent-alice",
+        "resource": "doc:finance:report-2024",
+        "revoked": false
+      }
+    },
+    "payment_tokens": [],
+    "reputation_scores": {},
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "ACCESS_DENIED"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "id": "TS-CORE-NEG-004",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L1",
+    "description": "Token with invalid signature — signature bytes do not correspond to the canonicalized input",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["read"],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "jti": "cap-neg-004",
+      "nonce": "e7b2a6f5c3d18490e7b2a6f5c3d18490",
+      "resource": "doc:board:minutes",
+      "signature": "aGVsbG8gd29ybGQ=",
+      "sub": "did:example:agent-mallory",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "payment_tokens": [],
+    "reputation_scores": {},
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "INVALID_SIGNATURE"
+  }
+}

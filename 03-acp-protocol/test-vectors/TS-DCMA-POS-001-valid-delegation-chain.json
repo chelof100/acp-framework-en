@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "id": "TS-DCMA-POS-001",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L2",
+    "description": "Valid single-hop delegation — Alice delegates read on doc-456 to Bob within Alice's own capability bounds",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["read"],
+      "delegation": {
+        "constraints": {
+          "action_set": ["read"],
+          "resource": "doc:finance:report-2024"
+        },
+        "delegatee": "did:example:agent-bob",
+        "delegator": "did:example:agent-alice",
+        "depth": 1,
+        "delegation_signature": "PLACEHOLDER:ed25519-sign(alice-key, canonical-json-of-delegation)",
+        "max_depth": 2
+      },
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "jti": "cap-dcma-pos-001",
+      "nonce": "1ae5d9c8b6f47023ae5d9c8b6f47023",
+      "resource": "doc:finance:report-2024",
+      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
+      "sub": "did:example:agent-bob",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "delegation_registry": {
+      "did:example:agent-alice": {
+        "action_set": ["read", "write"],
+        "resource": "doc:finance:report-2024",
+        "revoked": false
+      }
+    },
+    "payment_tokens": [],
+    "reputation_scores": {
+      "did:example:agent-alice": 0.92,
+      "did:example:agent-bob": 0.85
+    },
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

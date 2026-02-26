@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "id": "TS-CORE-NEG-001",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L1",
+    "description": "Expired token — exp is strictly before current_time",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["read"],
+      "exp": 1699999999,
+      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "jti": "cap-neg-001",
+      "nonce": "c5f0e4d3a1b96278c5f0e4d3a1b96278",
+      "resource": "doc:hr:salaries",
+      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "payment_tokens": [],
+    "reputation_scores": {},
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "EXPIRED"
+  }
+}

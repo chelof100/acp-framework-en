@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "id": "TS-CORE-POS-002",
+    "acp_version": "1.1",
+    "layer": "CORE",
+    "conformance_level": "L1",
+    "description": "Valid capability with multiple actions in action_set",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": ["read", "write", "delete"],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "jti": "cap-pos-002",
+      "nonce": "b4e9d3c2f0a85167b4e9d3c2f0a85167",
+      "resource": "repo:org:main-branch",
+      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
+      "sub": "did:example:agent-bob",
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1700000000,
+    "payment_tokens": [],
+    "reputation_scores": {
+      "did:example:agent-bob": 0.88
+    },
+    "revocation_list": [],
+    "trusted_issuers": [
+      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    ]
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}
