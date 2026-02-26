@@ -1,0 +1,55 @@
+version: "3.9"
+
+# ─── ACP Reference Implementation — Docker Compose ───────────────────────────
+#
+# Usage:
+#   # 1. Generate an Ed25519 key pair (one-time setup):
+#   #    go run ./cmd/acp-server/keygen/main.go
+#   #    or: openssl genpkey -algorithm ed25519 | openssl pkey -pubout
+#   #
+#   # 2. Set the institution public key:
+#   #    export ACP_INSTITUTION_PUBLIC_KEY=<base64url-encoded-32-bytes>
+#   #
+#   # 3. Start:
+#   #    docker-compose up
+#
+# Endpoints:
+#   GET  http://localhost:8080/acp/v1/challenge   — issue challenge nonce
+#   POST http://localhost:8080/acp/v1/verify       — verify CT + PoP
+#   POST http://localhost:8080/acp/v1/register     — register agent pubkey
+#   GET  http://localhost:8080/acp/v1/health       — health check
+
+services:
+  acp-server:
+    build:
+      context: ./acp-go
+      dockerfile: Dockerfile
+    container_name: acp-server
+    ports:
+      - "8080:8080"
+    environment:
+      # Required: base64url-encoded Ed25519 institution public key (32 bytes).
+      # Generate with: go run ./cmd/acp-server/keygen
+      ACP_INSTITUTION_PUBLIC_KEY: ${ACP_INSTITUTION_PUBLIC_KEY:?ACP_INSTITUTION_PUBLIC_KEY is required}
+      ACP_ADDR: ":8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/acp-server", "-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "acp.version=1.0.0"
+      - "acp.spec=ACP-CT-1.0,ACP-HP-1.0,ACP-SIGN-1.0"
+
+  # ── Optional: Prometheus metrics scraping ──────────────────────────────────
+  # Uncomment if you add /metrics endpoint.
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   ports:
+  #     - "9090:9090"
+  #   depends_on:
+  #     - acp-server
