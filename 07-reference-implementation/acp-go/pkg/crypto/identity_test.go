@@ -74,9 +74,10 @@ func TestValidateAgentID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := crypto.ValidateAgentID(tt.agentID)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateAgentID(%q) error = %v, wantErr = %v", tt.agentID, err, tt.wantErr)
+			valid := crypto.ValidateAgentID(tt.agentID)
+			// wantErr=true means invalid input → valid should be false.
+			if valid == tt.wantErr {
+				t.Errorf("ValidateAgentID(%q) = %v, wantErr = %v", tt.agentID, valid, tt.wantErr)
 			}
 		})
 	}

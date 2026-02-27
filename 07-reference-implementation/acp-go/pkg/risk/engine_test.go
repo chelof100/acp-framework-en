@@ -6,11 +6,14 @@ import (
 	"github.com/chelof100/acp-framework/acp-go/pkg/risk"
 )
 
+// floatPtr converts a float64 to a *float64 pointer for use in risk.Request.Amount.
+func floatPtr(v float64) *float64 { return &v }
+
 func TestAssess_FinancialHighAmount(t *testing.T) {
 	req := risk.Request{
 		Capability: "acp:cap:financial.payment",
 		Resource:   "org.bank/accounts/ACC-001",
-		Amount:     150000,
+		Amount:     floatPtr(150000),
 	}
 	result := risk.Assess(req)
 
@@ -26,7 +29,7 @@ func TestAssess_LowRisk(t *testing.T) {
 	req := risk.Request{
 		Capability: "acp:cap:data.read",
 		Resource:   "org.bank/reports",
-		Amount:     0,
+		Amount:     nil,
 	}
 	result := risk.Assess(req)
 
@@ -36,8 +39,8 @@ func TestAssess_LowRisk(t *testing.T) {
 	if result.RequiresMFA {
 		t.Error("low risk request should not require MFA")
 	}
-	if result.Deny {
-		t.Error("low risk request should not be denied")
+	if !result.Approved {
+		t.Error("low risk request should be approved")
 	}
 }
 
@@ -45,12 +48,12 @@ func TestAssess_Deny_VeryHighScore(t *testing.T) {
 	req := risk.Request{
 		Capability: "acp:cap:financial.payment",
 		Resource:   "org.bank/accounts",
-		Amount:     999999999,
+		Amount:     floatPtr(999999999),
 	}
 	result := risk.Assess(req)
 
-	if !result.Deny {
-		t.Errorf("extremely high risk should be denied (score=%d)", result.Score)
+	if result.Approved {
+		t.Errorf("extremely high risk should not be approved (score=%d)", result.Score)
 	}
 }
 
@@ -58,7 +61,7 @@ func TestAssess_SystemCapability(t *testing.T) {
 	req := risk.Request{
 		Capability: "acp:cap:system.admin",
 		Resource:   "org.bank/infrastructure",
-		Amount:     0,
+		Amount:     nil,
 	}
 	result := risk.Assess(req)
 
@@ -69,10 +72,10 @@ func TestAssess_SystemCapability(t *testing.T) {
 
 func TestAssess_Scores_InRange(t *testing.T) {
 	cases := []risk.Request{
-		{Capability: "acp:cap:data.read", Resource: "org.bank/reports", Amount: 0},
-		{Capability: "acp:cap:financial.payment", Resource: "org.bank/accounts", Amount: 500},
-		{Capability: "acp:cap:system.admin", Resource: "org.bank/all", Amount: 0},
-		{Capability: "acp:cap:data.write", Resource: "org.bank/records", Amount: 0},
+		{Capability: "acp:cap:data.read", Resource: "org.bank/reports", Amount: nil},
+		{Capability: "acp:cap:financial.payment", Resource: "org.bank/accounts", Amount: floatPtr(500)},
+		{Capability: "acp:cap:system.admin", Resource: "org.bank/all", Amount: nil},
+		{Capability: "acp:cap:data.write", Resource: "org.bank/records", Amount: nil},
 	}
 	for _, req := range cases {
 		result := risk.Assess(req)
@@ -86,7 +89,7 @@ func TestAssess_FinancialLowAmount(t *testing.T) {
 	req := risk.Request{
 		Capability: "acp:cap:financial.payment",
 		Resource:   "org.bank/accounts/ACC-001/sub",
-		Amount:     100,
+		Amount:     floatPtr(100),
 	}
 	result := risk.Assess(req)
 
@@ -96,11 +99,11 @@ func TestAssess_FinancialLowAmount(t *testing.T) {
 }
 
 func TestAssess_MFA_Threshold(t *testing.T) {
-	// Amount=10000 crosses the 10k threshold.
+	// Amount=10001 crosses the 10k threshold.
 	req := risk.Request{
 		Capability: "acp:cap:financial.payment",
 		Resource:   "org.bank/accounts",
-		Amount:     10001,
+		Amount:     floatPtr(10001),
 	}
 	result := risk.Assess(req)
 	_ = result

@@ -28,7 +28,7 @@ import (
 type server struct {
 	challenges        *handshake.ChallengeStore
 	registry          *registry.InMemoryRegistry
-	revChecker        revocation.RevocationChecker
+	revChecker        tokens.RevocationChecker
 	nonceStore        *tokens.InMemoryNonceStore
 	institutionPubKey ed25519.PublicKey
 	addr              string
@@ -79,10 +79,10 @@ func main() {
 		ticker := time.NewTicker(2 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
-			expiredC := srv.challenges.Prune()
+			srv.challenges.Prune() // ChallengeStore.Prune() is void
 			expiredN := srv.nonceStore.Prune()
-			if expiredC > 0 || expiredN > 0 {
-				log.Printf("[ACP] pruned %d challenges, %d nonces", expiredC, expiredN)
+			if expiredN > 0 {
+				log.Printf("[ACP] pruned %d nonces", expiredN)
 			}
 		}
 	}()
@@ -174,12 +174,10 @@ func (s *server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── 4. Parse and verify Capability Token ────────────────────────────────
-	opts := tokens.VerifyOptions{
-		IssuerPublicKey: s.institutionPubKey,
-		RevChecker:      s.revChecker,
-		NonceStore:      s.nonceStore,
-	}
-	token, err := tokens.ParseAndVerify(tokenJSON, opts)
+	token, err := tokens.ParseAndVerify([]byte(tokenJSON), s.institutionPubKey, tokens.VerificationRequest{
+		RevocationChecker: s.revChecker,
+		NonceStore:        s.nonceStore,
+	})
 	if err != nil {
 		writeJSON(w, http.StatusForbidden, map[string]interface{}{
 			"ok": false, "error": err.Error(),

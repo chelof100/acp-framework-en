@@ -59,6 +59,25 @@ func (s *InMemoryNonceStore) WasSeen(nonce string) bool {
 	return exists
 }
 
+// HasSeen implements the NonceStore interface (alias for WasSeen).
+func (s *InMemoryNonceStore) HasSeen(nonce string) bool {
+	return s.WasSeen(nonce)
+}
+
+// MarkSeen implements the NonceStore interface.
+// Records a nonce as used with a default 24-hour expiry.
+// Use MarkUsed when the token's actual exp timestamp is available.
+func (s *InMemoryNonceStore) MarkSeen(nonce string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.entries[nonce]; !exists {
+		s.entries[nonce] = nonceEntry{
+			seenAt:    time.Now(),
+			expiresAt: time.Now().Add(24 * time.Hour),
+		}
+	}
+}
+
 // Prune removes entries for tokens that have already expired.
 // Call periodically (e.g., every 5 minutes) to prevent unbounded growth.
 func (s *InMemoryNonceStore) Prune() int {

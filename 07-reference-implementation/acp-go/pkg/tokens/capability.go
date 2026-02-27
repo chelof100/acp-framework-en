@@ -122,7 +122,12 @@ func ParseAndVerify(rawJSON []byte, issuerPubKey ed25519.PublicKey, req Verifica
 	}
 
 	// Canonicalize with JCS (RFC 8785), hash with SHA-256, verify with Ed25519.
-	canonicalBytes, err := jcs.Transform(rawMap)
+	// jcs.Transform requires JSON bytes, so marshal the map first.
+	rawMapJSON, err := json.Marshal(rawMap)
+	if err != nil {
+		return nil, err
+	}
+	canonicalBytes, err := jcs.Transform(rawMapJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +249,11 @@ func ComputeTokenHash(token *CapabilityToken) (string, error) {
 	}
 	delete(rawMap, "sig")
 
-	canonical, err := jcs.Transform(rawMap)
+	rawMapJSON, err := json.Marshal(rawMap)
+	if err != nil {
+		return "", err
+	}
+	canonical, err := jcs.Transform(rawMapJSON)
 	if err != nil {
 		return "", err
 	}
