@@ -2,9 +2,16 @@
 acp.client — HTTP ACP client with automatic PoP handshake (ACP-HP-1.0)
 
 The ACPClient handles the full ACP authorization flow:
-  1. GET /acp/v1/challenge  → receive nonce
-  2. Sign nonce with agent private key (Proof of Possession)
-  3. POST /acp/v1/verify   → send capability token + PoP, receive decision
+  1. POST /acp/v1/register → register agent's public key (once per agent)
+  2. GET  /acp/v1/challenge → receive one-time nonce
+  3. Sign PoP: Method|Path|Challenge|base64url(SHA-256(body)) → Ed25519
+  4. POST /acp/v1/verify   → send token + PoP via HTTP headers, receive decision
+
+HTTP headers used by verify():
+  Authorization:   Bearer <capability_token_json>
+  X-ACP-Agent-ID:  <agent_id>
+  X-ACP-Challenge: <challenge>
+  X-ACP-Signature: <pop_signature>
 
 Usage:
     from acp.identity import AgentIdentity
@@ -19,13 +26,12 @@ Usage:
         signer=signer,
     )
 
-    # Verify a capability token for a given action + resource
-    result = client.verify(
-        capability_token=signed_token,
-        requested_capability="acp:cap:financial.payment",
-        requested_resource="org.banco/accounts/ACC-001",
-    )
-    print(result)  # {"decision": "AUTHORIZED", ...}
+    # Register agent with the server (once)
+    client.register()
+
+    # Verify a capability token
+    result = client.verify(capability_token=signed_token)
+    print(result)  # {"ok": true, "agent_id": "...", "capabilities": [...]}
 """
 from __future__ import annotations
 
@@ -110,42 +116,61 @@ class ACPClient:
 
     # ─── Public API ───────────────────────────────────────────────────────────
 
+    def register(self) -> Dict[str, Any]:
+        """
+        Register this agent's public key with the ACP server.
+
+        POST /acp/v1/register
+        Body: {"agent_id": "<agent_id>", "public_key_hex": "<base64url(pubkey)>"}
+
+        Must be called once before verify(). In production this endpoint is
+        restricted to institutional administrators.
+        """
+        pubkey_b64 = base64.urlsafe_b64encode(
+            self._identity.public_key_bytes
+        ).rstrip(b"=").decode()
+        return _post_json(
+            f"{self._server}/acp/v1/register",
+            {"agent_id": self._identity.agent_id, "public_key_hex": pubkey_b64},
+            timeout=self._timeout,
+        )
+
     def verify(
         self,
         capability_token: Dict[str, Any],
-        requested_capability: str,
-        requested_resource: str,
     ) -> Dict[str, Any]:
         """
         Full ACP verification flow (ACP-HP-1.0):
-          1. Fetch fresh challenge nonce from server
-          2. Produce PoP signature over challenge + agent_id + capability_id
-          3. POST to /acp/v1/verify with token + PoP
+          1. GET /acp/v1/challenge  → one-time nonce
+          2. Compute PoP: Method|Path|Challenge|base64url(SHA-256(body))
+          3. POST /acp/v1/verify via HTTP headers (Authorization + X-ACP-*)
+
+        Args:
+            capability_token: Signed capability token dict (from ACPSigner).
 
         Returns:
-            dict with at minimum {"decision": "AUTHORIZED" | "DENIED", ...}
+            {"ok": true, "agent_id": "...", "capabilities": [...], ...}
 
         Raises:
-            ACPError on HTTP or connection failure
+            ACPError on HTTP or connection failure.
         """
         # Step 1: Get challenge
         challenge_resp = self._get_challenge()
         challenge = challenge_resp["challenge"]
 
-        # Step 2: Proof of Possession
-        pop = self._produce_pop(challenge, requested_capability)
+        # Step 2: Serialize token and compute PoP over empty body
+        token_json = json.dumps(capability_token, separators=(",", ":"))
+        body = b""
+        pop_sig = self._sign_pop("POST", "/acp/v1/verify", challenge, body)
 
-        # Step 3: Verify
-        return _post_json(
+        # Step 3: POST with ACP headers
+        return self._post_with_acp_headers(
             f"{self._server}/acp/v1/verify",
-            {
-                "capability_token": capability_token,
-                "requested_capability": requested_capability,
-                "requested_resource": requested_resource,
-                "agent_id": self._identity.agent_id,
-                "proof_of_possession": pop,
-            },
-            timeout=self._timeout,
+            body=body,
+            token_json=token_json,
+            agent_id=self._identity.agent_id,
+            challenge=challenge,
+            pop_sig=pop_sig,
         )
 
     def health(self) -> Dict[str, Any]:
@@ -160,27 +185,53 @@ class ACPClient:
             f"{self._server}/acp/v1/challenge", timeout=self._timeout
         )
 
-    def _produce_pop(self, challenge: str, capability_id: str) -> Dict[str, Any]:
+    def _sign_pop(
+        self, method: str, path: str, challenge: str, body: bytes
+    ) -> str:
         """
-        Produce a Proof of Possession over:
-          SHA-256( challenge || agent_id || capability_id )
+        Compute Proof-of-Possession signature (ACP-HP-1.0 channel binding).
 
-        Returns a PoP object compatible with the ACP-HP-1.0 verify endpoint.
+        signed_payload = Method + "|" + Path + "|" + Challenge + "|" + base64url(SHA-256(body))
+        sig = Ed25519(sk, SHA-256(signed_payload_bytes))
+
+        Returns base64url-encoded signature (no padding).
         """
-        agent_id = self._identity.agent_id
+        body_hash = hashlib.sha256(body).digest()
+        body_hash_b64 = base64.urlsafe_b64encode(body_hash).rstrip(b"=").decode()
+        signed_payload = f"{method}|{path}|{challenge}|{body_hash_b64}"
+        payload_hash = hashlib.sha256(signed_payload.encode("utf-8")).digest()
+        sig_bytes = self._signer.sign_bytes(payload_hash)
+        return base64.urlsafe_b64encode(sig_bytes).rstrip(b"=").decode()
 
-        # Binding input: challenge + agent_id + capability_id (deterministic order)
-        binding = f"{challenge}.{agent_id}.{capability_id}".encode("utf-8")
-        digest = hashlib.sha256(binding).digest()
-
-        # Sign the digest
-        sig_bytes = self._signer.sign_bytes(digest)
-        sig_b64 = base64.urlsafe_b64encode(sig_bytes).rstrip(b"=").decode()
-
-        return {
-            "challenge": challenge,
-            "agent_id": agent_id,
-            "capability_id": capability_id,
-            "signature": sig_b64,
-            "algorithm": "Ed25519",
+    def _post_with_acp_headers(
+        self,
+        url: str,
+        body: bytes,
+        token_json: str,
+        agent_id: str,
+        challenge: str,
+        pop_sig: str,
+    ) -> Dict[str, Any]:
+        """POST request with ACP authentication headers."""
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token_json}",
+            "X-ACP-Agent-ID": agent_id,
+            "X-ACP-Challenge": challenge,
+            "X-ACP-Signature": pop_sig,
         }
+        req = Request(url, data=body, headers=headers)
+        try:
+            with urlopen(req, timeout=self._timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except HTTPError as e:
+            body_bytes = e.read()
+            try:
+                err = json.loads(body_bytes)
+            except Exception:
+                err = {"error": body_bytes.decode("utf-8", errors="replace")}
+            raise ACPError(
+                f"HTTP {e.code}: {err.get('error', str(err))}", status_code=e.code
+            ) from e
+        except URLError as e:
+            raise ACPError(f"Connection failed: {e.reason}") from e

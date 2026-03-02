@@ -5,7 +5,7 @@ ACP signing pipeline:
   1. Canonicalize the capability object using JCS (RFC 8785)
   2. Compute SHA-256 of the canonical bytes
   3. Sign the digest with Ed25519
-  4. Embed the signature as base64url in the capability's "proof" field
+  4. Embed the signature as base64url in the capability's flat "sig" field (ACP-CT-1.0)
 
 Usage:
     from acp.identity import AgentIdentity
@@ -16,18 +16,17 @@ Usage:
 
     capability = {
         "ver": "1.0",
-        "jti": "unique-token-id",
         "iss": agent.did,
-        "sub": "acp:agent:...",
+        "sub": agent.agent_id,
         "iat": 1700000000,
         "exp": 1700003600,
         "nonce": "random-nonce",
-        "capabilities": ["acp:cap:financial.payment"],
-        "constraints": {}
+        "cap": ["acp:cap:financial.payment"],
+        "resource": "org.example/accounts/ACC-001",
     }
 
     signed = signer.sign_capability(capability)
-    # signed["proof"]["signature"] contains the base64url Ed25519 signature
+    # signed["sig"] contains the base64url Ed25519 signature (flat field)
 
     # Verify
     is_valid = ACPSigner.verify_capability(signed, agent.public_key_bytes)
@@ -103,16 +102,16 @@ class ACPSigner:
 
     def sign_capability(self, capability: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Sign a capability object and embed the signature in capability["proof"].
+        Sign a capability object and embed the signature in capability["sig"].
 
         The capability dict is NOT modified in-place. A copy is returned with
-        the "proof" field added/replaced.
+        the "sig" field added/replaced (flat field per ACP-CT-1.0).
 
         The signing input is the canonical JCS bytes of the capability WITHOUT
-        the "proof" field (so the proof is not included in what's signed).
+        the "sig" field (so the signature is not included in what's signed).
         """
-        # Strip existing proof before signing
-        cap_to_sign = {k: v for k, v in capability.items() if k != "proof"}
+        # Strip existing signature before signing
+        cap_to_sign = {k: v for k, v in capability.items() if k != "sig"}
 
         canonical = _jcs_canonicalize(cap_to_sign)
         digest = hashlib.sha256(canonical).digest()
@@ -120,11 +119,7 @@ class ACPSigner:
         signature_b64 = _base64url_encode(signature_bytes)
 
         signed = copy.deepcopy(capability)
-        signed["proof"] = {
-            "type": "Ed25519Signature2020",
-            "verificationMethod": self._identity.did,
-            "signature": signature_b64,
-        }
+        signed["sig"] = signature_b64
         return signed
 
     def sign_bytes(self, data: bytes) -> bytes:
@@ -142,18 +137,19 @@ class ACPSigner:
         Verify a signed capability against a 32-byte Ed25519 public key.
 
         Returns True if the signature is valid, False otherwise.
+        Expects the signature in the flat "sig" field (ACP-CT-1.0).
         """
-        proof = capability.get("proof")
-        if not proof or "signature" not in proof:
+        sig_b64 = capability.get("sig")
+        if not sig_b64:
             return False
 
-        # Reconstruct signing input (capability without "proof")
-        cap_to_verify = {k: v for k, v in capability.items() if k != "proof"}
+        # Reconstruct signing input (capability without "sig")
+        cap_to_verify = {k: v for k, v in capability.items() if k != "sig"}
 
         try:
             canonical = _jcs_canonicalize(cap_to_verify)
             digest = hashlib.sha256(canonical).digest()
-            signature_bytes = _base64url_decode(proof["signature"])
+            signature_bytes = _base64url_decode(sig_b64)
 
             pub_key = Ed25519PublicKey.from_public_bytes(public_key_bytes)
             pub_key.verify(signature_bytes, digest)

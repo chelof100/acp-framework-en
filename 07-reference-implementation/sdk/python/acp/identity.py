@@ -68,7 +68,7 @@ class AgentIdentity:
     Ed25519 Agent Identity (ACP-SIGN-1.0).
 
     Attributes:
-        agent_id: Canonical ACP agent identifier ("acp:agent:<base64url>")
+        agent_id: Canonical ACP agent identifier (base58(SHA-256(pk)) per ACP-CT-1.0 §3)
         did:      did:key representation of the public key
         public_key_bytes: 32-byte raw Ed25519 public key
     """
@@ -97,9 +97,9 @@ class AgentIdentity:
 
     @property
     def agent_id(self) -> str:
-        """ACP AgentID: sha-256 of raw public key, base64url-encoded."""
+        """ACP AgentID: base58(SHA-256(raw public key)) per ACP-CT-1.0 §3."""
         digest = hashlib.sha256(self._pubkey_raw).digest()
-        return f"acp:agent:{_base64url(digest)}"
+        return _base58_encode(digest)
 
     @property
     def did(self) -> str:
