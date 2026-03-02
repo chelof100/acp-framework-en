@@ -1,24 +1,4 @@
 {
-  "meta": {
-    "id": "TS-CORE-NEG-002",
-    "acp_version": "1.1",
-    "layer": "CORE",
-    "conformance_level": "L1",
-    "description": "Token missing required exp field — must be rejected as malformed",
-    "severity": "mandatory"
-  },
-  "input": {
-    "capability": {
-      "action_set": ["read"],
-      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
-      "jti": "cap-neg-002",
-      "nonce": "d6a1f5e4b2c07389d6a1f5e4b2c07389",
-      "resource": "doc:legal:contracts",
-      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
-      "sub": "did:example:agent-alice",
-      "ver": "1.1"
-    }
-  },
   "context": {
     "current_time": 1700000000,
     "payment_tokens": [],
@@ -31,5 +11,27 @@
   "expected": {
     "decision": "REJECT",
     "error_code": "MALFORMED_INPUT"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-neg-002",
+      "nonce": "d6a1f5e4b2c07389d6a1f5e4b2c07389",
+      "resource": "doc:legal:contracts",
+      "signature": "ec6f7vOQ73iSq_6VtqFm0x41Km9w8psp1Gvzs17PloqZ_nfNw7-4OVTSQhQjDkfbwlNpa22FFB2uYMVRmpW_AA",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    }
+  },
+  "meta": {
+    "acp_version": "1.1",
+    "conformance_level": "L1",
+    "description": "Token missing required exp field — must be rejected as malformed",
+    "id": "TS-CORE-NEG-002",
+    "layer": "CORE",
+    "severity": "mandatory"
   }
 }

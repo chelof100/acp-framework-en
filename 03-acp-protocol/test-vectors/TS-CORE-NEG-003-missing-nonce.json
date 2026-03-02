@@ -1,24 +1,4 @@
 {
-  "meta": {
-    "id": "TS-CORE-NEG-003",
-    "acp_version": "1.1",
-    "layer": "CORE",
-    "conformance_level": "L1",
-    "description": "Token missing required nonce field — must be rejected as malformed",
-    "severity": "mandatory"
-  },
-  "input": {
-    "capability": {
-      "action_set": ["write"],
-      "exp": 1893456000,
-      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
-      "jti": "cap-neg-003",
-      "resource": "db:prod:users",
-      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
-      "sub": "did:example:agent-bob",
-      "ver": "1.1"
-    }
-  },
   "context": {
     "current_time": 1700000000,
     "payment_tokens": [],
@@ -31,5 +11,27 @@
   "expected": {
     "decision": "REJECT",
     "error_code": "MALFORMED_INPUT"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "write"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-neg-003",
+      "resource": "db:prod:users",
+      "signature": "i16IYP3XWW1a5qmhp0x_-jjwg2mf8rtlrC-Q96STLNRn25YSbZnnOIpWB8zUQXTRXwgZvN30QYwv2GC4KrEPBg",
+      "sub": "did:example:agent-bob",
+      "ver": "1.1"
+    }
+  },
+  "meta": {
+    "acp_version": "1.1",
+    "conformance_level": "L1",
+    "description": "Token missing required nonce field — must be rejected as malformed",
+    "id": "TS-CORE-NEG-003",
+    "layer": "CORE",
+    "severity": "mandatory"
   }
 }

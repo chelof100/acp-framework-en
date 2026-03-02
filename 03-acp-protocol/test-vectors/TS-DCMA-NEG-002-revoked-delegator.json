@@ -1,41 +1,12 @@
 {
-  "meta": {
-    "id": "TS-DCMA-NEG-002",
-    "acp_version": "1.1",
-    "layer": "CORE",
-    "conformance_level": "L2",
-    "description": "Revoked delegator — Alice was revoked, Bob's derived delegation is transitively invalid",
-    "severity": "mandatory"
-  },
-  "input": {
-    "capability": {
-      "action_set": ["read"],
-      "delegation": {
-        "constraints": {
-          "action_set": ["read"],
-          "resource": "doc:finance:report-2024"
-        },
-        "delegatee": "did:example:agent-bob",
-        "delegator": "did:example:agent-alice",
-        "depth": 1,
-        "delegation_signature": "PLACEHOLDER:ed25519-sign(alice-key, canonical-json-of-delegation)",
-        "max_depth": 2
-      },
-      "exp": 1893456000,
-      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
-      "jti": "cap-dcma-neg-002",
-      "nonce": "3cg7f1e0d8b69245cg7f1e0d8b69245",
-      "resource": "doc:finance:report-2024",
-      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
-      "sub": "did:example:agent-bob",
-      "ver": "1.1"
-    }
-  },
   "context": {
     "current_time": 1700000000,
     "delegation_registry": {
       "did:example:agent-alice": {
-        "action_set": ["read", "write"],
+        "action_set": [
+          "read",
+          "write"
+        ],
         "resource": "doc:finance:report-2024",
         "revoked": true,
         "revoked_at": 1699998000
@@ -51,5 +22,41 @@
   "expected": {
     "decision": "REJECT",
     "error_code": "REVOKED"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "delegation": {
+        "constraints": {
+          "action_set": [
+            "read"
+          ],
+          "resource": "doc:finance:report-2024"
+        },
+        "delegatee": "did:example:agent-bob",
+        "delegation_signature": "PLACEHOLDER:ed25519-sign(alice-key, canonical-json-of-delegation)",
+        "delegator": "did:example:agent-alice",
+        "depth": 1,
+        "max_depth": 2
+      },
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-dcma-neg-002",
+      "nonce": "3cg7f1e0d8b69245cg7f1e0d8b69245",
+      "resource": "doc:finance:report-2024",
+      "signature": "14aH0sS60mZiI49YBUwuMANV0xJ1KAVWWHyn99j6-n_Xyl-m-YNmWYPRZQv80kYjrrG56ojcuvuKoWAxNfAeDg",
+      "sub": "did:example:agent-bob",
+      "ver": "1.1"
+    }
+  },
+  "meta": {
+    "acp_version": "1.1",
+    "conformance_level": "L2",
+    "description": "Revoked delegator — Alice was revoked, Bob's derived delegation is transitively invalid",
+    "id": "TS-DCMA-NEG-002",
+    "layer": "CORE",
+    "severity": "mandatory"
   }
 }

@@ -1,25 +1,4 @@
 {
-  "meta": {
-    "id": "TS-CORE-NEG-001",
-    "acp_version": "1.1",
-    "layer": "CORE",
-    "conformance_level": "L1",
-    "description": "Expired token — exp is strictly before current_time",
-    "severity": "mandatory"
-  },
-  "input": {
-    "capability": {
-      "action_set": ["read"],
-      "exp": 1699999999,
-      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
-      "jti": "cap-neg-001",
-      "nonce": "c5f0e4d3a1b96278c5f0e4d3a1b96278",
-      "resource": "doc:hr:salaries",
-      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
-      "sub": "did:example:agent-alice",
-      "ver": "1.1"
-    }
-  },
   "context": {
     "current_time": 1700000000,
     "payment_tokens": [],
@@ -32,5 +11,28 @@
   "expected": {
     "decision": "REJECT",
     "error_code": "EXPIRED"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1699999999,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-neg-001",
+      "nonce": "c5f0e4d3a1b96278c5f0e4d3a1b96278",
+      "resource": "doc:hr:salaries",
+      "signature": "kpT9wZ73caLRrQ22UW_tFWiiGdIwkNZB1J64zFf6b5sCkn2RGRf6wW6m7CKi12B6Losc6bLqPFirdZmOoS0lCQ",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    }
+  },
+  "meta": {
+    "acp_version": "1.1",
+    "conformance_level": "L1",
+    "description": "Expired token — exp is strictly before current_time",
+    "id": "TS-CORE-NEG-001",
+    "layer": "CORE",
+    "severity": "mandatory"
   }
 }

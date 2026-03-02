@@ -1,30 +1,11 @@
 {
-  "meta": {
-    "id": "TS-CORE-NEG-005",
-    "acp_version": "1.1",
-    "layer": "CORE",
-    "conformance_level": "L1",
-    "description": "Token with jti present in revocation_list — must be rejected even if otherwise valid",
-    "severity": "mandatory"
-  },
-  "input": {
-    "capability": {
-      "action_set": ["read"],
-      "exp": 1893456000,
-      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
-      "jti": "cap-neg-005",
-      "nonce": "f8c3b7a6d4e29501f8c3b7a6d4e29501",
-      "resource": "api:payments:transfer",
-      "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
-      "sub": "did:example:agent-alice",
-      "ver": "1.1"
-    }
-  },
   "context": {
     "current_time": 1700000000,
     "payment_tokens": [],
     "reputation_scores": {},
-    "revocation_list": ["cap-neg-005"],
+    "revocation_list": [
+      "cap-neg-005"
+    ],
     "trusted_issuers": [
       "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
     ]
@@ -32,5 +13,28 @@
   "expected": {
     "decision": "REJECT",
     "error_code": "REVOKED"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-neg-005",
+      "nonce": "f8c3b7a6d4e29501f8c3b7a6d4e29501",
+      "resource": "api:payments:transfer",
+      "signature": "R050QNz6vIOBrPwfVRK1LmmNmNlWBsZsX3LB-M-wt24sNc4R79SKPWU68i_waE7OQsn3FPBKnZ8RgT7sBdxzAg",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    }
+  },
+  "meta": {
+    "acp_version": "1.1",
+    "conformance_level": "L1",
+    "description": "Token with jti present in revocation_list — must be rejected even if otherwise valid",
+    "id": "TS-CORE-NEG-005",
+    "layer": "CORE",
+    "severity": "mandatory"
   }
 }
