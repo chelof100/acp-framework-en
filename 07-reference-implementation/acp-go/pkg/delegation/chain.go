@@ -29,7 +29,19 @@ var (
 // delegation chain. chain[0] is the root token, chain[n] is the leaf.
 type Chain []*tokens.CapabilityToken
 
+// NewChain creates a delegation chain from an ordered slice of tokens.
+// chain[0] must be the root (institutional) token; chain[n] is the leaf.
+func NewChain(toks []*tokens.CapabilityToken) Chain {
+	return Chain(toks)
+}
+
 // Validate verifies the full delegation chain from root to leaf.
+// Convenience method that calls the package-level Validate function.
+func (c Chain) Validate() error {
+	return Validate(c, nil)
+}
+
+// validate verifies the full delegation chain from root to leaf.
 // issuerKeys maps AgentID → Ed25519PublicKey for each issuer in the chain.
 // All constraints from ACP-CT-1.0 §7 are enforced.
 func Validate(chain Chain, issuerKeys map[string]ed25519.PublicKey) error {
@@ -81,8 +93,12 @@ func validateLink(parent, child *tokens.CapabilityToken) error {
 		return ErrExpirationExtension
 	}
 
-	// max_depth(T2) < max_depth(T1) — must decrement by exactly 1.
-	if child.Deleg.MaxDepth != parent.Deleg.MaxDepth-1 {
+	// max_depth(T2) < max_depth(T1) — parent must have remaining depth.
+	// When parent.MaxDepth == 0, no further delegation is permitted.
+	if parent.Deleg.MaxDepth <= 0 {
+		return ErrDepthViolation
+	}
+	if child.Deleg.MaxDepth >= parent.Deleg.MaxDepth {
 		return ErrDepthViolation
 	}
 

@@ -1,9 +1,6 @@
 package delegation_test
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -12,12 +9,11 @@ import (
 	"github.com/chelof100/acp-framework/acp-go/pkg/tokens"
 )
 
-// hashToken returns a base64url SHA-256 hash of the token JSON
-// for use as parent_hash in delegation chains.
+// hashToken returns the JCS-based SHA-256 hash of the token (without sig),
+// matching tokens.ComputeTokenHash — for use as parent_hash in delegation tests.
 func hashToken(tok *tokens.CapabilityToken) string {
-	b, _ := json.Marshal(tok)
-	h := sha256.Sum256(b)
-	return base64.RawURLEncoding.EncodeToString(h[:])
+	h, _ := tokens.ComputeTokenHash(tok)
+	return h
 }
 
 func makeToken(issuer *acpcrypto.AgentIdentity, subject string, caps []string, resource string, expOffset int64, delegAllowed bool, maxDepth int, parentHash *string) *tokens.CapabilityToken {

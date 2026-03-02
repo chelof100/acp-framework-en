@@ -87,16 +87,20 @@ func (s *ChallengeStore) ConsumeChallenge(challenge string) error {
 }
 
 // Prune removes all expired challenges from the store.
+// Returns the number of entries removed.
 // Should be called periodically (e.g., every minute) to prevent memory growth.
-func (s *ChallengeStore) Prune() {
+func (s *ChallengeStore) Prune() int {
 	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	removed := 0
 	for k, v := range s.challenges {
 		if now.After(v.expiresAt) {
 			delete(s.challenges, k)
+			removed++
 		}
 	}
+	return removed
 }
 
 // Size returns the current number of pending challenges (for monitoring).
