@@ -9,8 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Planned
-- Reference implementation (at minimum L1 compliance)
+### Added — Reference Implementation (IUT)
+- **`pkg/iut`** — Core IUT evaluation package: `Evaluate()` (L1/L2 compliance logic), `SignCapability()` (Ed25519 over SHA-256(JCS(cap))), `resolveDIDKey()` (did:key: → Ed25519 pubkey), `checkDelegation()` (DCMA-1.0 rules)
+- **`cmd/acp-evaluate`** — IUT binary conforming to ACP-IUT-PROTOCOL-1.0: reads TestVector from STDIN, writes Response to STDOUT; `--manifest` flag
+- **`cmd/acp-sign-vectors`** — Tool to replace PLACEHOLDER signatures in test vector files with real Ed25519 signatures using RFC 8037 test key A
+- **`pkg/iut/evaluator_test.go`** — `TestCompliance`: loads all 12 ACP-TS-1.1 test vectors, signs PLACEHOLDERs in-memory, asserts decision + error_code (12/12 PASS)
+- **`go.sum`** — Added dependency checksums (jcs v1.0.1, base58 v1.2.0)
+- **`03-acp-protocol/test-vectors/*.json`** — Fixed issuer DID in all test vectors: now uses `did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ` (RFC 8037 test key A, seed `9d61b19d…`)
 
 ---
 

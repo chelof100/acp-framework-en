@@ -22,7 +22,7 @@
         "max_depth": 2
       },
       "exp": 1893456000,
-      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
       "jti": "cap-dcma-neg-002",
       "nonce": "3cg7f1e0d8b69245cg7f1e0d8b69245",
       "resource": "doc:finance:report-2024",
@@ -45,7 +45,7 @@
     "reputation_scores": {},
     "revocation_list": [],
     "trusted_issuers": [
-      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
     ]
   },
   "expected": {

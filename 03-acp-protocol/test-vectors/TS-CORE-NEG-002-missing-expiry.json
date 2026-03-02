@@ -10,7 +10,7 @@
   "input": {
     "capability": {
       "action_set": ["read"],
-      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
       "jti": "cap-neg-002",
       "nonce": "d6a1f5e4b2c07389d6a1f5e4b2c07389",
       "resource": "doc:legal:contracts",
@@ -25,7 +25,7 @@
     "reputation_scores": {},
     "revocation_list": [],
     "trusted_issuers": [
-      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
     ]
   },
   "expected": {

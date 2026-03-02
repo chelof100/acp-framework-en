@@ -11,7 +11,7 @@
     "capability": {
       "action_set": ["read"],
       "exp": 1699999999,
-      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
       "jti": "cap-neg-001",
       "nonce": "c5f0e4d3a1b96278c5f0e4d3a1b96278",
       "resource": "doc:hr:salaries",
@@ -26,7 +26,7 @@
     "reputation_scores": {},
     "revocation_list": [],
     "trusted_issuers": [
-      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
     ]
   },
   "expected": {

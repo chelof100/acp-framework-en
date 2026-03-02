@@ -11,7 +11,7 @@
     "capability": {
       "action_set": ["read"],
       "exp": 1893456000,
-      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
       "jti": "cap-neg-005",
       "nonce": "f8c3b7a6d4e29501f8c3b7a6d4e29501",
       "resource": "api:payments:transfer",
@@ -26,7 +26,7 @@
     "reputation_scores": {},
     "revocation_list": ["cap-neg-005"],
     "trusted_issuers": [
-      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
     ]
   },
   "expected": {

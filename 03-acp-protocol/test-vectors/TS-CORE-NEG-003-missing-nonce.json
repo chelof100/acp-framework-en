@@ -11,7 +11,7 @@
     "capability": {
       "action_set": ["write"],
       "exp": 1893456000,
-      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
       "jti": "cap-neg-003",
       "resource": "db:prod:users",
       "signature": "PLACEHOLDER:ed25519-sign(test-key-A, canonical-json-of-this-capability)",
@@ -25,7 +25,7 @@
     "reputation_scores": {},
     "revocation_list": [],
     "trusted_issuers": [
-      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
     ]
   },
   "expected": {

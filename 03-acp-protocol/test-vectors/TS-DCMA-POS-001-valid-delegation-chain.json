@@ -22,7 +22,7 @@
         "max_depth": 2
       },
       "exp": 1893456000,
-      "issuer": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
       "jti": "cap-dcma-pos-001",
       "nonce": "1ae5d9c8b6f47023ae5d9c8b6f47023",
       "resource": "doc:finance:report-2024",
@@ -47,7 +47,7 @@
     },
     "revocation_list": [],
     "trusted_issuers": [
-      "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
     ]
   },
   "expected": {
