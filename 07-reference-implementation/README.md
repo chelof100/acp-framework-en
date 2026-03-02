@@ -8,15 +8,19 @@ This directory contains the official reference implementation of ACP v1.0.
 
 ```
 reference-impl/
-├── acp-go/              # Go — Institutional Validator (Reference Implementation)
+├── acp-go/              # Go — Institutional Validator + IUT (Reference Implementation)
 │   ├── pkg/
 │   │   ├── crypto/      # Ed25519 identity, AgentID derivation (ACP-SIGN-1.0)
 │   │   ├── tokens/      # Capability Token parsing & 9-step verification (ACP-CT-1.0)
 │   │   ├── handshake/   # Challenge/PoP server-side (ACP-HP-1.0)
 │   │   ├── delegation/  # Delegation chain validation (ACP-CT-1.0 §7)
-│   │   └── risk/        # Risk assessment engine (ACP-RISK-1.0)
+│   │   ├── risk/        # Risk assessment engine (ACP-RISK-1.0)
+│   │   └── iut/         # IUT evaluation core — L1/L2 compliance logic (ACP-IUT-PROTOCOL-1.0)
 │   ├── cmd/
-│   │   └── acp-server/  # HTTP server exposing ACP endpoints
+│   │   ├── acp-server/       # HTTP server exposing ACP endpoints
+│   │   ├── acp-evaluate/     # IUT binary — STDIN→evaluate→STDOUT (ACP-IUT-PROTOCOL-1.0)
+│   │   ├── acp-runner/       # Compliance runner — executes test suites (ACR-1.0)
+│   │   └── acp-sign-vectors/ # Tool to sign PLACEHOLDER signatures in test vectors
 │   └── go.mod
 │
 └── sdk/
@@ -95,6 +99,8 @@ curl -X POST http://localhost:8080/acp/v1/verify \
 | ACP-HP-1.0 | ✅ Full | Challenge/PoP handshake with channel binding |
 | ACP-CT-1.0 §7 | ✅ Full | Delegation chain validation |
 | ACP-RISK-1.0 | ✅ Reference | Deterministic risk scoring |
+| ACP-IUT-PROTOCOL-1.0 | ✅ Full | IUT binary (acp-evaluate) — 12/12 test vectors PASS |
+| ACR-1.0 | ✅ Full | Compliance runner (acp-runner) — L1–L5 certification |
 | ACP-REV-1.0 | 🔲 Interface | Revocation interface defined, implementation pending |
 
 ## Design Decisions
