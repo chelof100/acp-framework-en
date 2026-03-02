@@ -1,111 +1,159 @@
 """
-Example: AI Agent executing a payment using ACP.
-Demonstrates the full ACP-HP-1.0 flow for an autonomous agent.
+Example: AI Agent executing a payment using ACP (ACP-HP-1.0).
+
+Demonstrates the full verification flow:
+  1. Generate agent identity (Ed25519)
+  2. Issue + sign a capability token (in production: done by institutional issuer)
+  3. Connect to an ACP server and call client.verify()
 
 Requirements:
-    pip install acp-sdk
-    Environment: ACP_AGENT_SEED (32 bytes hex-encoded)
-"""
+    pip install acp-sdk           # or: pip install cryptography
+    Optional: set ACP_AGENT_SEED  # 32 bytes hex — for deterministic identity
+    Optional: set ACP_SERVER_URL  # default: http://localhost:8080
 
-import os
+Run:
+    python examples/agent_payment.py
+
+To test with the Go reference server:
+    cd acp-go && go build -o acp-server.exe ./cmd/acp-server
+    ./acp-server.exe &
+    python examples/agent_payment.py
+"""
+from __future__ import annotations
+
 import json
-import base64
+import os
 import secrets
 import time
 
-from acp import ACPIdentity, ACPClient, sign_token
+from acp.identity import AgentIdentity
+from acp.signer import ACPSigner
+from acp.client import ACPClient, ACPError
 
 
-def load_or_generate_identity() -> ACPIdentity:
-    """Load agent identity from env, or generate a new one."""
-    seed_hex = os.getenv("ACP_AGENT_SEED")
+def _load_identity() -> AgentIdentity:
+    """Load from ACP_AGENT_SEED env var, or generate a new ephemeral identity."""
+    seed_hex = os.getenv("ACP_AGENT_SEED", "")
     if seed_hex:
-        seed = bytes.fromhex(seed_hex)
-        return ACPIdentity.from_seed(seed)
-    else:
-        print("[WARNING] ACP_AGENT_SEED not set — generating ephemeral identity")
-        return ACPIdentity.generate()
+        return AgentIdentity.from_private_bytes(bytes.fromhex(seed_hex))
+    print("[INFO] ACP_AGENT_SEED not set — generating ephemeral identity")
+    return AgentIdentity.generate()
 
 
-def create_example_token(
-    issuer_identity: ACPIdentity,
-    agent_identity: ACPIdentity,
-) -> str:
-    """Create a signed capability token for demonstration.
+def _build_payment_token(
+    issuer: AgentIdentity,
+    subject: AgentIdentity,
+) -> dict:
+    """
+    Build and sign a financial.payment capability token.
 
-    In production, tokens are issued by the institutional issuer,
-    NOT by the agent itself. This is for local testing only.
+    NOTE: In production, the institutional issuer creates and signs tokens.
+          This local demo uses a freshly generated issuer for illustration.
     """
     now = int(time.time())
-    payload = {
+    nonce = secrets.token_urlsafe(16)
+
+    capability = {
         "ver": "1.0",
-        "iss": issuer_identity.agent_id,
-        "sub": agent_identity.agent_id,
-        "cap": ["acp:cap:financial.payment"],
-        "res": "org.banco-soberano/accounts/ACC-001",
+        "jti": secrets.token_urlsafe(16),
+        "iss": issuer.did,
+        "sub": subject.agent_id,
         "iat": now,
-        "exp": now + 3600,  # 1 hour
-        "nonce": base64.urlsafe_b64encode(secrets.token_bytes(16)).rstrip(b"=").decode(),
-        "deleg": {"allowed": False, "max_depth": 0},
-        "parent_hash": None,
-        "constraints": {"max_amount_usd": 10000},
-        "rev": {
-            "type": "endpoint",
-            "uri": "https://acp.banco-soberano.com/acp/v1/rev/check",
+        "exp": now + 3600,
+        "nonce": nonce,
+        "capabilities": ["acp:cap:financial.payment"],
+        "constraints": {
+            "max_amount_usd": 10000,
+            "allowed_accounts": ["ACC-001", "ACC-002"],
         },
     }
-    signed = sign_token(payload, issuer_identity)
-    return json.dumps(signed)
+
+    signer = ACPSigner(issuer)
+    return signer.sign_capability(capability)
 
 
 def main() -> None:
-    print("=== ACP Reference Implementation — Agent Payment Example ===\n")
+    print("=== ACP Python SDK — Agent Payment Example (ACP-HP-1.0) ===\n")
 
-    # 1. Load agent identity.
-    agent = load_or_generate_identity()
-    print(f"Agent AgentID : {agent.agent_id}")
-    print(f"Agent PubKey  : {agent.public_key_bytes.hex()[:16]}...\n")
+    # Step 1 — Agent identity
+    agent = _load_identity()
+    signer = ACPSigner(agent)
+    print(f"Agent ID  : {agent.agent_id}")
+    print(f"Agent DID : {agent.did}")
+    print(f"Pubkey    : {agent.public_key_bytes.hex()[:24]}...\n")
 
-    # 2. For this example, the issuer is a separate identity.
-    #    In production: the token is issued by the institution's system.
-    issuer = ACPIdentity.generate()
-    print(f"Issuer AgentID: {issuer.agent_id}\n")
+    # Step 2 — Issuer (separate identity; in production: institutional system)
+    issuer = AgentIdentity.generate()
+    print(f"Issuer DID: {issuer.did}\n")
 
-    # 3. Create a capability token (issuer signs it).
-    token_json = create_example_token(issuer, agent)
-    print("Capability Token (truncated):")
-    print(f"  {token_json[:80]}...\n")
+    # Step 3 — Signed capability token
+    token = _build_payment_token(issuer, agent)
+    print("Capability token (summary):")
+    print(f"  jti         : {token['jti']}")
+    print(f"  capabilities: {token['capabilities']}")
+    print(f"  exp         : {token['exp']} (now+1h)")
+    print(f"  signature   : {token['proof']['signature'][:32]}...\n")
 
-    # 4. Initialize ACP client.
-    #    Point to your ACP server (e.g., the Go reference implementation).
-    base_url = os.getenv("ACP_SERVER_URL", "http://localhost:8080")
-    client = ACPClient(agent, base_url=base_url)
+    # Step 4 — Verify signature locally (no server needed)
+    is_valid = ACPSigner.verify_capability(token, issuer.public_key_bytes)
+    print(f"Local signature valid : {is_valid}")
 
-    # 5. Execute the action — handshake happens automatically.
-    transfer_payload = {
-        "to_account": "ACC-999",
-        "amount": 500,
-        "currency": "USD",
-        "memo": "Invoice payment #2024-001",
-    }
+    # Step 5 — Connect to ACP server and run full PoP handshake
+    server_url = os.getenv("ACP_SERVER_URL", "http://localhost:8080")
+    client = ACPClient(
+        server_url=server_url,
+        identity=agent,
+        signer=signer,
+    )
 
-    print(f"Executing payment: {transfer_payload}")
-    print(f"Server: {base_url}\n")
-
+    print(f"\nConnecting to ACP server: {server_url}")
     try:
-        response = client.execute(
-            method="POST",
-            path="/api/v1/payments/transfer",
-            capability_token=token_json,
-            payload=transfer_payload,
+        health = client.health()
+        print(f"Server health: {health}\n")
+    except ACPError as e:
+        print(f"[Server not reachable — {e}]")
+        print("Continuing with local verification only.\n")
+        _show_offline_demo(agent, signer, token)
+        return
+
+    # Full ACP-HP-1.0 verification (challenge → PoP → verify)
+    print("Running full ACP-HP-1.0 verification flow...")
+    try:
+        result = client.verify(
+            capability_token=token,
+            requested_capability="acp:cap:financial.payment",
+            requested_resource="org.banco-soberano/accounts/ACC-001",
         )
-        print(f"Response status : {response.status_code}")
-        print(f"Response body   : {response.text[:200]}")
-    except Exception as e:
-        print(f"[Expected in demo without server] {type(e).__name__}: {e}")
-        print("\nTo test with the Go server:")
-        print("  cd acp-go && go run ./cmd/acp-server")
-        print("  ACP_SERVER_URL=http://localhost:8080 python examples/agent_payment.py")
+        print(f"Decision  : {result.get('decision')}")
+        print(f"Full response: {json.dumps(result, indent=2)}")
+    except ACPError as e:
+        print(f"ACP error (status={e.status_code}): {e}")
+
+
+def _show_offline_demo(
+    agent: AgentIdentity,
+    signer: ACPSigner,
+    token: dict,
+) -> None:
+    """Show what the PoP payload would look like without a live server."""
+    import base64
+    import hashlib
+
+    fake_challenge = base64.urlsafe_b64encode(b"demo-challenge-nonce").rstrip(b"=").decode()
+    capability_id = "acp:cap:financial.payment"
+    binding = f"{fake_challenge}.{agent.agent_id}.{capability_id}".encode()
+    digest = hashlib.sha256(binding).digest()
+    sig_bytes = signer.sign_bytes(digest)
+    sig_b64 = base64.urlsafe_b64encode(sig_bytes).rstrip(b"=").decode()
+
+    print("--- Offline PoP demo ---")
+    print(f"Challenge : {fake_challenge}")
+    print(f"Agent ID  : {agent.agent_id}")
+    print(f"Capability: {capability_id}")
+    print(f"PoP sig   : {sig_b64[:40]}...")
+    print("\nTo run the full flow, start the Go reference server:")
+    print("  cd acp-go && go build -o acp-server.exe ./cmd/acp-server && ./acp-server.exe")
+    print("  ACP_SERVER_URL=http://localhost:8080 python examples/agent_payment.py")
 
 
 if __name__ == "__main__":

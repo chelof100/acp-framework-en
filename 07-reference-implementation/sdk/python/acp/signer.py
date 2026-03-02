@@ -1,112 +1,167 @@
 """
-acp.signer — ACP token signing and JCS canonicalization.
-Implements ACP-SIGN-1.0: JCS (RFC 8785) → SHA-256 → Ed25519.
+acp.signer — JCS canonicalization + Ed25519 signing pipeline (ACP-SIGN-1.0)
 
-Used by the issuer to produce capability tokens.
+ACP signing pipeline:
+  1. Canonicalize the capability object using JCS (RFC 8785)
+  2. Compute SHA-256 of the canonical bytes
+  3. Sign the digest with Ed25519
+  4. Embed the signature as base64url in the capability's "proof" field
+
+Usage:
+    from acp.identity import AgentIdentity
+    from acp.signer import ACPSigner
+
+    agent = AgentIdentity.generate()
+    signer = ACPSigner(agent)
+
+    capability = {
+        "ver": "1.0",
+        "jti": "unique-token-id",
+        "iss": agent.did,
+        "sub": "acp:agent:...",
+        "iat": 1700000000,
+        "exp": 1700003600,
+        "nonce": "random-nonce",
+        "capabilities": ["acp:cap:financial.payment"],
+        "constraints": {}
+    }
+
+    signed = signer.sign_capability(capability)
+    # signed["proof"]["signature"] contains the base64url Ed25519 signature
+
+    # Verify
+    is_valid = ACPSigner.verify_capability(signed, agent.public_key_bytes)
 """
-
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-from .identity import ACPIdentity
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+from .identity import AgentIdentity
 
 
-def canonicalize(data: Dict[str, Any]) -> bytes:
-    """Serialize a dict to JCS canonical form (RFC 8785).
+def _base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
-    JCS rules:
-    - Keys sorted lexicographically by Unicode code point
-    - No insignificant whitespace
-    - UTF-8 encoding
-    - Numbers as per ECMAScript JSON.stringify
 
-    This is a pure-Python JCS implementation sufficient for ACP tokens.
-    For production, consider using `jcs` PyPI package.
+def _base64url_decode(s: str) -> bytes:
+    padding = "=" * (4 - len(s) % 4) if len(s) % 4 else ""
+    return base64.urlsafe_b64decode(s + padding)
+
+
+def _jcs_canonicalize(obj: Any) -> bytes:
     """
-    return json.dumps(
-        data,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    ).encode("utf-8")
+    JSON Canonicalization Scheme (RFC 8785).
 
-
-def sign_token(payload: Dict[str, Any], identity: ACPIdentity) -> Dict[str, Any]:
-    """Sign a capability token payload using ACP-SIGN-1.0.
-
-    1. Remove any existing 'sig' field.
-    2. Canonicalize with JCS (RFC 8785).
-    3. Compute SHA-256 of canonical bytes.
-    4. Sign with Ed25519.
-    5. Add 'sig' field as base64url without padding.
-
-    Args:
-        payload: Token dict WITHOUT 'sig' field.
-        identity: Issuer's cryptographic identity.
-
-    Returns:
-        Token dict WITH 'sig' field appended.
+    Produces deterministic UTF-8 bytes:
+    - Object keys sorted lexicographically
+    - No whitespace
+    - Unicode escapes for control characters
     """
-    # Ensure no stale signature.
-    payload_copy = {k: v for k, v in payload.items() if k != "sig"}
+    if obj is None:
+        return b"null"
+    if isinstance(obj, bool):
+        return b"true" if obj else b"false"
+    if isinstance(obj, int):
+        return str(obj).encode()
+    if isinstance(obj, float):
+        # Use JSON representation (no trailing zeros)
+        return json.dumps(obj, separators=(",", ":")).encode()
+    if isinstance(obj, str):
+        return json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode()
+    if isinstance(obj, (list, tuple)):
+        items = b",".join(_jcs_canonicalize(v) for v in obj)
+        return b"[" + items + b"]"
+    if isinstance(obj, dict):
+        # Sort keys lexicographically by their Unicode code points
+        sorted_pairs = sorted(obj.items(), key=lambda kv: kv[0])
+        items = b",".join(
+            _jcs_canonicalize(k) + b":" + _jcs_canonicalize(v)
+            for k, v in sorted_pairs
+        )
+        return b"{" + items + b"}"
+    raise TypeError(f"Not JSON-serializable: {type(obj)}")
 
-    # Canonicalize and hash.
-    canonical_bytes = canonicalize(payload_copy)
-    sig_bytes = identity.sign(canonical_bytes)
 
-    # Encode signature as base64url without padding.
-    sig_b64 = base64.urlsafe_b64encode(sig_bytes).rstrip(b"=").decode("utf-8")
-
-    # Return token with signature appended.
-    return {**payload_copy, "sig": sig_b64}
-
-
-def verify_token_signature(token: Dict[str, Any], issuer_pub_key_bytes: bytes) -> bool:
-    """Verify the Ed25519 signature of a token dict.
-
-    Args:
-        token: Full token dict including 'sig' field.
-        issuer_pub_key_bytes: 32-byte raw Ed25519 public key of the issuer.
-
-    Returns:
-        True if signature is valid, False otherwise.
+class ACPSigner:
     """
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-    from cryptography.exceptions import InvalidSignature
+    ACP signing and verification pipeline (ACP-SIGN-1.0).
 
-    sig_b64 = token.get("sig")
-    if not sig_b64:
-        return False
-
-    try:
-        sig_bytes = base64.urlsafe_b64decode(sig_b64 + "==")
-    except Exception:
-        return False
-
-    # Canonicalize without sig.
-    payload_copy = {k: v for k, v in token.items() if k != "sig"}
-    canonical_bytes = canonicalize(payload_copy)
-    payload_hash = hashlib.sha256(canonical_bytes).digest()
-
-    try:
-        pub_key = Ed25519PublicKey.from_public_bytes(issuer_pub_key_bytes)
-        pub_key.verify(sig_bytes, payload_hash)
-        return True
-    except (InvalidSignature, Exception):
-        return False
-
-
-def compute_token_hash(token: Dict[str, Any]) -> str:
-    """Compute SHA-256(JCS(token without sig)) for use in parent_hash.
-
-    Returns base64url-encoded hash (no padding), as specified in ACP-CT-1.0 §7.
+    Pipeline: JCS(capability) → SHA-256 → Ed25519.sign → base64url
     """
-    payload_copy = {k: v for k, v in token.items() if k != "sig"}
-    canonical_bytes = canonicalize(payload_copy)
-    hash_bytes = hashlib.sha256(canonical_bytes).digest()
-    return base64.urlsafe_b64encode(hash_bytes).rstrip(b"=").decode("utf-8")
+
+    def __init__(self, identity: AgentIdentity) -> None:
+        self._identity = identity
+
+    # ─── Signing ──────────────────────────────────────────────────────────────
+
+    def sign_capability(self, capability: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Sign a capability object and embed the signature in capability["proof"].
+
+        The capability dict is NOT modified in-place. A copy is returned with
+        the "proof" field added/replaced.
+
+        The signing input is the canonical JCS bytes of the capability WITHOUT
+        the "proof" field (so the proof is not included in what's signed).
+        """
+        # Strip existing proof before signing
+        cap_to_sign = {k: v for k, v in capability.items() if k != "proof"}
+
+        canonical = _jcs_canonicalize(cap_to_sign)
+        digest = hashlib.sha256(canonical).digest()
+        signature_bytes = self._identity.sign(digest)
+        signature_b64 = _base64url_encode(signature_bytes)
+
+        signed = copy.deepcopy(capability)
+        signed["proof"] = {
+            "type": "Ed25519Signature2020",
+            "verificationMethod": self._identity.did,
+            "signature": signature_b64,
+        }
+        return signed
+
+    def sign_bytes(self, data: bytes) -> bytes:
+        """Sign arbitrary bytes directly (for PoP challenges)."""
+        return self._identity.sign(data)
+
+    # ─── Verification ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def verify_capability(
+        capability: Dict[str, Any],
+        public_key_bytes: bytes,
+    ) -> bool:
+        """
+        Verify a signed capability against a 32-byte Ed25519 public key.
+
+        Returns True if the signature is valid, False otherwise.
+        """
+        proof = capability.get("proof")
+        if not proof or "signature" not in proof:
+            return False
+
+        # Reconstruct signing input (capability without "proof")
+        cap_to_verify = {k: v for k, v in capability.items() if k != "proof"}
+
+        try:
+            canonical = _jcs_canonicalize(cap_to_verify)
+            digest = hashlib.sha256(canonical).digest()
+            signature_bytes = _base64url_decode(proof["signature"])
+
+            pub_key = Ed25519PublicKey.from_public_bytes(public_key_bytes)
+            pub_key.verify(signature_bytes, digest)
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def canonicalize(obj: Any) -> bytes:
+        """Expose JCS canonicalization for external use."""
+        return _jcs_canonicalize(obj)
