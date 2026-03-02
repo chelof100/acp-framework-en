@@ -1,0 +1,8 @@
+# Go binaries
+*.exe
+07-reference-implementation/acp-go/acp-evaluate
+07-reference-implementation/acp-go/acp-runner
+07-reference-implementation/acp-go/acp-sign-vectors
+
+# Certification outputs
+ACP-CERT-*.json
