@@ -1,169 +1,261 @@
 /**
- * ACP HTTP Client — ACP-HP-1.0 Challenge/PoP Handshake.
+ * acp/client — HTTP ACP client with automatic PoP handshake (ACP-HP-1.0)
  *
- * Automatically handles the full handshake:
- *   1. Request ephemeral challenge nonce from server
- *   2. Generate Proof-of-Possession with HTTP channel binding
- *   3. Attach ACP security headers to the actual request
+ * The ACPClient handles the full ACP authorization flow:
+ *   1. POST /acp/v1/register → register agent's public key (once per agent)
+ *   2. GET  /acp/v1/challenge → receive one-time nonce
+ *   3. Sign PoP: Method|Path|Challenge|base64url(SHA-256(body)) → SHA-256 → Ed25519
+ *   4. POST /acp/v1/verify   → send token + PoP via HTTP headers, receive decision
  *
- * Compatible with LangChain.js, Vercel AI SDK, and plain Node.js.
+ * HTTP headers used by verify():
+ *   Authorization:   Bearer <capability_token_json>
+ *   X-ACP-Agent-ID:  <agent_id>
+ *   X-ACP-Challenge: <challenge>
+ *   X-ACP-Signature: <pop_signature>
+ *
+ * Zero runtime dependencies — uses only Node.js built-in `node:crypto` and `fetch` (Node 18+).
+ *
+ * @example
+ * ```typescript
+ * import { AgentIdentity, ACPSigner, ACPClient } from '@acp/sdk';
+ *
+ * const agent = AgentIdentity.generate();
+ * const signer = new ACPSigner(agent);
+ * const client = new ACPClient('http://localhost:8080', agent, signer);
+ *
+ * // Register agent with the server (once)
+ * await client.register();
+ *
+ * // Verify a capability token
+ * const result = await client.verify(signedToken);
+ * console.log(result); // { ok: true, agent_id: '...', capabilities: [...] }
+ * ```
  */
 
-import { createHash } from "crypto";
-import type { ACPClientOptions, ACPHeaders, ExecuteOptions } from "./types.js";
-import type { ACPIdentity } from "./identity.js";
+import { createHash } from 'node:crypto';
+import { AgentIdentity } from './identity';
+import { ACPSigner } from './signer';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── ACPError ─────────────────────────────────────────────────────────────────
 
-const CHALLENGE_PATH = "/acp/v1/challenge";
+/** Thrown when the ACP server returns an error or the request fails. */
+export class ACPError extends Error {
+  /** HTTP status code, if applicable. */
+  readonly statusCode?: number;
 
-// ─── Errors ───────────────────────────────────────────────────────────────────
-
-/** Thrown when the ACP challenge/PoP handshake fails. */
-export class ACPHandshakeError extends Error {
-  constructor(message: string) {
-    super(`ACPHandshakeError: ${message}`);
-    this.name = "ACPHandshakeError";
+  constructor(message: string, statusCode?: number) {
+    super(message);
+    this.name = 'ACPError';
+    this.statusCode = statusCode;
   }
 }
 
 // ─── ACPClient ────────────────────────────────────────────────────────────────
 
 /**
- * ACP HTTP client for autonomous AI agents.
+ * ACP HTTP client implementing the Challenge/PoP handshake (ACP-HP-1.0).
  *
- * Performs the full ACP-HP-1.0 handshake transparently on every request.
- *
- * @example
- * ```typescript
- * const identity = ACPIdentity.generate();
- * const client = new ACPClient(identity, { baseUrl: "https://api.institution.com" });
- *
- * const response = await client.execute({
- *   method: "POST",
- *   path: "/api/v1/payments/transfer",
- *   capabilityToken: tokenJson,
- *   payload: { to_account: "ACC-999", amount: 500, currency: "USD" },
- * });
- * ```
+ * The client is stateless between calls. Each verify() call performs a
+ * fresh challenge request to prevent replay attacks.
  */
 export class ACPClient {
-  private readonly identity: ACPIdentity;
-  private readonly baseUrl: string;
-  private readonly timeoutMs: number;
-
-  constructor(identity: ACPIdentity, options: ACPClientOptions) {
-    this.identity = identity;
-    this.baseUrl = options.baseUrl.replace(/\/$/, "");
-    this.timeoutMs = options.timeoutMs ?? 10_000;
-  }
-
-  // ── Public API ──────────────────────────────────────────────────────────────
+  private readonly _server: string;
+  private readonly _identity: AgentIdentity;
+  private readonly _signer: ACPSigner;
+  private readonly _timeoutMs: number;
 
   /**
-   * Execute an authenticated action using a Capability Token.
-   *
-   * Full ACP-HP-1.0 handshake is performed automatically:
-   *   challenge request → PoP signing → actual API call.
-   *
-   * @param options Execute options
-   * @returns Raw fetch Response
+   * @param serverUrl  Base URL of the ACP validator (e.g. "http://localhost:8080")
+   * @param identity   Agent identity (Ed25519 key pair)
+   * @param signer     ACPSigner instance for producing PoP signatures
+   * @param timeoutMs  HTTP timeout in milliseconds (default: 10000)
    */
-  async execute(options: ExecuteOptions): Promise<Response> {
-    const method = options.method.toUpperCase();
-    const path = options.path.startsWith("/") ? options.path : `/${options.path}`;
-    const { capabilityToken, payload } = options;
-
-    // 1. Request ephemeral challenge from server.
-    const challenge = await this.requestChallenge();
-
-    // 2. Serialize body deterministically.
-    const bodyBytes =
-      payload !== undefined
-        ? Buffer.from(JSON.stringify(payload), "utf-8")
-        : Buffer.alloc(0);
-
-    // 3. Generate Proof-of-Possession signature.
-    const popSig = this.buildPopSignature(method, path, challenge, bodyBytes);
-
-    // 4. Assemble ACP security headers.
-    const headers: ACPHeaders = {
-      "Content-Type":      "application/json",
-      "Authorization":     `Bearer ${capabilityToken}`,
-      "X-ACP-Challenge":   challenge,
-      "X-ACP-Signature":   popSig,
-      "X-ACP-Agent-ID":    this.identity.agentId,
-    };
-
-    // 5. Send request with timeout.
-    const url = `${this.baseUrl}${path}`;
-    const controller = new AbortController();
-    const timerId = setTimeout(() => controller.abort(), this.timeoutMs);
-
-    try {
-      return await fetch(url, {
-        method,
-        headers,
-        body: bodyBytes.length > 0 ? bodyBytes : undefined,
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timerId);
-    }
+  constructor(
+    serverUrl: string,
+    identity: AgentIdentity,
+    signer: ACPSigner,
+    timeoutMs = 10_000
+  ) {
+    this._server = serverUrl.replace(/\/$/, '');
+    this._identity = identity;
+    this._signer = signer;
+    this._timeoutMs = timeoutMs;
   }
 
-  // ── Internal ────────────────────────────────────────────────────────────────
+  // ─── Public API ─────────────────────────────────────────────────────────────
 
   /**
-   * Request a one-time 128-bit challenge nonce from the ACP server.
-   * GET /acp/v1/challenge → { "challenge": "<base64url>" }
+   * Register this agent's public key with the ACP server.
+   *
+   * POST /acp/v1/register
+   * Body: { "agent_id": "<agent_id>", "public_key_hex": "<base64url(pubkey)>" }
+   *
+   * Must be called once before verify(). In production, this endpoint is
+   * restricted to institutional administrators.
    */
-  private async requestChallenge(): Promise<string> {
-    const url = `${this.baseUrl}${CHALLENGE_PATH}`;
-    const controller = new AbortController();
-    const timerId = setTimeout(() => controller.abort(), this.timeoutMs);
-
-    let response: Response;
-    try {
-      response = await fetch(url, { method: "GET", signal: controller.signal });
-    } finally {
-      clearTimeout(timerId);
-    }
-
-    if (!response.ok) {
-      throw new ACPHandshakeError(
-        `challenge request failed: HTTP ${response.status} ${response.statusText}`
-      );
-    }
-
-    const data = (await response.json()) as { challenge?: string };
-    if (!data.challenge) {
-      throw new ACPHandshakeError("server response missing 'challenge' field");
-    }
-    return data.challenge;
+  async register(): Promise<Record<string, unknown>> {
+    const pubKeyB64 = this._identity.publicKeyBytes.toString('base64url');
+    return this._postJson('/acp/v1/register', {
+      agent_id: this._identity.agentId,
+      public_key_hex: pubKeyB64,
+    });
   }
 
   /**
-   * Build the Proof-of-Possession signature (ACP-HP-1.0 channel binding).
+   * Full ACP verification flow (ACP-HP-1.0):
+   *   1. GET /acp/v1/challenge  → one-time nonce
+   *   2. Compute PoP: Method|Path|Challenge|base64url(SHA-256(body))
+   *   3. POST /acp/v1/verify via HTTP headers (Authorization + X-ACP-*)
    *
-   * Signed payload (UTF-8):
-   *   Method + "|" + Path + "|" + Challenge + "|" + base64url(SHA-256(body))
-   *
-   * Signature:
-   *   Ed25519(sk_agent, SHA-256(signed_payload_bytes))
-   *
-   * @returns base64url-encoded (no padding) Ed25519 signature
+   * @param capabilityToken Signed capability token object (from ACPSigner)
+   * @returns { ok: true, agent_id: '...', capabilities: [...] }
    */
-  private buildPopSignature(
+  async verify(
+    capabilityToken: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    // Step 1: Get challenge
+    const challengeResp = await this._getJson('/acp/v1/challenge');
+    const challenge = challengeResp['challenge'] as string | undefined;
+    if (!challenge) {
+      throw new ACPError("server response missing 'challenge' field");
+    }
+
+    // Step 2: Serialize token (compact JSON) and compute PoP over empty body
+    const tokenJson = JSON.stringify(capabilityToken);
+    const body = Buffer.alloc(0);
+    const popSig = this._signPop('POST', '/acp/v1/verify', challenge, body);
+
+    // Step 3: POST with ACP headers
+    return this._postWithAcpHeaders(
+      '/acp/v1/verify',
+      body,
+      tokenJson,
+      this._identity.agentId,
+      challenge,
+      popSig
+    );
+  }
+
+  /**
+   * GET /acp/v1/health — check server availability.
+   */
+  async health(): Promise<Record<string, unknown>> {
+    return this._getJson('/acp/v1/health');
+  }
+
+  // ─── Internal ───────────────────────────────────────────────────────────────
+
+  /**
+   * Compute Proof-of-Possession signature (ACP-HP-1.0 channel binding).
+   *
+   * signed_payload = Method + "|" + Path + "|" + Challenge + "|" + base64url(SHA-256(body))
+   * sig = Ed25519(sk, SHA-256(signed_payload_bytes))
+   *
+   * Returns base64url-encoded signature (no padding).
+   */
+  private _signPop(
     method: string,
     path: string,
     challenge: string,
-    bodyBytes: Buffer
+    body: Buffer
   ): string {
-    const bodyHash = createHash("sha256").update(bodyBytes).digest();
-    const bodyHashB64 = bodyHash.toString("base64url");
+    const bodyHash = createHash('sha256').update(body).digest();
+    const bodyHashB64 = bodyHash.toString('base64url');
+    const signedPayload = `${method}|${path}|${challenge}|${bodyHashB64}`;
+    const payloadHash = createHash('sha256')
+      .update(Buffer.from(signedPayload, 'utf-8'))
+      .digest();
+    const sigBytes = this._signer.signBytes(payloadHash);
+    return sigBytes.toString('base64url');
+  }
 
-    const payload = `${method}|${path}|${challenge}|${bodyHashB64}`;
-    return this.identity.sign(Buffer.from(payload, "utf-8"));
+  private async _getJson(path: string): Promise<Record<string, unknown>> {
+    const url = `${this._server}${path}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    try {
+      const resp = await fetch(url, { method: 'GET', signal: controller.signal });
+      if (!resp.ok) {
+        throw new ACPError(`HTTP ${resp.status}`, resp.status);
+      }
+      return (await resp.json()) as Record<string, unknown>;
+    } catch (err) {
+      if (err instanceof ACPError) throw err;
+      throw new ACPError(`Connection failed: ${(err as Error).message}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async _postJson(
+    path: string,
+    body: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const url = `${this._server}${path}`;
+    const data = Buffer.from(JSON.stringify(body), 'utf-8');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: data,
+        signal: controller.signal,
+      });
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({ error: resp.statusText })) as Record<string, unknown>;
+        throw new ACPError(
+          `HTTP ${resp.status}: ${String(errBody['error'] ?? resp.statusText)}`,
+          resp.status
+        );
+      }
+      return (await resp.json()) as Record<string, unknown>;
+    } catch (err) {
+      if (err instanceof ACPError) throw err;
+      throw new ACPError(`Connection failed: ${(err as Error).message}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async _postWithAcpHeaders(
+    path: string,
+    body: Buffer,
+    tokenJson: string,
+    agentId: string,
+    challenge: string,
+    popSig: string
+  ): Promise<Record<string, unknown>> {
+    const url = `${this._server}${path}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${tokenJson}`,
+      'X-ACP-Agent-ID': agentId,
+      'X-ACP-Challenge': challenge,
+      'X-ACP-Signature': popSig,
+    };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: body.length > 0 ? body : undefined,
+        signal: controller.signal,
+      });
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({ error: resp.statusText })) as Record<string, unknown>;
+        throw new ACPError(
+          `HTTP ${resp.status}: ${String(errBody['error'] ?? resp.statusText)}`,
+          resp.status
+        );
+      }
+      return (await resp.json()) as Record<string, unknown>;
+    } catch (err) {
+      if (err instanceof ACPError) throw err;
+      throw new ACPError(`Connection failed: ${(err as Error).message}`);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }

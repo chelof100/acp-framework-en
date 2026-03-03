@@ -1,33 +1,33 @@
 /**
- * @acp/sdk — Agent Control Protocol TypeScript SDK v1.0
+ * @acp/sdk — Agent Capability Protocol TypeScript/Node.js SDK v1.0
  *
  * Implements: ACP-CT-1.0, ACP-SIGN-1.0, ACP-HP-1.0
  *
+ * Zero runtime dependencies — requires only Node.js 18+.
+ *
  * @example
  * ```typescript
- * import { ACPIdentity, ACPClient, signToken } from "@acp/sdk";
+ * import { AgentIdentity, ACPSigner, ACPClient } from '@acp/sdk';
  *
- * const identity = ACPIdentity.generate();
- * const client = new ACPClient(identity, { baseUrl: "https://api.institution.com" });
+ * const agent = AgentIdentity.generate();
+ * const signer = new ACPSigner(agent);
+ * const client = new ACPClient('http://localhost:8080', agent, signer);
  *
- * const response = await client.execute({
- *   method: "POST",
- *   path: "/api/v1/payments/transfer",
- *   capabilityToken: tokenJson,
- *   payload: { amount: 500, currency: "USD", to_account: "ACC-999" },
- * });
+ * // Register once
+ * await client.register();
+ *
+ * // Verify a capability token
+ * const result = await client.verify(signedToken);
+ * // { ok: true, agent_id: '...', capabilities: [...] }
  * ```
  */
 
-export { ACPIdentity, deriveAgentId, validateAgentId } from "./identity.js";
-export {
-  signToken,
-  verifyTokenSignature,
-  computeTokenHash,
-  canonicalizePayload,
-} from "./signer.js";
-export { ACPClient, ACPHandshakeError } from "./client.js";
+// ─── Core exports ─────────────────────────────────────────────────────────────
+export { AgentIdentity, deriveAgentId } from './identity';
+export { ACPSigner, jcsCanonicalize } from './signer';
+export { ACPClient, ACPError } from './client';
 
+// ─── Type exports ─────────────────────────────────────────────────────────────
 export type {
   CapabilityToken,
   SignedCapabilityToken,
@@ -37,6 +37,7 @@ export type {
   ACPClientOptions,
   ExecuteOptions,
   ACPErrorCode,
-} from "./types.js";
+} from './types';
 
-export const VERSION = "1.0.0";
+// ─── Version ──────────────────────────────────────────────────────────────────
+export const VERSION = '1.0.0';

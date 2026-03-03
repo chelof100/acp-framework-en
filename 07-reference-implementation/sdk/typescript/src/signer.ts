@@ -1,127 +1,169 @@
 /**
- * ACP Signer — Token signing and signature verification.
+ * acp/signer — JCS canonicalization + Ed25519 signing pipeline (ACP-SIGN-1.0)
  *
- * Implements ACP-SIGN-1.0:
- *   sig = Ed25519(sk, SHA-256(JCS(payload_without_sig)))
+ * ACP signing pipeline:
+ *   1. Canonicalize the capability object using JCS (RFC 8785)
+ *   2. Compute SHA-256 of the canonical bytes
+ *   3. Sign the digest with Ed25519
+ *   4. Embed the signature as base64url in the capability's flat "sig" field (ACP-CT-1.0)
  *
- * JCS = JSON Canonicalization Scheme (RFC 8785)
- * Library: "canonicalize" — compliant RFC 8785 implementation.
+ * Zero runtime dependencies — uses only Node.js built-in `node:crypto`.
+ *
+ * @example
+ * ```typescript
+ * import { AgentIdentity, ACPSigner } from '@acp/sdk';
+ *
+ * const agent = AgentIdentity.generate();
+ * const signer = new ACPSigner(agent);
+ *
+ * const capability = {
+ *   ver: '1.0', iss: agent.did, sub: agent.agentId,
+ *   iat: 1700000000, exp: 1700003600,
+ *   nonce: 'random-nonce',
+ *   cap: ['acp:cap:financial.payment'],
+ *   res: 'org.example/accounts/ACC-001',
+ * };
+ *
+ * const signed = signer.signCapability(capability);
+ * // signed['sig'] contains the base64url Ed25519 signature
+ *
+ * const isValid = ACPSigner.verifyCapability(signed, agent.publicKeyBytes);
+ * ```
  */
 
-import * as ed from "@noble/ed25519";
-import canonicalize from "canonicalize";
-import { createHash } from "crypto";
+import { createHash, createPublicKey, verify as cryptoVerify } from 'node:crypto';
+import { AgentIdentity } from './identity';
 
-import type { CapabilityToken, SignedCapabilityToken } from "./types.js";
-import { ACPIdentity } from "./identity.js";
-
-// ─── JCS Canonicalization ─────────────────────────────────────────────────────
+// ─── JCS Canonicalization (RFC 8785) ─────────────────────────────────────────
 
 /**
- * Produce the JCS (RFC 8785) canonical byte representation of a payload.
- * Returns UTF-8 encoded bytes suitable for hashing.
+ * Recursively produce the JCS (RFC 8785) canonical string of a JSON value.
+ *
+ * Rules:
+ *   - Object keys sorted lexicographically by Unicode code point
+ *   - No whitespace between tokens
+ *   - Strings encoded via JSON.stringify (proper escape sequences)
+ *   - Numbers encoded via JSON.stringify (IEEE 754 representation)
  */
-export function canonicalizePayload(payload: unknown): Uint8Array {
-  const canonical = canonicalize(payload);
-  if (canonical === undefined) {
-    throw new Error("acp/signer: canonicalize() returned undefined for payload");
+function _jcsStr(obj: unknown): string {
+  if (obj === null) return 'null';
+  if (typeof obj === 'boolean') return obj ? 'true' : 'false';
+  if (typeof obj === 'number') return JSON.stringify(obj);
+  if (typeof obj === 'string') return JSON.stringify(obj);
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(_jcsStr).join(',') + ']';
   }
-  return Buffer.from(canonical, "utf-8");
+  if (typeof obj === 'object') {
+    const sorted = Object.entries(obj as Record<string, unknown>).sort(
+      ([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)
+    );
+    return (
+      '{' +
+      sorted.map(([k, v]) => `${JSON.stringify(k)}:${_jcsStr(v)}`).join(',') +
+      '}'
+    );
+  }
+  throw new TypeError(`jcsCanonicalize: not JSON-serializable: ${typeof obj}`);
 }
 
-// ─── Token Signing ────────────────────────────────────────────────────────────
-
 /**
- * Sign a Capability Token using ACP-SIGN-1.0.
- *
- * Steps:
- *   1. Remove any existing "sig" field from the payload
- *   2. JCS-canonicalize (RFC 8785) the remaining fields
- *   3. SHA-256 hash the canonical bytes
- *   4. Ed25519-sign the hash
- *   5. Encode signature as base64url (no padding)
- *   6. Return token with "sig" populated
- *
- * @param payload Token payload — the "sig" field will be ignored/stripped
- * @param identity Issuer's ACPIdentity
- * @returns SignedCapabilityToken with populated "sig" field
+ * JCS-canonicalize an object to UTF-8 bytes (RFC 8785).
+ * Exported for use by tests and external callers.
  */
-export function signToken(
-  payload: Omit<CapabilityToken, "sig">,
-  identity: ACPIdentity
-): SignedCapabilityToken {
-  // Strip sig if present.
-  const { sig: _sig, ...withoutSig } = payload as CapabilityToken;
-
-  // JCS-canonicalize.
-  const canonicalBytes = canonicalizePayload(withoutSig);
-
-  // Sign.
-  const sigB64 = identity.sign(canonicalBytes);
-
-  return { ...withoutSig, sig: sigB64 } as SignedCapabilityToken;
+export function jcsCanonicalize(obj: unknown): Buffer {
+  return Buffer.from(_jcsStr(obj), 'utf-8');
 }
 
-// ─── Signature Verification ───────────────────────────────────────────────────
+// ─── SPKI header (for verifyCapability) ──────────────────────────────────────
+
+// Ed25519 SPKI DER prefix (12 bytes): 302a300506032b6570032100
+const SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+
+// ─── ACPSigner ────────────────────────────────────────────────────────────────
 
 /**
- * Verify the Ed25519 signature on a Capability Token.
+ * ACP signing and verification pipeline (ACP-SIGN-1.0).
  *
- * @param token A SignedCapabilityToken (must have non-empty "sig" field)
- * @param issuerPublicKey 32-byte Ed25519 public key of the issuer
- * @returns true if signature is valid
- * @throws Error with code CT-006 if signature is invalid or missing
+ * Pipeline: JCS(capability) → SHA-256 → Ed25519.sign → base64url
  */
-export function verifyTokenSignature(
-  token: SignedCapabilityToken,
-  issuerPublicKey: Uint8Array
-): boolean {
-  const { sig, ...withoutSig } = token;
+export class ACPSigner {
+  private readonly _identity: AgentIdentity;
 
-  if (!sig) {
-    throw new Error("CT-006: missing signature field (sig)");
+  constructor(identity: AgentIdentity) {
+    this._identity = identity;
   }
 
-  // Reconstruct canonical bytes (same as signing).
-  const canonicalBytes = canonicalizePayload(withoutSig);
-  const digest = createHash("sha256").update(canonicalBytes).digest();
+  // ─── Signing ────────────────────────────────────────────────────────────────
 
-  // Decode signature.
-  let sigBytes: Buffer;
-  try {
-    sigBytes = Buffer.from(sig, "base64url");
-  } catch {
-    throw new Error("CT-006: invalid signature encoding (expected base64url)");
+  /**
+   * Sign a capability object and embed the signature in capability["sig"].
+   *
+   * The input dict is NOT modified. A new object is returned with the "sig"
+   * field added/replaced (flat field per ACP-CT-1.0).
+   *
+   * The signing input is JCS(capability WITHOUT "sig").
+   */
+  signCapability(capability: Record<string, unknown>): Record<string, unknown> {
+    // Strip existing "sig" before signing
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { sig: _sig, ...capToSign } = capability;
+
+    // JCS canonicalize → SHA-256 → Ed25519.sign
+    const canonical = jcsCanonicalize(capToSign);
+    const digest = createHash('sha256').update(canonical).digest();
+    const sigBytes = this._identity.sign(digest);
+    const sigB64 = sigBytes.toString('base64url');
+
+    return { ...capability, sig: sigB64 };
   }
 
-  if (sigBytes.length !== 64) {
-    throw new Error(`CT-006: signature must be 64 bytes, got ${sigBytes.length}`);
+  /**
+   * Sign arbitrary bytes directly (for PoP challenges).
+   * Returns raw 64-byte Ed25519 signature.
+   */
+  signBytes(data: Buffer): Buffer {
+    return this._identity.sign(data);
   }
 
-  // Verify with noble/ed25519.
-  const valid = ed.verifySync(
-    new Uint8Array(sigBytes),
-    new Uint8Array(digest),
-    issuerPublicKey
-  );
+  // ─── Verification ───────────────────────────────────────────────────────────
 
-  if (!valid) {
-    throw new Error("CT-006: Ed25519 signature verification failed");
+  /**
+   * Verify a signed capability against a 32-byte Ed25519 public key.
+   *
+   * Returns true if the signature is valid, false otherwise.
+   * Expects the signature in the flat "sig" field (ACP-CT-1.0).
+   */
+  static verifyCapability(
+    capability: Record<string, unknown>,
+    publicKeyBytes: Buffer
+  ): boolean {
+    const sig = capability['sig'];
+    if (!sig || typeof sig !== 'string') return false;
+
+    // Reconstruct signing input (capability without "sig")
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { sig: _sig, ...capToVerify } = capability;
+
+    try {
+      const canonical = jcsCanonicalize(capToVerify);
+      const digest = createHash('sha256').update(canonical).digest();
+
+      // Decode base64url signature
+      const sigBytes = Buffer.from(sig, 'base64url');
+      if (sigBytes.length !== 64) return false;
+
+      // Reconstruct public key from raw bytes
+      const spkiDer = Buffer.concat([SPKI_PREFIX, publicKeyBytes]);
+      const pubKey = createPublicKey({ key: spkiDer, format: 'der', type: 'spki' });
+
+      return cryptoVerify(null, digest, pubKey, sigBytes);
+    } catch {
+      return false;
+    }
   }
-  return true;
-}
 
-// ─── Token Hash ───────────────────────────────────────────────────────────────
-
-/**
- * Compute SHA-256 hash of a signed token JSON string.
- * Used for delegation chain linking (parent_hash field).
- *
- * @param tokenJson Raw JSON string of the signed token
- * @returns base64url-encoded (no padding) SHA-256 hash
- */
-export function computeTokenHash(tokenJson: string): string {
-  return createHash("sha256")
-    .update(Buffer.from(tokenJson, "utf-8"))
-    .digest("base64url");
+  /** Expose JCS canonicalization for external use. */
+  static canonicalize(obj: unknown): Buffer {
+    return jcsCanonicalize(obj);
+  }
 }
