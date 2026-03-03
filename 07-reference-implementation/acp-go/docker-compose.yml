@@ -17,6 +17,12 @@
 #
 # For the RFC 8037 test key A (seed 9d61b19d...):
 #   ACP_INSTITUTION_PUBLIC_KEY=cA4s58S2dEJ-qye6EpJaJKKaVfvPT8mAQf97Vo8TInk
+#
+# Endpoints:
+#   GET  http://localhost:${ACP_PORT:-8080}/acp/v1/challenge   — issue challenge nonce
+#   POST http://localhost:${ACP_PORT:-8080}/acp/v1/verify       — verify CT + PoP
+#   POST http://localhost:${ACP_PORT:-8080}/acp/v1/register     — register agent pubkey
+#   GET  http://localhost:${ACP_PORT:-8080}/acp/v1/health       — health check
 
 services:
   acp-server:
@@ -24,16 +30,32 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: acp-server
     ports:
       - "${ACP_PORT:-8080}:8080"
     environment:
-      ACP_INSTITUTION_PUBLIC_KEY: "${ACP_INSTITUTION_PUBLIC_KEY}"
+      ACP_INSTITUTION_PUBLIC_KEY: "${ACP_INSTITUTION_PUBLIC_KEY:?ACP_INSTITUTION_PUBLIC_KEY is required}"
       ACP_ADDR: ":8080"
       ACP_LOG_LEVEL: "${ACP_LOG_LEVEL:-info}"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/acp/v1/health || exit 1"]
+      # distroless has no shell — invoke the binary directly
+      test: ["/acp-server", "-health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 5s
+    labels:
+      - "acp.version=1.0.0"
+      - "acp.spec=ACP-CT-1.0,ACP-HP-1.0,ACP-SIGN-1.0"
+
+  # ── Optional: Prometheus metrics scraping ──────────────────────────────────
+  # Uncomment if you add /metrics endpoint.
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   ports:
+  #     - "9090:9090"
+  #   depends_on:
+  #     - acp-server
