@@ -248,6 +248,68 @@ Academic and technical documentation for external audiences.
 
 ---
 
+## Get Started (5 minutes)
+
+```bash
+# 1. Start the ACP server (Go reference implementation)
+cd 07-reference-implementation
+export ACP_INSTITUTION_PUBLIC_KEY=cA4s58S2dEJ-qye6ggvPbw-uvmjgn-hWQpIRTkHcakE  # RFC 8037 test key
+docker compose up -d
+
+# 2. Verify the server is running
+curl http://localhost:8080/acp/v1/health
+# {"status":"ok","version":"1.0.0"}
+```
+
+**Python SDK** (Node/AI agent side):
+```python
+from acp import AgentIdentity, ACPSigner, ACPClient
+
+# Generate agent identity
+agent = AgentIdentity.generate()
+signer = ACPSigner(agent)
+client = ACPClient("http://localhost:8080", agent, signer)
+
+# Register with the institution
+client.register()
+
+# Build and sign a capability token
+token = {
+    "ver": "1.0", "iss": "did:key:z<institution-key>",
+    "sub": agent.agent_id, "cap": "acp:cap:financial.read",
+    "resource": "account:12345", "iat": 1700000000, "exp": 1700003600, "nonce": "abc123"
+}
+signed = signer.sign_capability(token)
+
+# Verify with the institution (full Challenge/PoP handshake)
+result = client.verify(signed)
+print(result)  # {"decision": "PERMIT", ...}
+```
+
+**TypeScript SDK** (Node.js):
+```typescript
+import { AgentIdentity, ACPSigner, ACPClient } from '@acp/sdk';
+
+const agent = AgentIdentity.generate();
+const signer = new ACPSigner(agent);
+const client = new ACPClient('http://localhost:8080', agent, signer);
+
+await client.register();
+
+const token = {
+  ver: '1.0', iss: 'did:key:z<institution-key>',
+  sub: agent.agentId, cap: 'acp:cap:financial.read',
+  resource: 'account:12345', iat: 1700000000, exp: 1700003600, nonce: 'abc123'
+};
+const signed = signer.signCapability(token);
+const result = await client.verify(signed);
+console.log(result); // { decision: 'PERMIT', ... }
+```
+
+→ Full documentation: [`QUICKSTART.md`](QUICKSTART.md) | [`07-reference-implementation/`](07-reference-implementation/)
+
+---
+
 ## Roadmap
 
 | Version | Status | Milestone |
@@ -256,14 +318,9 @@ Academic and technical documentation for external audiences.
 | **v1.1** | ✅ Complete | PAY-1.0, REP-1.1, ITA-1.1 BFT + Architecture Spec |
 | **v1.2** | ✅ Complete | CONF-1.1 (5 levels), complete compliance chain, 12 test vectors |
 | **v1.3** | ✅ Complete | IUT binary (acp-evaluate, 12/12 PASS), compliance runner (ACR-1.0), Python SDK |
+| **v1.4** | 🔄 In progress | SDK completeness — TypeScript (68 tests), Rust, Docker CI/CD |
 | **v2.0** | 📋 Specified | Full ACP-D (BFT, ZK-proofs, DIDs) |
 | **Paper** | ✍️ In preparation | Target IEEE S&P / NDSS |
-
----
-
-## Quick Start
-
-→ [`QUICKSTART.md`](QUICKSTART.md) — 15 minutes to understand the complete framework
 
 ---
 

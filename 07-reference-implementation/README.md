@@ -24,14 +24,25 @@ reference-impl/
 │   └── go.mod
 │
 └── sdk/
-    └── python/          # Python — Agent SDK (for AI agents)
-        ├── acp/
-        │   ├── identity.py   # Ed25519 identity, AgentID
-        │   ├── signer.py     # JCS canonicalization, token signing/verification
-        │   └── client.py     # HTTP client with automatic PoP handshake
-        ├── examples/
-        │   └── agent_payment.py
-        └── pyproject.toml
+    ├── python/          # Python — Agent SDK (for AI agents)
+    │   ├── acp/
+    │   │   ├── identity.py   # Ed25519 identity, AgentID
+    │   │   ├── signer.py     # JCS canonicalization, token signing/verification
+    │   │   └── client.py     # HTTP client with automatic PoP handshake
+    │   ├── examples/
+    │   │   └── agent_payment.py
+    │   └── pyproject.toml
+    └── typescript/      # TypeScript/Node.js — Agent SDK (zero runtime deps)
+        ├── src/
+        │   ├── identity.ts   # Ed25519 identity via node:crypto, AgentID, DID
+        │   ├── signer.ts     # JCS canonicalize (RFC 8785), sign/verify
+        │   └── client.ts     # HTTP client with automatic PoP handshake
+        ├── tests/
+        │   ├── identity.test.ts
+        │   ├── signer.test.ts
+        │   └── client.test.ts
+        ├── package.json
+        └── tsconfig.json
 ```
 
 ## Quick Start
@@ -63,10 +74,37 @@ pip install -e ".[dev]"
 ACP_SERVER_URL=http://localhost:8080 python examples/agent_payment.py
 ```
 
+### TypeScript SDK
+
+```bash
+cd sdk/typescript
+
+# Install (no runtime dependencies — Node.js 18+ only)
+npm install
+
+# Run tests
+npm test
+# 68 tests passed
+
+# Use in your project
+```
+```typescript
+import { AgentIdentity, ACPSigner, ACPClient } from './src';
+
+const agent = AgentIdentity.generate();
+const signer = new ACPSigner(agent);
+const client = new ACPClient('http://localhost:8080', agent, signer);
+
+await client.register();
+const health = await client.health();
+console.log(health); // { status: 'ok', version: '1.0.0' }
+```
+
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `POST` | `/acp/v1/register`  | Register agent public key |
 | `GET`  | `/acp/v1/challenge` | Issue one-time 128-bit nonce |
 | `POST` | `/acp/v1/verify`    | Verify CT + PoP, return authorization decision |
 | `GET`  | `/acp/v1/health`    | Health check |

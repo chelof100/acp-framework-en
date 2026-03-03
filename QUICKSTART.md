@@ -43,6 +43,69 @@ Execute(request) ⟹ ValidIdentity ∧ ValidCapability ∧ ValidDelegationChain 
 4. [`03-acp-protocol/compliance/ACR-1.0.md`](03-acp-protocol/compliance/ACR-1.0.md) — Run the compliance runner
 5. [`03-acp-protocol/test-vectors/`](03-acp-protocol/test-vectors/) — 12 normative vectors ready to use
 
+### Path E — I want to run the reference implementation
+
+**Prerequisites:** Docker, Git, Go 1.21+ (or Docker only)
+
+**Step 1 — Clone and start the server**
+```bash
+git clone https://github.com/chelof100/acp-framework-en
+cd acp-framework-en/07-reference-implementation
+
+# Start the Go server (uses RFC 8037 test key for development)
+export ACP_INSTITUTION_PUBLIC_KEY=cA4s58S2dEJ-qye6ggvPbw-uvmjgn-hWQpIRTkHcakE
+docker compose up -d
+
+# Verify
+curl http://localhost:8080/acp/v1/health
+# {"status":"ok","version":"1.0.0"}
+```
+
+**Step 2 — Choose your SDK**
+
+*Python:*
+```bash
+cd sdk/python
+pip install -e ".[dev]"
+ACP_SERVER_URL=http://localhost:8080 python examples/agent_payment.py
+```
+
+*TypeScript (Node.js 18+):*
+```bash
+cd sdk/typescript
+npm install
+```
+```typescript
+import { AgentIdentity, ACPSigner, ACPClient } from './src';
+
+const agent = AgentIdentity.generate();
+const signer = new ACPSigner(agent);
+const client = new ACPClient('http://localhost:8080', agent, signer);
+
+// Register agent with institution
+await client.register();
+console.log('Agent ID:', agent.agentId);
+console.log('DID:', agent.did);
+
+// Health check
+const health = await client.health();
+console.log('Server:', health);
+```
+
+**Step 3 — Run the compliance suite**
+```bash
+cd 07-reference-implementation/acp-go
+
+# Run IUT against all 12 ACP-TS-1.1 test vectors
+go test ./pkg/iut/... -v
+# 12/12 PASS → CONFORMANT L1+L2
+
+# Or run the full compliance runner
+go run ./cmd/acp-runner --impl ./acp-evaluate.exe --suite ../../../03-acp-protocol/test-vectors
+```
+
+→ Full reference docs: [`07-reference-implementation/README.md`](07-reference-implementation/README.md)
+
 ### Path D — I want to contribute to the framework
 
 1. [`CONTRIBUTING.md`](CONTRIBUTING.md) — RFC process for normative changes
