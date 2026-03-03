@@ -1,0 +1,27 @@
+[package]
+name = "acp-sdk"
+version = "1.0.0"
+edition = "2021"
+description = "ACP (Agent Control Protocol) SDK for Rust — Agent identity, capability signing, and HTTP client"
+license = "Apache-2.0"
+repository = "https://github.com/chelof100/acp-framework-en"
+keywords = ["acp", "agent", "capability", "ed25519", "protocol"]
+
+[dependencies]
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+sha2 = "0.10"
+bs58 = "0.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+rand = "0.8"
+thiserror = "1"
+hex = "0.4"
+ureq = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+mockito = "1"
+
+[features]
+default = []
