@@ -1,0 +1,16 @@
+# Windows/Darwin binaries
+*.exe
+*.dll
+*.dylib
+
+# Build artifacts
+acp-server
+acp-evaluate
+acp-runner
+acp-sign-vectors
+
+# Certification outputs
+ACP-CERT-*.json
+
+# Go test cache
+**/*_test.go

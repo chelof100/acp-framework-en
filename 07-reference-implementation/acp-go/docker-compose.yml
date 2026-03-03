@@ -1,0 +1,39 @@
+# ACP Reference Server — docker-compose for local development
+#
+# Usage:
+#   1. Copy .env.example to .env and fill ACP_INSTITUTION_PUBLIC_KEY
+#   2. docker compose up
+#
+# The institution public key is the base64url-encoded Ed25519 public key
+# of the institution that issues capability tokens.
+#
+# To generate a test key with the Python SDK:
+#   PYTHONPATH=../sdk/python python -c "
+#   from acp.identity import AgentIdentity
+#   import base64
+#   a = AgentIdentity.generate()
+#   print(base64.urlsafe_b64encode(a.public_key_bytes).rstrip(b'=').decode())
+#   "
+#
+# For the RFC 8037 test key A (seed 9d61b19d...):
+#   ACP_INSTITUTION_PUBLIC_KEY=cA4s58S2dEJ-qye6EpJaJKKaVfvPT8mAQf97Vo8TInk
+
+services:
+  acp-server:
+    image: ghcr.io/chelof100/acp-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${ACP_PORT:-8080}:8080"
+    environment:
+      ACP_INSTITUTION_PUBLIC_KEY: "${ACP_INSTITUTION_PUBLIC_KEY}"
+      ACP_ADDR: ":8080"
+      ACP_LOG_LEVEL: "${ACP_LOG_LEVEL:-info}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/acp/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
