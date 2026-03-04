@@ -11,6 +11,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.0] — 2026-03-04
+
+### Added — TypeScript SDK
+- **`sdk/typescript/src/identity.ts`** — `AgentIdentity` class: `generate()` static method (Ed25519 key pair via libsodium), `agentId` (base58-SHA-256 per ACP-SIGN-1.0), `did` (did:key:z6Mk... format)
+- **`sdk/typescript/src/signer.ts`** — `ACPSigner` class: `signCapability()` (Ed25519 over SHA-256(JCS(cap))), `signPoP()` (`Method|Path|Challenge|base64url(SHA-256(body))` binding per ACP-HP-1.0)
+- **`sdk/typescript/src/client.ts`** — `ACPClient` class: `register()`, `verify()`, `health()` with correct ACP-HP-1.0 header transport (`Authorization: Bearer`, `X-ACP-Agent-ID`, `X-ACP-Challenge`, `X-ACP-Signature`)
+- **`sdk/typescript/tests/`** — 68 tests passing: identity suite (AgentID format, DID format, key pair), signer suite (capability signing, PoP binding), client suite (register/verify/health flows)
+
+### Added — Rust SDK
+- **`sdk/rust/src/identity.rs`** — `AgentIdentity` struct: `generate()` (ed25519-dalek), `agent_id()` (base58-SHA-256 per ACP-SIGN-1.0), `did()` (did:key:z6Mk... format)
+- **`sdk/rust/src/signer.rs`** — `ACPSigner` struct: `sign_capability()` (Ed25519 over SHA-256(JCS(cap))), `sign_pop()` (ACP-HP-1.0 PoP binding)
+- **`sdk/rust/src/client.rs`** — `ACPClient` struct: `register()`, `verify()`, `health()` async methods via reqwest
+- **`sdk/rust/tests/`** — 43 tests passing: identity/signer/client test suites
+- **`sdk/rust/Cargo.toml`** — dependencies: ed25519-dalek, sha2, bs58, serde_json, reqwest, tokio
+
+### Added — Docker CI/CD
+- **`.github/workflows/docker.yml`** — Automated Docker image build and push on merge to main; multi-platform (linux/amd64, linux/arm64); images tagged `chelof100/acp-go:{version}` and `chelof100/acp-go:latest`
+
+---
+
 ## [1.3.0] — 2026-03-02
 
 ### Fixed — Python SDK (reconciled with Go server v1.0)
@@ -133,7 +153,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/traslaia/acp-framework/compare/v1.2.0...HEAD
-[1.2.0]: https://github.com/traslaia/acp-framework/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/traslaia/acp-framework/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/traslaia/acp-framework/releases/tag/v1.0.0
+[Unreleased]: https://github.com/chelof100/acp-framework-en/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/chelof100/acp-framework-en/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/chelof100/acp-framework-en/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/chelof100/acp-framework-en/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/chelof100/acp-framework-en/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/chelof100/acp-framework-en/releases/tag/v1.0.0

@@ -12,7 +12,7 @@ It defines a unified framework that integrates:
 
 ACP is not solely a messaging or signing protocol. It is a constitutional architecture that establishes formal rules under which an autonomous agent may act.
 
-**Version:** 1.3 | **License:** Apache 2.0 | **Author:** Marcelo Fernandez — TraslaIA | info@traslaia.com
+**Version:** 1.4 | **License:** Apache 2.0 | **Author:** Marcelo Fernandez — TraslaIA | info@traslaia.com
 
 ---
 
@@ -318,7 +318,8 @@ console.log(result); // { decision: 'PERMIT', ... }
 | **v1.1** | ✅ Complete | PAY-1.0, REP-1.1, ITA-1.1 BFT + Architecture Spec |
 | **v1.2** | ✅ Complete | CONF-1.1 (5 levels), complete compliance chain, 12 test vectors |
 | **v1.3** | ✅ Complete | IUT binary (acp-evaluate, 12/12 PASS), compliance runner (ACR-1.0), Python SDK |
-| **v1.4** | 🔄 In progress | SDK completeness — TypeScript (68 tests), Rust, Docker CI/CD |
+| **v1.4** | ✅ Complete | TypeScript SDK (68 tests), Rust SDK (43 tests), Docker CI/CD |
+| **v1.5** | 🔄 In progress | Go SDK (client) + acp-cli + full integration examples |
 | **v2.0** | 📋 Specified | Full ACP-D (BFT, ZK-proofs, DIDs) |
 | **Paper** | ✍️ In preparation | Target IEEE S&P / NDSS |
 
