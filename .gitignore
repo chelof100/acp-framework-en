@@ -6,3 +6,6 @@
 
 # Certification outputs
 ACP-CERT-*.json
+
+# Internal agent instructions (do not commit)
+AGENTS.md
