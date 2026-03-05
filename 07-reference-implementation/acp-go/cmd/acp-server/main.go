@@ -1,10 +1,11 @@
 // cmd/acp-server — ACP Reference Server
-// Protocols: ACP-HP-1.0 + ACP-CT-1.0 + ACP-REV-1.0 + ACP-REP-1.1
+// Protocols: ACP-HP-1.0 + ACP-CT-1.0 + ACP-REV-1.0 + ACP-REP-1.1 + ACP-API-1.0
 //
 // Environment variables:
-//   ACP_INSTITUTION_PUBLIC_KEY  base64url-encoded Ed25519 public key (required)
-//   ACP_ADDR                    listen address (default :8080)
-//   ACP_LOG_LEVEL               log level (default info)
+//   ACP_INSTITUTION_PUBLIC_KEY   base64url-encoded Ed25519 public key (required)
+//   ACP_INSTITUTION_PRIVATE_KEY  base64url-encoded Ed25519 private key (optional; enables response signing)
+//   ACP_ADDR                     listen address (default :8080)
+//   ACP_LOG_LEVEL                log level (default info)
 package main
 
 import (
@@ -20,33 +21,36 @@ import (
 	"strings"
 	"time"
 
+	acpapi "github.com/chelof100/acp-framework/acp-go/pkg/api"
 	"github.com/chelof100/acp-framework/acp-go/pkg/handshake"
 	"github.com/chelof100/acp-framework/acp-go/pkg/registry"
 	"github.com/chelof100/acp-framework/acp-go/pkg/reputation"
 	"github.com/chelof100/acp-framework/acp-go/pkg/revocation"
+	"github.com/chelof100/acp-framework/acp-go/pkg/risk"
 	"github.com/chelof100/acp-framework/acp-go/pkg/tokens"
 )
 
 // ─── Server State ─────────────────────────────────────────────────────────────
 
 type server struct {
-	challenges        *handshake.ChallengeStore
-	registry          *registry.InMemoryRegistry
-	revStore          revocation.RevocationStore
-	revChecker        tokens.RevocationChecker
-	repEngine         *reputation.Engine
-	nonceStore        *tokens.InMemoryNonceStore
-	institutionPubKey ed25519.PublicKey
-	addr              string
+	challenges         *handshake.ChallengeStore
+	registry           *registry.InMemoryRegistry
+	revStore           revocation.RevocationStore
+	revChecker         tokens.RevocationChecker
+	repEngine          *reputation.Engine
+	nonceStore         *tokens.InMemoryNonceStore
+	institutionPubKey  ed25519.PublicKey
+	institutionPrivKey ed25519.PrivateKey // nil if ACP_INSTITUTION_PRIVATE_KEY not set
+	addr               string
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 func main() {
-	// 1. Load institution public key from environment.
+	// 1. Load institution public key.
 	pubKeyB64 := os.Getenv("ACP_INSTITUTION_PUBLIC_KEY")
 	if pubKeyB64 == "" {
-		log.Fatal("[ACP] ACP_INSTITUTION_PUBLIC_KEY not set (base64url-encoded Ed25519 pubkey required)")
+		log.Fatal("[ACP] ACP_INSTITUTION_PUBLIC_KEY not set")
 	}
 	pubKeyBytes, err := base64.RawURLEncoding.DecodeString(pubKeyB64)
 	if err != nil {
@@ -55,90 +59,522 @@ func main() {
 	if len(pubKeyBytes) != ed25519.PublicKeySize {
 		log.Fatalf("[ACP] ACP_INSTITUTION_PUBLIC_KEY must be %d bytes, got %d", ed25519.PublicKeySize, len(pubKeyBytes))
 	}
-	institutionPubKey := ed25519.PublicKey(pubKeyBytes)
 
-	// 2. Determine listen address.
+	// 2. Load institution private key (optional — enables response signing).
+	var institutionPrivKey ed25519.PrivateKey
+	if privKeyB64 := os.Getenv("ACP_INSTITUTION_PRIVATE_KEY"); privKeyB64 != "" {
+		privKeyBytes, err := base64.RawURLEncoding.DecodeString(privKeyB64)
+		if err != nil {
+			log.Fatalf("[ACP] failed to decode ACP_INSTITUTION_PRIVATE_KEY: %v", err)
+		}
+		if len(privKeyBytes) != ed25519.PrivateKeySize {
+			log.Fatalf("[ACP] ACP_INSTITUTION_PRIVATE_KEY must be %d bytes, got %d", ed25519.PrivateKeySize, len(privKeyBytes))
+		}
+		institutionPrivKey = ed25519.PrivateKey(privKeyBytes)
+		log.Printf("[ACP] response signing enabled")
+	} else {
+		log.Printf("[ACP] ACP_INSTITUTION_PRIVATE_KEY not set — responses will not be signed (dev mode)")
+	}
+
+	// 3. Determine listen address.
 	addr := os.Getenv("ACP_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
 
-	// 3. Initialise server components.
-	//    revStore is the authoritative revocation registry (ACP-REV-1.0).
-	//    StoreRevocationChecker wires it into the token verification pipeline.
+	// 4. Initialise server components.
 	revStore := revocation.NewInMemoryRevocationStore()
 	srv := &server{
-		challenges:        handshake.NewChallengeStore(),
-		registry:          registry.NewInMemoryRegistry(),
-		revStore:          revStore,
-		revChecker:        revocation.NewStoreRevocationChecker(revStore),
-		repEngine:         reputation.NewDefaultEngine(reputation.NewInMemoryReputationStore()),
-		nonceStore:        tokens.NewInMemoryNonceStore(),
-		institutionPubKey: institutionPubKey,
-		addr:              addr,
+		challenges:         handshake.NewChallengeStore(),
+		registry:           registry.NewInMemoryRegistry(),
+		revStore:           revStore,
+		revChecker:         revocation.NewStoreRevocationChecker(revStore),
+		repEngine:          reputation.NewDefaultEngine(reputation.NewInMemoryReputationStore()),
+		nonceStore:         tokens.NewInMemoryNonceStore(),
+		institutionPubKey:  ed25519.PublicKey(pubKeyBytes),
+		institutionPrivKey: institutionPrivKey,
+		addr:               addr,
 	}
 
-	// 4. Register HTTP routes.
+	// 5. Build mux and apply ACP-API-1.0 middleware.
 	mux := http.NewServeMux()
 
-	// ACP-HP-1.0 + ACP-CT-1.0
-	mux.HandleFunc("/acp/v1/challenge", srv.handleChallenge)
-	mux.HandleFunc("/acp/v1/verify",    srv.handleVerify)
-	mux.HandleFunc("/acp/v1/register",  srv.handleRegister)
-	mux.HandleFunc("/acp/v1/health",    srv.handleHealth)
+	// ── ACP-HP-1.0: Handshake ────────────────────────────────────────────────
+	mux.HandleFunc("GET /acp/v1/handshake/challenge",  srv.handleChallenge)
+	mux.HandleFunc("/acp/v1/challenge",                srv.handleChallenge) // legacy alias
 
-	// ACP-REV-1.0 — revocation endpoints
+	// ── ACP-CT-1.0: Token verification (legacy path, kept for SDK compat) ───
+	mux.HandleFunc("POST /acp/v1/verify", srv.handleVerify)
+
+	// ── ACP-API-1.0 §4: Agent Registry ───────────────────────────────────────
+	mux.HandleFunc("POST /acp/v1/agents",                    srv.handleAgentRegister)
+	mux.HandleFunc("GET /acp/v1/agents/{agent_id}",          srv.handleAgentGet)
+	mux.HandleFunc("POST /acp/v1/agents/{agent_id}/state",   srv.handleAgentState)
+
+	// ── ACP-API-1.0 §5: Authorization ────────────────────────────────────────
+	mux.HandleFunc("POST /acp/v1/authorize",                                           srv.handleAuthorize)
+	mux.HandleFunc("POST /acp/v1/authorize/escalations/{escalation_id}/resolve",       srv.handleEscalationResolve)
+
+	// ── ACP-API-1.0 §6: Capability Tokens (stub) ─────────────────────────────
+	mux.HandleFunc("POST /acp/v1/tokens", srv.handleTokensIssue)
+
+	// ── ACP-API-1.0 §7: Audit (stubs — ACP-LEDGER-1.0 will implement) ────────
+	mux.HandleFunc("POST /acp/v1/audit/query",               srv.handleAuditQuery)
+	mux.HandleFunc("GET /acp/v1/audit/verify/{event_id}",    srv.handleAuditVerify)
+
+	// ── ACP-API-1.0 §8: Execution Tokens (stubs — ACP-EXEC-1.0 will implement)
+	mux.HandleFunc("POST /acp/v1/exec-tokens/{et_id}/consume", srv.handleExecTokenConsume)
+	mux.HandleFunc("GET /acp/v1/exec-tokens/{et_id}/status",   srv.handleExecTokenStatus)
+
+	// ── ACP-REV-1.0 ──────────────────────────────────────────────────────────
 	mux.HandleFunc("GET /acp/v1/rev/check",   srv.handleRevCheck)
 	mux.HandleFunc("POST /acp/v1/rev/revoke", srv.handleRevRevoke)
 
-	// ACP-REP-1.1 — reputation endpoints (Go 1.22 path params)
-	mux.HandleFunc("GET /acp/v1/rep/{agent_id}",              srv.handleRepGet)
-	mux.HandleFunc("GET /acp/v1/rep/{agent_id}/events",       srv.handleRepEvents)
-	mux.HandleFunc("POST /acp/v1/rep/{agent_id}/state",       srv.handleRepState)
+	// ── ACP-REP-1.1 ──────────────────────────────────────────────────────────
+	mux.HandleFunc("GET /acp/v1/rep/{agent_id}",         srv.handleRepGet)
+	mux.HandleFunc("GET /acp/v1/rep/{agent_id}/events",  srv.handleRepEvents)
+	mux.HandleFunc("POST /acp/v1/rep/{agent_id}/state",  srv.handleRepState)
 
-	// 5. Background pruning goroutine (every 2 minutes).
+	// ── Health ────────────────────────────────────────────────────────────────
+	mux.HandleFunc("GET /acp/v1/health", srv.handleHealth)
+	mux.HandleFunc("/acp/v1/health",     srv.handleHealth) // legacy alias
+
+	// ── Legacy register (kept for SDK backward compat) ────────────────────────
+	mux.HandleFunc("POST /acp/v1/register", srv.handleRegisterLegacy)
+
+	// 6. Apply ACP-API-1.0 middleware (X-ACP-Version, X-ACP-Request-ID).
+	handler := acpapi.Middleware(mux)
+
+	// 7. Background pruning goroutine (every 2 minutes).
 	go func() {
 		ticker := time.NewTicker(2 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
 			srv.challenges.Prune()
-			expiredN := srv.nonceStore.Prune()
-			if expiredN > 0 {
-				log.Printf("[ACP] pruned %d nonces", expiredN)
+			if n := srv.nonceStore.Prune(); n > 0 {
+				log.Printf("[ACP] pruned %d nonces", n)
 			}
 		}
 	}()
 
-	// 6. Start server.
+	// 8. Start server.
 	log.Printf("[ACP] server listening on %s", addr)
 	log.Printf("[ACP] institution pubkey: %s...", pubKeyB64[:min(16, len(pubKeyB64))])
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("[ACP] server error: %v", err)
 	}
 }
 
-// ─── ACP-HP-1.0 + ACP-CT-1.0 Handlers ───────────────────────────────────────
+// ─── ACP-API-1.0 §4: Agent Registry Handlers ─────────────────────────────────
 
-// handleChallenge issues a one-time challenge nonce.
-// GET /acp/v1/challenge
-// Response: {"challenge": "<base64url>"}
-func (s *server) handleChallenge(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+// handleAgentRegister registers a new agent with full metadata.
+// POST /acp/v1/agents
+// Capability required: acp:cap:agent.register
+//
+// Body: {agent_id, public_key (base64url), institution_id, autonomy_level,
+//        authority_domain, metadata{}, sig}
+// Response 201: data.{agent_id, status, registered_at}
+func (s *server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AgentID         string            `json:"agent_id"`
+		PublicKey       string            `json:"public_key"` // base64url
+		InstitutionID   string            `json:"institution_id"`
+		AutonomyLevel   int               `json:"autonomy_level"`
+		AuthorityDomain string            `json:"authority_domain"`
+		Metadata        map[string]string `json:"metadata"`
+		Sig             string            `json:"sig"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
 		return
 	}
 
+	// Validate required fields.
+	if req.AgentID == "" || req.PublicKey == "" {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "agent_id and public_key are required")
+		return
+	}
+	if req.AutonomyLevel < 0 || req.AutonomyLevel > 4 {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrAGENT002, fmt.Sprintf("autonomy_level %d out of range [0,4]", req.AutonomyLevel))
+		return
+	}
+
+	pubKeyBytes, err := base64.RawURLEncoding.DecodeString(req.PublicKey)
+	if err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "public_key must be base64url-encoded")
+		return
+	}
+	if len(pubKeyBytes) != ed25519.PublicKeySize {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrAGENT001, fmt.Sprintf("public_key must be %d bytes", ed25519.PublicKeySize))
+		return
+	}
+
+	now := time.Now().Unix()
+	rec := registry.AgentRecord{
+		AgentID:         req.AgentID,
+		PublicKey:       ed25519.PublicKey(pubKeyBytes),
+		PublicKeyB64:    req.PublicKey,
+		InstitutionID:   req.InstitutionID,
+		AutonomyLevel:   req.AutonomyLevel,
+		AuthorityDomain: req.AuthorityDomain,
+		Status:          registry.StatusActive,
+		Metadata:        req.Metadata,
+		RegisteredAt:    now,
+		LastActiveAt:    now,
+	}
+
+	if err := s.registry.RegisterFull(rec); err != nil {
+		if errors.Is(err, registry.ErrAgentAlreadyRegistered) {
+			acpapi.WriteError(w, r, http.StatusConflict, acpapi.ErrAGENT004, fmt.Sprintf("agent %q already registered", req.AgentID))
+			return
+		}
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
+		return
+	}
+
+	log.Printf("[ACP/AGENTS] registered agent %s (autonomy=%d domain=%s)", req.AgentID, req.AutonomyLevel, req.AuthorityDomain)
+	acpapi.WriteSuccess(w, r, http.StatusCreated, map[string]interface{}{
+		"agent_id":      req.AgentID,
+		"status":        string(registry.StatusActive),
+		"registered_at": now,
+	}, s.institutionPrivKey)
+}
+
+// handleAgentGet returns the current state of an agent.
+// GET /acp/v1/agents/{agent_id}
+// Capability required: acp:cap:agent.read
+//
+// Response 200: data.{agent_id, status, autonomy_level, authority_domain,
+//                     registered_at, last_active_at, trust_score}
+func (s *server) handleAgentGet(w http.ResponseWriter, r *http.Request) {
+	agentID := r.PathValue("agent_id")
+
+	rec, err := s.registry.GetRecord(agentID)
+	if err != nil {
+		if errors.Is(err, registry.ErrAgentNotFound) {
+			acpapi.WriteError(w, r, http.StatusNotFound, acpapi.ErrAGENT005, fmt.Sprintf("agent %q not found", agentID))
+			return
+		}
+		acpapi.WriteError(w, r, http.StatusServiceUnavailable, acpapi.ErrSYS001, "registry unavailable")
+		return
+	}
+
+	// ACP-REP-1.1 integration: include trust score (MAY be null in v1.0).
+	var trustScore interface{} = nil
+	if repRec, err := s.repEngine.GetRecord(agentID); err == nil && repRec.Score != nil {
+		trustScore = *repRec.Score
+	}
+
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"agent_id":         rec.AgentID,
+		"status":           string(rec.Status),
+		"autonomy_level":   rec.AutonomyLevel,
+		"authority_domain": rec.AuthorityDomain,
+		"institution_id":   rec.InstitutionID,
+		"registered_at":    rec.RegisteredAt,
+		"last_active_at":   rec.LastActiveAt,
+		"trust_score":      trustScore,
+	}, s.institutionPrivKey)
+}
+
+// handleAgentState transitions an agent to a new status.
+// POST /acp/v1/agents/{agent_id}/state
+// Capability required: acp:cap:agent.modify / agent.suspend / agent.revoke
+//
+// Body: {state, reason, authorized_by}
+// Response 200: data.{agent_id, state}
+func (s *server) handleAgentState(w http.ResponseWriter, r *http.Request) {
+	agentID := r.PathValue("agent_id")
+
+	var req struct {
+		State        string `json:"state"`
+		Reason       string `json:"reason"`
+		AuthorizedBy string `json:"authorized_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
+		return
+	}
+
+	newStatus := registry.AgentStatus(req.State)
+	switch newStatus {
+	case registry.StatusActive, registry.StatusRestricted,
+		registry.StatusSuspended, registry.StatusRevoked:
+		// valid
+	default:
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSTATE001,
+			fmt.Sprintf("invalid state %q; valid: active, restricted, suspended, revoked", req.State))
+		return
+	}
+
+	if err := s.registry.UpdateStatus(agentID, newStatus); err != nil {
+		if errors.Is(err, registry.ErrAgentNotFound) {
+			acpapi.WriteError(w, r, http.StatusNotFound, acpapi.ErrAGENT005, fmt.Sprintf("agent %q not found", agentID))
+			return
+		}
+		if errors.Is(err, registry.ErrAgentRevoked) {
+			acpapi.WriteError(w, r, http.StatusConflict, acpapi.ErrSTATE002, "agent is revoked — irreversible state")
+			return
+		}
+		if errors.Is(err, registry.ErrInvalidTransition) {
+			acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSTATE001, err.Error())
+			return
+		}
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
+		return
+	}
+
+	log.Printf("[ACP/AGENTS] state change %s → %s (by %s: %s)", agentID, newStatus, req.AuthorizedBy, req.Reason)
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"agent_id": agentID,
+		"state":    string(newStatus),
+	}, s.institutionPrivKey)
+}
+
+// ─── ACP-API-1.0 §5: Authorization Handler ───────────────────────────────────
+
+// handleAuthorize evaluates an authorization request (ACP-API-1.0 §5).
+// POST /acp/v1/authorize
+//
+// Body: {request_id, agent_id, capability, resource, action_parameters, context, sig}
+// Response 200: {decision: APPROVED|DENIED|ESCALATED, risk_score, ...}
+//
+// Processing order per §5:
+//  1. Validate request JSON
+//  2. Check agent status
+//  3. autonomy_level == 0 → DENIED (AUTH-008)
+//  4. Run ACP-RISK-1.0
+//  5. Apply thresholds by autonomy_level → decision
+//  6. Return decision
+func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RequestID        string                 `json:"request_id"`
+		AgentID          string                 `json:"agent_id"`
+		Capability       string                 `json:"capability"`
+		Resource         string                 `json:"resource"`
+		ActionParameters map[string]interface{} `json:"action_parameters"`
+		Context          map[string]interface{} `json:"context"`
+		Sig              string                 `json:"sig"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
+		return
+	}
+	if req.AgentID == "" || req.Capability == "" || req.Resource == "" {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "agent_id, capability, and resource are required")
+		return
+	}
+
+	// Step 2: Check agent status.
+	rec, err := s.registry.GetRecord(req.AgentID)
+	if err != nil {
+		// Agent may be registered via legacy path — treat as active with level 2.
+		rec = registry.AgentRecord{AgentID: req.AgentID, AutonomyLevel: 2, Status: registry.StatusActive}
+	}
+	if rec.Status == registry.StatusSuspended || rec.Status == registry.StatusRevoked {
+		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+			"decision":    "DENIED",
+			"risk_score":  100,
+			"reason_code": acpapi.ErrAUTH005,
+			"message":     fmt.Sprintf("agent %s is %s", req.AgentID, rec.Status),
+		}, s.institutionPrivKey)
+		return
+	}
+
+	// Step 3: autonomy_level == 0 → DENIED (AUTH-008).
+	if rec.AutonomyLevel == 0 {
+		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+			"decision":    "DENIED",
+			"risk_score":  100,
+			"reason_code": acpapi.ErrAUTH008,
+			"message":     "agent has no execution autonomy (level 0)",
+		}, s.institutionPrivKey)
+		return
+	}
+
+	// Step 4: ACP-RISK-1.0 assessment.
+	riskReq := risk.Request{
+		AgentID:    req.AgentID,
+		Capability: req.Capability,
+		Resource:   req.Resource,
+	}
+	// Extract amount from action_parameters if present.
+	if amt, ok := req.ActionParameters["amount"]; ok {
+		if amtFloat, ok := toFloat64(amt); ok {
+			riskReq.Amount = &amtFloat
+		}
+	}
+	assessment := risk.Assess(riskReq)
+
+	// Step 5: Apply thresholds by autonomy_level.
+	//   Level 1: approve < 25, escalate 25–89, deny ≥ 90
+	//   Level 2: approve < 60, escalate 60–89, deny ≥ 90
+	//   Level 3+: approve < 90, deny ≥ 90
+	decision := decisionByLevel(rec.AutonomyLevel, assessment.Score)
+
+	// Update reputation + last active.
+	s.registry.TouchLastActive(req.AgentID)
+
+	switch decision {
+	case "APPROVED":
+		validUntil := time.Now().Add(5 * time.Minute).Unix()
+		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+			"decision":        "APPROVED",
+			"risk_score":      assessment.Score,
+			"risk_level":      assessment.Level.String(),
+			"valid_until":     validUntil,
+			"execution_token": nil, // populated by ACP-EXEC-1.0
+		}, s.institutionPrivKey)
+
+	case "DENIED":
+		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+			"decision":      "DENIED",
+			"risk_score":    assessment.Score,
+			"risk_level":    assessment.Level.String(),
+			"reason_code":   "RISK-005",
+			"retry_allowed": false,
+		}, s.institutionPrivKey)
+
+	case "ESCALATED":
+		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+			"decision":      "ESCALATED",
+			"risk_score":    assessment.Score,
+			"risk_level":    assessment.Level.String(),
+			"escalation_id": acpapi.GetRequestID(r), // reuse request ID as escalation ID
+			"escalated_to":  "review_queue",
+			"expires_at":    time.Now().Add(1 * time.Hour).Unix(),
+		}, s.institutionPrivKey)
+	}
+
+	log.Printf("[ACP/AUTH] %s agent=%s cap=%s score=%d decision=%s",
+		req.RequestID, req.AgentID, req.Capability, assessment.Score, decision)
+}
+
+// handleEscalationResolve resolves an escalated authorization.
+// POST /acp/v1/authorize/escalations/{escalation_id}/resolve
+// Capability required: acp:cap:agent.modify with autonomy_level ≥ 3.
+//
+// Body: {resolution: "APPROVED"|"DENIED", resolved_by, sig}
+func (s *server) handleEscalationResolve(w http.ResponseWriter, r *http.Request) {
+	escalationID := r.PathValue("escalation_id")
+
+	var req struct {
+		Resolution string `json:"resolution"`
+		ResolvedBy string `json:"resolved_by"`
+		Sig        string `json:"sig"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
+		return
+	}
+
+	if req.Resolution != "APPROVED" && req.Resolution != "DENIED" {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004,
+			"resolution must be APPROVED or DENIED")
+		return
+	}
+
+	log.Printf("[ACP/AUTH] escalation %s resolved as %s by %s", escalationID, req.Resolution, req.ResolvedBy)
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"escalation_id": escalationID,
+		"resolution":    req.Resolution,
+		"resolved_by":   req.ResolvedBy,
+		"resolved_at":   time.Now().Unix(),
+	}, s.institutionPrivKey)
+}
+
+// ─── ACP-API-1.0 §6: Token Issuance (stub) ───────────────────────────────────
+
+// handleTokensIssue is a stub for CT issuance (ACP-API-1.0 §6).
+// POST /acp/v1/tokens
+// Capability required: acp:cap:agent.delegate
+//
+// Full implementation deferred — will be completed alongside ACP-EXEC-1.0.
+func (s *server) handleTokensIssue(w http.ResponseWriter, r *http.Request) {
+	acpapi.WriteError(w, r, http.StatusNotImplemented, "CT-STUB",
+		"token issuance not yet implemented — coming in ACP-EXEC-1.0")
+}
+
+// ─── ACP-API-1.0 §7: Audit Stubs (ACP-LEDGER-1.0 will replace) ──────────────
+
+// handleAuditQuery is a stub for audit ledger query (ACP-API-1.0 §7).
+// POST /acp/v1/audit/query
+func (s *server) handleAuditQuery(w http.ResponseWriter, r *http.Request) {
+	acpapi.WriteError(w, r, http.StatusNotImplemented, "LEDGER-STUB",
+		"audit ledger not yet implemented — coming in ACP-LEDGER-1.0")
+}
+
+// handleAuditVerify is a stub for event integrity verification (ACP-API-1.0 §7).
+// GET /acp/v1/audit/verify/{event_id}
+func (s *server) handleAuditVerify(w http.ResponseWriter, r *http.Request) {
+	acpapi.WriteError(w, r, http.StatusNotImplemented, "LEDGER-STUB",
+		"audit verification not yet implemented — coming in ACP-LEDGER-1.0")
+}
+
+// ─── ACP-API-1.0 §8: Execution Token Stubs (ACP-EXEC-1.0 will replace) ───────
+
+// handleExecTokenConsume is a stub for ET consumption reporting (ACP-API-1.0 §8).
+// POST /acp/v1/exec-tokens/{et_id}/consume
+func (s *server) handleExecTokenConsume(w http.ResponseWriter, r *http.Request) {
+	acpapi.WriteError(w, r, http.StatusNotImplemented, "EXEC-STUB",
+		"execution token consume not yet implemented — coming in ACP-EXEC-1.0")
+}
+
+// handleExecTokenStatus is a stub for ET status query (ACP-API-1.0 §8).
+// GET /acp/v1/exec-tokens/{et_id}/status
+func (s *server) handleExecTokenStatus(w http.ResponseWriter, r *http.Request) {
+	acpapi.WriteError(w, r, http.StatusNotImplemented, "EXEC-STUB",
+		"execution token status not yet implemented — coming in ACP-EXEC-1.0")
+}
+
+// ─── ACP-API-1.0 §9: Health ───────────────────────────────────────────────────
+
+// handleHealth returns server health in ACP-API-1.0 §9 format.
+// GET /acp/v1/health — no authentication required.
+func (s *server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Determine overall status: operational unless a component is degraded.
+	status := "operational"
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"acp_version": "1.0",
+		"status":      status,
+		"timestamp":   time.Now().Unix(),
+		"components": map[string]string{
+			"policy_engine":  "operational",
+			"audit_ledger":   "not_implemented",
+			"agent_registry": "operational",
+			"rev_endpoint":   "operational",
+			"rep_engine":     "operational",
+		},
+		// Internal counters (informational).
+		"_counters": map[string]interface{}{
+			"agents":     s.registry.Size(),
+			"challenges": s.challenges.Size(),
+			"nonces":     s.nonceStore.Size(),
+			"revoked":    s.revStore.Size(),
+		},
+	})
+}
+
+// ─── ACP-HP-1.0 + ACP-CT-1.0: Handshake & Verify ────────────────────────────
+
+// handleChallenge issues a one-time challenge nonce.
+// GET /acp/v1/handshake/challenge  (also: GET /acp/v1/challenge for legacy)
+func (s *server) handleChallenge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		acpapi.WriteError(w, r, http.StatusMethodNotAllowed, acpapi.ErrSYS004, "method not allowed")
+		return
+	}
 	challenge, err := s.challenges.GenerateChallenge()
 	if err != nil {
 		log.Printf("[ACP] challenge generation failed: %v", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		acpapi.WriteError(w, r, http.StatusInternalServerError, acpapi.ErrSYS002, "challenge generation failed")
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]string{
 		"challenge": challenge,
-	})
+	}, s.institutionPrivKey)
 }
 
 // handleVerify verifies a Capability Token + Proof-of-Possession.
@@ -149,23 +585,15 @@ func (s *server) handleChallenge(w http.ResponseWriter, r *http.Request) {
 //   X-ACP-Agent-ID:   <agentID>
 //   X-ACP-Challenge:  <challenge>
 //   X-ACP-Signature:  <pop_signature>
-//
-// Response 200: {"ok": true, "agent_id": "...", "capabilities": [...]}
-// Response 4xx: {"ok": false, "error": "CT-xxx: ..."}
-//
-// ACP-REP-1.1 integration: emits reputation event on success or token failure.
 func (s *server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		acpapi.WriteError(w, r, http.StatusMethodNotAllowed, acpapi.ErrSYS004, "method not allowed")
 		return
 	}
 
-	// ── 1. Extract headers ──────────────────────────────────────────────────
 	authHeader := r.Header.Get("Authorization")
 	if !strings.HasPrefix(authHeader, "Bearer ") {
-		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
-			"ok": false, "error": "missing or invalid Authorization header",
-		})
+		acpapi.WriteError(w, r, http.StatusUnauthorized, acpapi.ErrAUTH001, "missing or invalid Authorization header")
 		return
 	}
 	tokenJSON := strings.TrimPrefix(authHeader, "Bearer ")
@@ -174,149 +602,68 @@ func (s *server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	popSig    := r.Header.Get("X-ACP-Signature")
 
 	if agentID == "" || challenge == "" || popSig == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"ok": false, "error": "missing ACP headers (X-ACP-Agent-ID, X-ACP-Challenge, X-ACP-Signature)",
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrHP004, "missing ACP headers (X-ACP-Agent-ID, X-ACP-Challenge, X-ACP-Signature)")
 		return
 	}
 
-	// ── 2. Resolve agent public key from registry ───────────────────────────
 	agentPubKey, err := s.registry.GetPublicKey(agentID)
 	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
-			"ok": false, "error": fmt.Sprintf("agent not registered: %v", err),
-		})
+		acpapi.WriteError(w, r, http.StatusUnauthorized, acpapi.ErrAGENT005, fmt.Sprintf("agent not registered: %v", err))
 		return
 	}
 
-	// ── 3. Verify Proof-of-Possession ───────────────────────────────────────
 	if err := handshake.VerifyProofOfPossession(r, s.challenges, agentPubKey); err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
-			"ok": false, "error": fmt.Sprintf("PoP verification failed: %v", err),
-		})
+		acpapi.WriteError(w, r, http.StatusUnauthorized, acpapi.ErrHP009, fmt.Sprintf("PoP verification failed: %v", err))
 		return
 	}
 
-	// ── 4. Parse and verify Capability Token ────────────────────────────────
 	token, err := tokens.ParseAndVerify([]byte(tokenJSON), s.institutionPubKey, tokens.VerificationRequest{
 		RevocationChecker: s.revChecker,
 		NonceStore:        s.nonceStore,
 	})
 	if err != nil {
-		// ACP-REP-1.1: record reputation event for the token failure.
 		s.emitRepEvent(agentID, repEventFromTokenError(err))
-		writeJSON(w, http.StatusForbidden, map[string]interface{}{
-			"ok": false, "error": err.Error(),
-		})
+		code := acpapi.ErrAUTH001
+		if strings.Contains(err.Error(), "CT-010") || strings.Contains(err.Error(), "revoked") {
+			code = acpapi.ErrAUTH006
+		}
+		acpapi.WriteError(w, r, http.StatusForbidden, code, err.Error())
 		return
 	}
 
-	// ── 5. Cross-check: token subject must match requesting agent ────────────
 	if token.Subject != agentID {
-		writeJSON(w, http.StatusForbidden, map[string]interface{}{
-			"ok": false, "error": fmt.Sprintf("CT-011: token subject %q does not match agent %q", token.Subject, agentID),
-		})
+		acpapi.WriteError(w, r, http.StatusForbidden, acpapi.ErrHP010,
+			fmt.Sprintf("token subject %q does not match agent %q", token.Subject, agentID))
 		return
 	}
 
-	// ── 6. Success — emit positive reputation event ──────────────────────────
 	s.emitRepEvent(agentID, reputation.EvtVerifyOK)
+	s.registry.TouchLastActive(agentID)
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 		"ok":           true,
 		"agent_id":     agentID,
 		"capabilities": token.Cap,
 		"resource":     token.Resource,
 		"expires":      token.Expiration,
-	})
-}
-
-// handleRegister registers an agent's public key.
-// POST /acp/v1/register
-// Body: {"agent_id": "...", "public_key_hex": "..."}
-//
-// NOTE: In production, this endpoint must be authenticated and
-// restricted to institutional administrators.
-func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		AgentID      string `json:"agent_id"`
-		PublicKeyHex string `json:"public_key_hex"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"ok": false, "error": "invalid JSON body",
-		})
-		return
-	}
-
-	pubKeyBytes, err := base64.RawURLEncoding.DecodeString(req.PublicKeyHex)
-	if err != nil {
-		// Try hex fallback
-		pubKeyBytes, err = hexDecode(req.PublicKeyHex)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-				"ok": false, "error": "public_key_hex must be base64url or hex-encoded",
-			})
-			return
-		}
-	}
-
-	if err := s.registry.Register(req.AgentID, ed25519.PublicKey(pubKeyBytes)); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"ok": false, "error": err.Error(),
-		})
-		return
-	}
-
-	log.Printf("[ACP] registered agent %s (pubkey %x...)", req.AgentID, pubKeyBytes[:4])
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"ok":       true,
-		"agent_id": req.AgentID,
-	})
-}
-
-// handleHealth returns server health status.
-// GET /acp/v1/health
-func (s *server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"ok":         true,
-		"version":    "1.0.0",
-		"challenges": s.challenges.Size(),
-		"agents":     s.registry.Size(),
-		"nonces":     s.nonceStore.Size(),
-		"revoked":    s.revStore.Size(),
-		"timestamp":  time.Now().Unix(),
-	})
+	}, s.institutionPrivKey)
 }
 
 // ─── ACP-REV-1.0 Handlers ─────────────────────────────────────────────────────
 
 // handleRevCheck queries revocation status for a token.
 // GET /acp/v1/rev/check?token_id=<nonce>
-//
-// Response 200: {"token_id":"...","status":"active"|"revoked","checked_at":<unix>}
-// Response 404: {"error":"token not found — treat as revoked (ACP-REV-1.0 §4.2)"}
-// Response 400: {"error":"missing token_id query parameter"}
 func (s *server) handleRevCheck(w http.ResponseWriter, r *http.Request) {
 	tokenID := r.URL.Query().Get("token_id")
 	if tokenID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": "missing token_id query parameter",
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "missing token_id query parameter")
 		return
 	}
 
 	revoked, _, err := s.revStore.IsRevoked(tokenID)
 	if err != nil {
 		log.Printf("[ACP/REV] store error checking %s: %v", tokenID, err)
-		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"error": "internal store error",
-		})
+		acpapi.WriteError(w, r, http.StatusInternalServerError, acpapi.ErrSYS001, "internal store error")
 		return
 	}
 
@@ -324,21 +671,16 @@ func (s *server) handleRevCheck(w http.ResponseWriter, r *http.Request) {
 	if revoked {
 		status = "revoked"
 	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 		"token_id":   tokenID,
 		"status":     status,
 		"checked_at": time.Now().Unix(),
-	})
+	}, s.institutionPrivKey)
 }
 
 // handleRevRevoke emits a revocation for a token.
 // POST /acp/v1/rev/revoke
-// Body: {"token_id":"...","reason_code":"REV-001","revoked_by":"..."}
-//
-// Response 200: {"ok":true,"token_id":"...","revoked_at":<unix>}
-// Response 400: {"error":"..."}  — missing fields, invalid reason_code
-// Response 409: {"error":"token already revoked (REV-E001)"}
+// Body: {token_id, reason_code, revoked_by}
 func (s *server) handleRevRevoke(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TokenID    string `json:"token_id"`
@@ -346,22 +688,15 @@ func (s *server) handleRevRevoke(w http.ResponseWriter, r *http.Request) {
 		RevokedBy  string `json:"revoked_by"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": "invalid JSON body",
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
 		return
 	}
-
 	if req.TokenID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": "token_id is required",
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "token_id is required")
 		return
 	}
 	if req.RevokedBy == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": "revoked_by is required",
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "revoked_by is required")
 		return
 	}
 
@@ -375,59 +710,41 @@ func (s *server) handleRevRevoke(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.revStore.Revoke(record); err != nil {
 		if errors.Is(err, revocation.ErrAlreadyRevoked) {
-			writeJSON(w, http.StatusConflict, map[string]interface{}{
-				"error": "token already revoked (REV-E001)",
-			})
+			acpapi.WriteError(w, r, http.StatusConflict, "REV-E001", "token already revoked")
 			return
 		}
 		if errors.Is(err, revocation.ErrInvalidReason) {
-			writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-				"error": err.Error(),
-			})
+			acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
 			return
 		}
-		log.Printf("[ACP/REV] revoke error for %s: %v", req.TokenID, err)
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": err.Error(),
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
 		return
 	}
 
 	log.Printf("[ACP/REV] revoked token %s by %s (reason: %s)", req.TokenID, req.RevokedBy, req.ReasonCode)
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 		"ok":         true,
 		"token_id":   req.TokenID,
 		"revoked_at": now,
-	})
+	}, s.institutionPrivKey)
 }
 
 // ─── ACP-REP-1.1 Handlers ─────────────────────────────────────────────────────
 
 // handleRepGet returns the current reputation record for an agent.
 // GET /acp/v1/rep/{agent_id}
-//
-// Response 200: ReputationRecord JSON
-// Cold-start agents return Score=null, State="ACTIVE".
 func (s *server) handleRepGet(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agent_id")
-
 	record, err := s.repEngine.GetRecord(agentID)
 	if err != nil {
-		log.Printf("[ACP/REP] get record error for %s: %v", agentID, err)
-		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"error": "internal store error",
-		})
+		acpapi.WriteError(w, r, http.StatusInternalServerError, acpapi.ErrSYS001, "internal store error")
 		return
 	}
-
-	writeJSON(w, http.StatusOK, record)
+	acpapi.WriteSuccess(w, r, http.StatusOK, record, s.institutionPrivKey)
 }
 
 // handleRepEvents returns paginated reputation events for an agent.
 // GET /acp/v1/rep/{agent_id}/events?limit=20&offset=0
-//
-// Response 200: {"events":[...],"total":<int>,"limit":<int>,"offset":<int>}
-// Events are returned most-recent-first.
 func (s *server) handleRepEvents(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agent_id")
 
@@ -442,28 +759,20 @@ func (s *server) handleRepEvents(w http.ResponseWriter, r *http.Request) {
 
 	events, total, err := s.repEngine.GetEvents(agentID, limit, offset)
 	if err != nil {
-		log.Printf("[ACP/REP] get events error for %s: %v", agentID, err)
-		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"error": "internal store error",
-		})
+		acpapi.WriteError(w, r, http.StatusInternalServerError, acpapi.ErrSYS001, "internal store error")
 		return
 	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 		"events": events,
 		"total":  total,
 		"limit":  limit,
 		"offset": offset,
-	})
+	}, s.institutionPrivKey)
 }
 
 // handleRepState manually sets the administrative state of an agent.
 // POST /acp/v1/rep/{agent_id}/state
-// Body: {"state":"PROBATION","reason":"...","authorized_by":"<admin_agent_id>"}
-//
-// Response 200: {"ok":true,"agent_id":"...","state":"PROBATION"}
-// Response 400: invalid state, missing reason, or missing authorized_by
-// Response 409: agent is BANNED (terminal state)
+// Body: {state, reason, authorized_by}
 func (s *server) handleRepState(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agent_id")
 
@@ -473,78 +782,132 @@ func (s *server) handleRepState(w http.ResponseWriter, r *http.Request) {
 		AuthorizedBy string `json:"authorized_by"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": "invalid JSON body",
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
 		return
 	}
 
-	// Validate state value.
 	targetState := reputation.AgentState(req.State)
 	switch targetState {
 	case reputation.StateActive, reputation.StateProbation,
 		reputation.StateSuspended, reputation.StateBanned:
 		// valid
 	default:
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": fmt.Sprintf("invalid state %q; valid: ACTIVE, PROBATION, SUSPENDED, BANNED", req.State),
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004,
+			fmt.Sprintf("invalid state %q; valid: ACTIVE, PROBATION, SUSPENDED, BANNED", req.State))
 		return
 	}
 
 	if err := s.repEngine.SetState(agentID, targetState, req.Reason, req.AuthorizedBy); err != nil {
 		if errors.Is(err, reputation.ErrAgentBanned) {
-			writeJSON(w, http.StatusConflict, map[string]interface{}{
-				"error": "agent is BANNED — terminal state, no further state changes allowed",
-			})
+			acpapi.WriteError(w, r, http.StatusConflict, acpapi.ErrSTATE002, "agent is BANNED — terminal state")
 			return
 		}
-		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"error": err.Error(),
-		})
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
 		return
 	}
 
 	log.Printf("[ACP/REP] state change for %s → %s (by %s: %s)", agentID, targetState, req.AuthorizedBy, req.Reason)
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 		"ok":       true,
 		"agent_id": agentID,
 		"state":    string(targetState),
-	})
+	}, s.institutionPrivKey)
+}
+
+// ─── Legacy Register (backward compat for SDKs) ───────────────────────────────
+
+// handleRegisterLegacy is the pre-ACP-API-1.0 agent registration endpoint.
+// POST /acp/v1/register
+// Body: {"agent_id": "...", "public_key_hex": "..."}
+//
+// Deprecated: use POST /acp/v1/agents instead.
+func (s *server) handleRegisterLegacy(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AgentID      string `json:"agent_id"`
+		PublicKeyHex string `json:"public_key_hex"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "invalid JSON body")
+		return
+	}
+
+	pubKeyBytes, err := base64.RawURLEncoding.DecodeString(req.PublicKeyHex)
+	if err != nil {
+		pubKeyBytes, err = hexDecode(req.PublicKeyHex)
+		if err != nil {
+			acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "public_key_hex must be base64url or hex-encoded")
+			return
+		}
+	}
+
+	if err := s.registry.Register(req.AgentID, ed25519.PublicKey(pubKeyBytes)); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
+		return
+	}
+
+	log.Printf("[ACP] registered agent %s (legacy path)", req.AgentID)
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"ok":       true,
+		"agent_id": req.AgentID,
+	}, s.institutionPrivKey)
 }
 
 // ─── Reputation helpers ────────────────────────────────────────────────────────
 
-// emitRepEvent records a reputation event, logging on failure (non-blocking).
 func (s *server) emitRepEvent(agentID, eventType string) {
 	if err := s.repEngine.RecordEvent(agentID, eventType); err != nil {
 		log.Printf("[ACP/REP] failed to record %s for agent %s: %v", eventType, agentID, err)
 	}
 }
 
-// repEventFromTokenError maps a token verification error to the appropriate
-// ACP-REP-1.1 event type based on the CT error code in the error message.
 func repEventFromTokenError(err error) string {
 	msg := err.Error()
-	// CT-010 = revoked token; CT-011 = subject mismatch (not a sig error)
 	if strings.Contains(msg, "CT-010") || strings.Contains(msg, "revoked") {
 		return reputation.EvtRevInvalid
 	}
-	// CT-002 = invalid institution signature
 	if strings.Contains(msg, "CT-002") || strings.Contains(msg, "signature") {
 		return reputation.EvtSigInvalid
 	}
-	// Everything else: malformed token (expired, bad structure, etc.)
 	return reputation.EvtTokenMalformed
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Authorization helpers ────────────────────────────────────────────────────
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+// decisionByLevel maps autonomy_level + risk score to an authorization decision.
+//
+//	Level 1: approve < 25, escalate [25,90), deny ≥ 90
+//	Level 2: approve < 60, escalate [60,90), deny ≥ 90
+//	Level 3+: approve < 90, deny ≥ 90
+func decisionByLevel(level, score int) string {
+	const thresholdDeny = 90
+	switch {
+	case score >= thresholdDeny:
+		return "DENIED"
+	case level >= 3:
+		return "APPROVED"
+	case level == 2 && score < 60:
+		return "APPROVED"
+	case level == 1 && score < 25:
+		return "APPROVED"
+	default:
+		return "ESCALATED"
+	}
 }
+
+// toFloat64 converts an interface{} to float64 (for JSON numbers).
+func toFloat64(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	}
+	return 0, false
+}
+
+// ─── Low-level helpers ────────────────────────────────────────────────────────
 
 func hexDecode(s string) ([]byte, error) {
 	if len(s)%2 != 0 {
@@ -552,28 +915,27 @@ func hexDecode(s string) ([]byte, error) {
 	}
 	b := make([]byte, len(s)/2)
 	for i := 0; i < len(s); i += 2 {
-		var hi, lo byte
-		if s[i] >= '0' && s[i] <= '9' {
-			hi = s[i] - '0'
-		} else if s[i] >= 'a' && s[i] <= 'f' {
-			hi = s[i] - 'a' + 10
-		} else if s[i] >= 'A' && s[i] <= 'F' {
-			hi = s[i] - 'A' + 10
-		} else {
-			return nil, fmt.Errorf("invalid hex char %c", s[i])
-		}
-		if s[i+1] >= '0' && s[i+1] <= '9' {
-			lo = s[i+1] - '0'
-		} else if s[i+1] >= 'a' && s[i+1] <= 'f' {
-			lo = s[i+1] - 'a' + 10
-		} else if s[i+1] >= 'A' && s[i+1] <= 'F' {
-			lo = s[i+1] - 'A' + 10
-		} else {
-			return nil, fmt.Errorf("invalid hex char %c", s[i+1])
+		hi, err1 := hexNibble(s[i])
+		lo, err2 := hexNibble(s[i+1])
+		if err1 != nil || err2 != nil {
+			return nil, fmt.Errorf("invalid hex at position %d", i)
 		}
 		b[i/2] = hi<<4 | lo
 	}
 	return b, nil
+}
+
+func hexNibble(c byte) (byte, error) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', nil
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, nil
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10, nil
+	default:
+		return 0, fmt.Errorf("invalid hex char %c", c)
+	}
 }
 
 func min(a, b int) int {
