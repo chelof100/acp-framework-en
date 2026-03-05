@@ -1,15 +1,17 @@
 // cmd/acp-server — ACP Reference Server
-// Protocols: ACP-HP-1.0 + ACP-CT-1.0 + ACP-REV-1.0 + ACP-REP-1.1 + ACP-API-1.0 + ACP-EXEC-1.0
+// Protocols: ACP-HP-1.0 + ACP-CT-1.0 + ACP-REV-1.0 + ACP-REP-1.1 + ACP-API-1.0 + ACP-EXEC-1.0 + ACP-LEDGER-1.0
 //
 // Environment variables:
 //   ACP_INSTITUTION_PUBLIC_KEY   base64url-encoded Ed25519 public key (required)
 //   ACP_INSTITUTION_PRIVATE_KEY  base64url-encoded Ed25519 private key (optional; enables response signing)
+//   ACP_INSTITUTION_ID           institution identifier for audit ledger (default: org.acp.server)
 //   ACP_ADDR                     listen address (default :8080)
 //   ACP_LOG_LEVEL                log level (default info)
 package main
 
 import (
 	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -24,6 +26,7 @@ import (
 	acpapi "github.com/chelof100/acp-framework/acp-go/pkg/api"
 	"github.com/chelof100/acp-framework/acp-go/pkg/execution"
 	"github.com/chelof100/acp-framework/acp-go/pkg/handshake"
+	"github.com/chelof100/acp-framework/acp-go/pkg/ledger"
 	"github.com/chelof100/acp-framework/acp-go/pkg/registry"
 	"github.com/chelof100/acp-framework/acp-go/pkg/reputation"
 	"github.com/chelof100/acp-framework/acp-go/pkg/revocation"
@@ -41,6 +44,8 @@ type server struct {
 	repEngine          *reputation.Engine
 	nonceStore         *tokens.InMemoryNonceStore
 	etRegistry         *execution.InMemoryETRegistry // ACP-EXEC-1.0
+	auditLedger        *ledger.InMemoryLedger        // ACP-LEDGER-1.0
+	institutionID      string
 	institutionPubKey  ed25519.PublicKey
 	institutionPrivKey ed25519.PrivateKey // nil if ACP_INSTITUTION_PRIVATE_KEY not set
 	addr               string
@@ -62,7 +67,7 @@ func main() {
 		log.Fatalf("[ACP] ACP_INSTITUTION_PUBLIC_KEY must be %d bytes, got %d", ed25519.PublicKeySize, len(pubKeyBytes))
 	}
 
-	// 2. Load institution private key (optional — enables response signing).
+	// 2. Load institution private key (optional — enables response signing + ledger signing).
 	var institutionPrivKey ed25519.PrivateKey
 	if privKeyB64 := os.Getenv("ACP_INSTITUTION_PRIVATE_KEY"); privKeyB64 != "" {
 		privKeyBytes, err := base64.RawURLEncoding.DecodeString(privKeyB64)
@@ -78,13 +83,27 @@ func main() {
 		log.Printf("[ACP] ACP_INSTITUTION_PRIVATE_KEY not set — responses will not be signed (dev mode)")
 	}
 
-	// 3. Determine listen address.
+	// 3. Load institution ID for audit ledger.
+	institutionID := os.Getenv("ACP_INSTITUTION_ID")
+	if institutionID == "" {
+		institutionID = "org.acp.server"
+		log.Printf("[ACP] ACP_INSTITUTION_ID not set — using default: %s", institutionID)
+	}
+
+	// 4. Determine listen address.
 	addr := os.Getenv("ACP_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
 
-	// 4. Initialise server components.
+	// 5. Initialise audit ledger (ACP-LEDGER-1.0).
+	auditLedger, err := ledger.NewInMemoryLedger(institutionID, institutionPrivKey)
+	if err != nil {
+		log.Fatalf("[ACP] failed to initialize audit ledger: %v", err)
+	}
+	log.Printf("[ACP/LEDGER] initialized (genesis seq=1 institution=%s)", institutionID)
+
+	// 6. Initialise server components.
 	revStore := revocation.NewInMemoryRevocationStore()
 	srv := &server{
 		challenges:         handshake.NewChallengeStore(),
@@ -94,12 +113,14 @@ func main() {
 		repEngine:          reputation.NewDefaultEngine(reputation.NewInMemoryReputationStore()),
 		nonceStore:         tokens.NewInMemoryNonceStore(),
 		etRegistry:         execution.NewInMemoryETRegistry(),
+		auditLedger:        auditLedger,
+		institutionID:      institutionID,
 		institutionPubKey:  ed25519.PublicKey(pubKeyBytes),
 		institutionPrivKey: institutionPrivKey,
 		addr:               addr,
 	}
 
-	// 5. Build mux and apply ACP-API-1.0 middleware.
+	// 7. Build mux and apply ACP-API-1.0 middleware.
 	mux := http.NewServeMux()
 
 	// ── ACP-HP-1.0: Handshake ────────────────────────────────────────────────
@@ -121,11 +142,11 @@ func main() {
 	// ── ACP-API-1.0 §6: Capability Tokens (stub) ─────────────────────────────
 	mux.HandleFunc("POST /acp/v1/tokens", srv.handleTokensIssue)
 
-	// ── ACP-API-1.0 §7: Audit (stubs — ACP-LEDGER-1.0 will implement) ────────
+	// ── ACP-API-1.0 §7: Audit — ACP-LEDGER-1.0 ───────────────────────────────
 	mux.HandleFunc("POST /acp/v1/audit/query",               srv.handleAuditQuery)
 	mux.HandleFunc("GET /acp/v1/audit/verify/{event_id}",    srv.handleAuditVerify)
 
-	// ── ACP-API-1.0 §8: Execution Tokens (stubs — ACP-EXEC-1.0 will implement)
+	// ── ACP-EXEC-1.0 §9: Execution Tokens ────────────────────────────────────
 	mux.HandleFunc("POST /acp/v1/exec-tokens/{et_id}/consume", srv.handleExecTokenConsume)
 	mux.HandleFunc("GET /acp/v1/exec-tokens/{et_id}/status",   srv.handleExecTokenStatus)
 
@@ -145,10 +166,10 @@ func main() {
 	// ── Legacy register (kept for SDK backward compat) ────────────────────────
 	mux.HandleFunc("POST /acp/v1/register", srv.handleRegisterLegacy)
 
-	// 6. Apply ACP-API-1.0 middleware (X-ACP-Version, X-ACP-Request-ID).
+	// 8. Apply ACP-API-1.0 middleware (X-ACP-Version, X-ACP-Request-ID).
 	handler := acpapi.Middleware(mux)
 
-	// 7. Background pruning goroutine (every 2 minutes).
+	// 9. Background pruning goroutine (every 2 minutes).
 	go func() {
 		ticker := time.NewTicker(2 * time.Minute)
 		defer ticker.Stop()
@@ -163,7 +184,7 @@ func main() {
 		}
 	}()
 
-	// 8. Start server.
+	// 10. Start server.
 	log.Printf("[ACP] server listening on %s", addr)
 	log.Printf("[ACP] institution pubkey: %s...", pubKeyB64[:min(16, len(pubKeyB64))])
 	if err := http.ListenAndServe(addr, handler); err != nil {
@@ -237,6 +258,19 @@ func (s *server) handleAgentRegister(w http.ResponseWriter, r *http.Request) {
 		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
 		return
 	}
+
+	// ACP-LEDGER-1.0: emit AGENT_REGISTERED event.
+	instID := req.InstitutionID
+	if instID == "" {
+		instID = s.institutionID
+	}
+	s.emitLedgerEvent(ledger.EventAgentRegistered, map[string]interface{}{
+		"agent_id":         req.AgentID,
+		"institution_id":   instID,
+		"autonomy_level":   req.AutonomyLevel,
+		"authority_domain": req.AuthorityDomain,
+		"registered_by":    s.institutionID,
+	})
 
 	log.Printf("[ACP/AGENTS] registered agent %s (autonomy=%d domain=%s)", req.AgentID, req.AutonomyLevel, req.AuthorityDomain)
 	acpapi.WriteSuccess(w, r, http.StatusCreated, map[string]interface{}{
@@ -313,6 +347,12 @@ func (s *server) handleAgentState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Capture previous state for ledger before update.
+	var prevState string
+	if existing, err := s.registry.GetRecord(agentID); err == nil {
+		prevState = string(existing.Status)
+	}
+
 	if err := s.registry.UpdateStatus(agentID, newStatus); err != nil {
 		if errors.Is(err, registry.ErrAgentNotFound) {
 			acpapi.WriteError(w, r, http.StatusNotFound, acpapi.ErrAGENT005, fmt.Sprintf("agent %q not found", agentID))
@@ -329,6 +369,16 @@ func (s *server) handleAgentState(w http.ResponseWriter, r *http.Request) {
 		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, err.Error())
 		return
 	}
+
+	// ACP-LEDGER-1.0: emit AGENT_STATE_CHANGE event.
+	s.emitLedgerEvent(ledger.EventAgentStateChange, map[string]interface{}{
+		"agent_id":          agentID,
+		"previous_state":    prevState,
+		"new_state":         string(newStatus),
+		"reason_code":       req.Reason,
+		"authorized_by":     req.AuthorizedBy,
+		"authorization_ref": acpapi.GetRequestID(r),
+	})
 
 	log.Printf("[ACP/AGENTS] state change %s → %s (by %s: %s)", agentID, newStatus, req.AuthorizedBy, req.Reason)
 	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
@@ -351,7 +401,7 @@ func (s *server) handleAgentState(w http.ResponseWriter, r *http.Request) {
 //  3. autonomy_level == 0 → DENIED (AUTH-008)
 //  4. Run ACP-RISK-1.0
 //  5. Apply thresholds by autonomy_level → decision
-//  6. Return decision
+//  6. Return decision + emit ledger events
 func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RequestID        string                 `json:"request_id"`
@@ -378,6 +428,15 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		rec = registry.AgentRecord{AgentID: req.AgentID, AutonomyLevel: 2, Status: registry.StatusActive}
 	}
 	if rec.Status == registry.StatusSuspended || rec.Status == registry.StatusRevoked {
+		// ACP-LEDGER-1.0: DENIED must be recorded (§5.2).
+		s.emitLedgerEvent(ledger.EventAuthorization, map[string]interface{}{
+			"request_id": req.RequestID,
+			"agent_id":   req.AgentID,
+			"capability": req.Capability,
+			"resource":   req.Resource,
+			"decision":   "DENIED",
+			"risk_score": 100,
+		})
 		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 			"decision":    "DENIED",
 			"risk_score":  100,
@@ -389,6 +448,15 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	// Step 3: autonomy_level == 0 → DENIED (AUTH-008).
 	if rec.AutonomyLevel == 0 {
+		// ACP-LEDGER-1.0: DENIED must be recorded (§5.2).
+		s.emitLedgerEvent(ledger.EventAuthorization, map[string]interface{}{
+			"request_id": req.RequestID,
+			"agent_id":   req.AgentID,
+			"capability": req.Capability,
+			"resource":   req.Resource,
+			"decision":   "DENIED",
+			"risk_score": 100,
+		})
 		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 			"decision":    "DENIED",
 			"risk_score":  100,
@@ -421,6 +489,17 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	// Update reputation + last active.
 	s.registry.TouchLastActive(req.AgentID)
 
+	// ACP-LEDGER-1.0: emit RISK_EVALUATION event (§5.3).
+	evalID := randUUID()
+	s.emitLedgerEvent(ledger.EventRiskEvaluation, map[string]interface{}{
+		"eval_id":    evalID,
+		"request_id": req.RequestID,
+		"agent_id":   req.AgentID,
+		"capability": req.Capability,
+		"rs_final":   assessment.Score,
+		"decision":   decision,
+	})
+
 	switch decision {
 	case "APPROVED":
 		// ACP-EXEC-1.0 §7: Issue Execution Token from APPROVED authorization.
@@ -433,9 +512,11 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		}
 		et, etErr := execution.Issue(etReq, s.institutionPrivKey)
 		var etData interface{}
+		etIssued := false
 		if etErr == nil {
 			if regErr := s.etRegistry.Register(et); regErr == nil {
 				etData = et
+				etIssued = true
 				log.Printf("[ACP/EXEC] issued ET %s for agent=%s cap=%s", et.ETID, req.AgentID, req.Capability)
 			} else {
 				log.Printf("[ACP/EXEC] register ET failed: %v", regErr)
@@ -443,6 +524,28 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Printf("[ACP/EXEC] issue ET failed: %v", etErr)
 		}
+
+		// ACP-LEDGER-1.0: emit AUTHORIZATION (§5.2) + EXECUTION_TOKEN_ISSUED (§5.6).
+		s.emitLedgerEvent(ledger.EventAuthorization, map[string]interface{}{
+			"request_id":   req.RequestID,
+			"agent_id":     req.AgentID,
+			"capability":   req.Capability,
+			"resource":     req.Resource,
+			"decision":     "APPROVED",
+			"risk_eval_id": evalID,
+			"risk_score":   assessment.Score,
+		})
+		if etIssued {
+			s.emitLedgerEvent(ledger.EventExecutionTokenIssued, map[string]interface{}{
+				"et_id":            et.ETID,
+				"authorization_id": req.RequestID,
+				"agent_id":         req.AgentID,
+				"capability":       req.Capability,
+				"resource":         req.Resource,
+				"expires_at":       et.ExpiresAt,
+			})
+		}
+
 		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 			"decision":        "APPROVED",
 			"risk_score":      assessment.Score,
@@ -451,6 +554,17 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		}, s.institutionPrivKey)
 
 	case "DENIED":
+		// ACP-LEDGER-1.0: emit AUTHORIZATION — DENIED must be recorded (§5.2).
+		s.emitLedgerEvent(ledger.EventAuthorization, map[string]interface{}{
+			"request_id":   req.RequestID,
+			"agent_id":     req.AgentID,
+			"capability":   req.Capability,
+			"resource":     req.Resource,
+			"decision":     "DENIED",
+			"risk_eval_id": evalID,
+			"risk_score":   assessment.Score,
+		})
+
 		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 			"decision":      "DENIED",
 			"risk_score":    assessment.Score,
@@ -460,13 +574,36 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		}, s.institutionPrivKey)
 
 	case "ESCALATED":
+		escalationID := acpapi.GetRequestID(r)
+		expiresAt := time.Now().Add(1 * time.Hour).Unix()
+
+		// ACP-LEDGER-1.0: emit AUTHORIZATION (§5.2) + ESCALATION_CREATED (§5.10).
+		s.emitLedgerEvent(ledger.EventAuthorization, map[string]interface{}{
+			"request_id":   req.RequestID,
+			"agent_id":     req.AgentID,
+			"capability":   req.Capability,
+			"resource":     req.Resource,
+			"decision":     "ESCALATED",
+			"risk_eval_id": evalID,
+			"risk_score":   assessment.Score,
+		})
+		s.emitLedgerEvent(ledger.EventEscalationCreated, map[string]interface{}{
+			"escalation_id": escalationID,
+			"request_id":    req.RequestID,
+			"agent_id":      req.AgentID,
+			"capability":    req.Capability,
+			"risk_score":    assessment.Score,
+			"escalated_to":  "review_queue",
+			"expires_at":    expiresAt,
+		})
+
 		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 			"decision":      "ESCALATED",
 			"risk_score":    assessment.Score,
 			"risk_level":    assessment.Level.String(),
-			"escalation_id": acpapi.GetRequestID(r), // reuse request ID as escalation ID
+			"escalation_id": escalationID,
 			"escalated_to":  "review_queue",
-			"expires_at":    time.Now().Add(1 * time.Hour).Unix(),
+			"expires_at":    expiresAt,
 		}, s.institutionPrivKey)
 	}
 
@@ -498,12 +635,23 @@ func (s *server) handleEscalationResolve(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	resolvedAt := time.Now().Unix()
+
+	// ACP-LEDGER-1.0: emit ESCALATION_RESOLVED event (§5.11).
+	s.emitLedgerEvent(ledger.EventEscalationResolved, map[string]interface{}{
+		"escalation_id":       escalationID,
+		"original_request_id": escalationID,
+		"resolution":          req.Resolution,
+		"resolved_by":         req.ResolvedBy,
+		"resolved_at":         resolvedAt,
+	})
+
 	log.Printf("[ACP/AUTH] escalation %s resolved as %s by %s", escalationID, req.Resolution, req.ResolvedBy)
 	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 		"escalation_id": escalationID,
 		"resolution":    req.Resolution,
 		"resolved_by":   req.ResolvedBy,
-		"resolved_at":   time.Now().Unix(),
+		"resolved_at":   resolvedAt,
 	}, s.institutionPrivKey)
 }
 
@@ -519,20 +667,53 @@ func (s *server) handleTokensIssue(w http.ResponseWriter, r *http.Request) {
 		"token issuance not yet implemented — coming in ACP-EXEC-1.0")
 }
 
-// ─── ACP-API-1.0 §7: Audit Stubs (ACP-LEDGER-1.0 will replace) ──────────────
+// ─── ACP-API-1.0 §7: Audit — ACP-LEDGER-1.0 ─────────────────────────────────
 
-// handleAuditQuery is a stub for audit ledger query (ACP-API-1.0 §7).
+// handleAuditQuery returns a range of audit events with chain validity status.
 // POST /acp/v1/audit/query
+//
+// Body: {from_sequence?, to_sequence?}  — both optional; 0 means unset.
+// Response 200: {events, count, chain_valid}
 func (s *server) handleAuditQuery(w http.ResponseWriter, r *http.Request) {
-	acpapi.WriteError(w, r, http.StatusNotImplemented, "LEDGER-STUB",
-		"audit ledger not yet implemented — coming in ACP-LEDGER-1.0")
+	var req struct {
+		FromSequence int64 `json:"from_sequence"`
+		ToSequence   int64 `json:"to_sequence"`
+	}
+	// Body is optional — ignore decode errors; zero values return all events.
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	events := s.auditLedger.List(req.FromSequence, req.ToSequence)
+	errs := s.auditLedger.Verify()
+	chainValid := len(errs) == 0
+
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"events":      events,
+		"count":       len(events),
+		"chain_valid": chainValid,
+	}, s.institutionPrivKey)
 }
 
-// handleAuditVerify is a stub for event integrity verification (ACP-API-1.0 §7).
+// handleAuditVerify verifies the integrity of a single audit event.
 // GET /acp/v1/audit/verify/{event_id}
+//
+// Response 200: {event, chain_valid, errors}
+// Response 404: event not found
 func (s *server) handleAuditVerify(w http.ResponseWriter, r *http.Request) {
-	acpapi.WriteError(w, r, http.StatusNotImplemented, "LEDGER-STUB",
-		"audit verification not yet implemented — coming in ACP-LEDGER-1.0")
+	eventID := r.PathValue("event_id")
+
+	event, errs := s.auditLedger.VerifyEvent(eventID)
+	if event.EventID == "" {
+		acpapi.WriteError(w, r, http.StatusNotFound, "LEDGER-008",
+			fmt.Sprintf("event %q not found", eventID))
+		return
+	}
+
+	chainValid := len(errs) == 0
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"event":       event,
+		"chain_valid": chainValid,
+		"errors":      errs,
+	}, s.institutionPrivKey)
 }
 
 // ─── ACP-EXEC-1.0 §9: Execution Token Handlers ───────────────────────────────
@@ -563,6 +744,9 @@ func (s *server) handleExecTokenConsume(w http.ResponseWriter, r *http.Request) 
 		consumerSystem = "unknown"
 	}
 
+	// Look up ET entry for ledger audit (before consume changes state).
+	etEntry, etLookupErr := s.etRegistry.Get(etID)
+
 	if err := s.etRegistry.Consume(etID, consumerSystem, consumedAt); err != nil {
 		switch {
 		case errors.Is(err, execution.ErrTokenNotFound):
@@ -575,6 +759,18 @@ func (s *server) handleExecTokenConsume(w http.ResponseWriter, r *http.Request) 
 			acpapi.WriteError(w, r, http.StatusInternalServerError, acpapi.ErrSYS001, err.Error())
 		}
 		return
+	}
+
+	// ACP-LEDGER-1.0: emit EXECUTION_TOKEN_CONSUMED event (§5.7).
+	if etLookupErr == nil {
+		s.emitLedgerEvent(ledger.EventExecutionTokenConsumed, map[string]interface{}{
+			"et_id":              etID,
+			"authorization_id":   etEntry.AuthorizationID,
+			"agent_id":           etEntry.AgentID,
+			"consumed_at":        consumedAt,
+			"consumed_by_system": consumerSystem,
+			"execution_result":   req.ExecutionResult,
+		})
 	}
 
 	log.Printf("[ACP/EXEC] consumed ET %s by %s (result: %s)", etID, consumerSystem, req.ExecutionResult)
@@ -640,17 +836,18 @@ func (s *server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"timestamp":   time.Now().Unix(),
 		"components": map[string]string{
 			"policy_engine":  "operational",
-			"audit_ledger":   "not_implemented",
+			"audit_ledger":   "operational",
 			"agent_registry": "operational",
 			"rev_endpoint":   "operational",
 			"rep_engine":     "operational",
 		},
 		// Internal counters (informational).
 		"_counters": map[string]interface{}{
-			"agents":     s.registry.Size(),
-			"challenges": s.challenges.Size(),
-			"nonces":     s.nonceStore.Size(),
-			"revoked":    s.revStore.Size(),
+			"agents":        s.registry.Size(),
+			"challenges":    s.challenges.Size(),
+			"nonces":        s.nonceStore.Size(),
+			"revoked":       s.revStore.Size(),
+			"ledger_events": s.auditLedger.Size(),
 		},
 	})
 }
@@ -679,10 +876,11 @@ func (s *server) handleChallenge(w http.ResponseWriter, r *http.Request) {
 // POST /acp/v1/verify
 //
 // Required headers:
-//   Authorization:    Bearer <token_json>
-//   X-ACP-Agent-ID:   <agentID>
-//   X-ACP-Challenge:  <challenge>
-//   X-ACP-Signature:  <pop_signature>
+//
+//	Authorization:    Bearer <token_json>
+//	X-ACP-Agent-ID:   <agentID>
+//	X-ACP-Challenge:  <challenge>
+//	X-ACP-Signature:  <pop_signature>
 func (s *server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		acpapi.WriteError(w, r, http.StatusMethodNotAllowed, acpapi.ErrSYS004, "method not allowed")
@@ -819,6 +1017,17 @@ func (s *server) handleRevRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ACP-LEDGER-1.0: emit REVOCATION event (§5.4).
+	s.emitLedgerEvent(ledger.EventRevocation, map[string]interface{}{
+		"revocation_id":       randUUID(),
+		"target_type":         "token",
+		"target_id":           req.TokenID,
+		"reason_code":         req.ReasonCode,
+		"revoked_by":          req.RevokedBy,
+		"descendants_revoked": false,
+		"descendant_count":    0,
+	})
+
 	log.Printf("[ACP/REV] revoked token %s by %s (reason: %s)", req.TokenID, req.RevokedBy, req.ReasonCode)
 	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 		"ok":         true,
@@ -950,6 +1159,16 @@ func (s *server) handleRegisterLegacy(w http.ResponseWriter, r *http.Request) {
 	}, s.institutionPrivKey)
 }
 
+// ─── Ledger helpers ────────────────────────────────────────────────────────────
+
+// emitLedgerEvent appends an event to the audit ledger.
+// Errors are logged but do not affect the calling handler's response.
+func (s *server) emitLedgerEvent(eventType string, payload interface{}) {
+	if _, err := s.auditLedger.Append(eventType, payload); err != nil {
+		log.Printf("[ACP/LEDGER] failed to emit %s: %v", eventType, err)
+	}
+}
+
 // ─── Reputation helpers ────────────────────────────────────────────────────────
 
 func (s *server) emitRepEvent(agentID, eventType string) {
@@ -1006,6 +1225,22 @@ func toFloat64(v interface{}) (float64, bool) {
 }
 
 // ─── Low-level helpers ────────────────────────────────────────────────────────
+
+// randUUID generates a random UUID v4 string.
+func randUUID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback: use time-based bytes (should never happen).
+		t := time.Now().UnixNano()
+		for i := range b {
+			b[i] = byte(t >> (uint(i%8) * 8))
+		}
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant bits
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
 
 func hexDecode(s string) ([]byte, error) {
 	if len(s)%2 != 0 {
