@@ -1,5 +1,5 @@
 // cmd/acp-server — ACP Reference Server
-// Protocols: ACP-HP-1.0 + ACP-CT-1.0 + ACP-REV-1.0 + ACP-REP-1.1 + ACP-API-1.0
+// Protocols: ACP-HP-1.0 + ACP-CT-1.0 + ACP-REV-1.0 + ACP-REP-1.1 + ACP-API-1.0 + ACP-EXEC-1.0
 //
 // Environment variables:
 //   ACP_INSTITUTION_PUBLIC_KEY   base64url-encoded Ed25519 public key (required)
@@ -22,6 +22,7 @@ import (
 	"time"
 
 	acpapi "github.com/chelof100/acp-framework/acp-go/pkg/api"
+	"github.com/chelof100/acp-framework/acp-go/pkg/execution"
 	"github.com/chelof100/acp-framework/acp-go/pkg/handshake"
 	"github.com/chelof100/acp-framework/acp-go/pkg/registry"
 	"github.com/chelof100/acp-framework/acp-go/pkg/reputation"
@@ -39,6 +40,7 @@ type server struct {
 	revChecker         tokens.RevocationChecker
 	repEngine          *reputation.Engine
 	nonceStore         *tokens.InMemoryNonceStore
+	etRegistry         *execution.InMemoryETRegistry // ACP-EXEC-1.0
 	institutionPubKey  ed25519.PublicKey
 	institutionPrivKey ed25519.PrivateKey // nil if ACP_INSTITUTION_PRIVATE_KEY not set
 	addr               string
@@ -91,6 +93,7 @@ func main() {
 		revChecker:         revocation.NewStoreRevocationChecker(revStore),
 		repEngine:          reputation.NewDefaultEngine(reputation.NewInMemoryReputationStore()),
 		nonceStore:         tokens.NewInMemoryNonceStore(),
+		etRegistry:         execution.NewInMemoryETRegistry(),
 		institutionPubKey:  ed25519.PublicKey(pubKeyBytes),
 		institutionPrivKey: institutionPrivKey,
 		addr:               addr,
@@ -153,6 +156,9 @@ func main() {
 			srv.challenges.Prune()
 			if n := srv.nonceStore.Prune(); n > 0 {
 				log.Printf("[ACP] pruned %d nonces", n)
+			}
+			if n := srv.etRegistry.Prune(); n > 0 {
+				log.Printf("[ACP/EXEC] pruned %d expired/used ETs", n)
 			}
 		}
 	}()
@@ -417,13 +423,31 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	switch decision {
 	case "APPROVED":
-		validUntil := time.Now().Add(5 * time.Minute).Unix()
+		// ACP-EXEC-1.0 §7: Issue Execution Token from APPROVED authorization.
+		etReq := execution.IssueRequest{
+			AgentID:          req.AgentID,
+			AuthorizationID:  req.RequestID,
+			Capability:       req.Capability,
+			Resource:         req.Resource,
+			ActionParameters: req.ActionParameters,
+		}
+		et, etErr := execution.Issue(etReq, s.institutionPrivKey)
+		var etData interface{}
+		if etErr == nil {
+			if regErr := s.etRegistry.Register(et); regErr == nil {
+				etData = et
+				log.Printf("[ACP/EXEC] issued ET %s for agent=%s cap=%s", et.ETID, req.AgentID, req.Capability)
+			} else {
+				log.Printf("[ACP/EXEC] register ET failed: %v", regErr)
+			}
+		} else {
+			log.Printf("[ACP/EXEC] issue ET failed: %v", etErr)
+		}
 		acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
 			"decision":        "APPROVED",
 			"risk_score":      assessment.Score,
 			"risk_level":      assessment.Level.String(),
-			"valid_until":     validUntil,
-			"execution_token": nil, // populated by ACP-EXEC-1.0
+			"execution_token": etData,
 		}, s.institutionPrivKey)
 
 	case "DENIED":
@@ -511,20 +535,94 @@ func (s *server) handleAuditVerify(w http.ResponseWriter, r *http.Request) {
 		"audit verification not yet implemented — coming in ACP-LEDGER-1.0")
 }
 
-// ─── ACP-API-1.0 §8: Execution Token Stubs (ACP-EXEC-1.0 will replace) ───────
+// ─── ACP-EXEC-1.0 §9: Execution Token Handlers ───────────────────────────────
 
-// handleExecTokenConsume is a stub for ET consumption reporting (ACP-API-1.0 §8).
+// handleExecTokenConsume reports ET consumption by a target system (ACP-EXEC-1.0 §9).
 // POST /acp/v1/exec-tokens/{et_id}/consume
+//
+// Body: {et_id, consumed_at, execution_result, sig}
+// Response 200: {et_id, state, consumed_at, consumed_by, execution_result}
 func (s *server) handleExecTokenConsume(w http.ResponseWriter, r *http.Request) {
-	acpapi.WriteError(w, r, http.StatusNotImplemented, "EXEC-STUB",
-		"execution token consume not yet implemented — coming in ACP-EXEC-1.0")
+	etID := r.PathValue("et_id")
+
+	var req execution.ConsumeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
+		return
+	}
+
+	// Use provided consumed_at or default to now.
+	consumedAt := req.ConsumedAt
+	if consumedAt == 0 {
+		consumedAt = time.Now().Unix()
+	}
+
+	// Identify the consuming system via header (preferred) or "unknown".
+	consumerSystem := r.Header.Get("X-ACP-Agent-ID")
+	if consumerSystem == "" {
+		consumerSystem = "unknown"
+	}
+
+	if err := s.etRegistry.Consume(etID, consumerSystem, consumedAt); err != nil {
+		switch {
+		case errors.Is(err, execution.ErrTokenNotFound):
+			acpapi.WriteError(w, r, http.StatusNotFound, "EXEC-008", "execution token not found")
+		case errors.Is(err, execution.ErrTokenAlreadyConsumed):
+			acpapi.WriteError(w, r, http.StatusConflict, "EXEC-004", "token already consumed")
+		case errors.Is(err, execution.ErrTokenExpired):
+			acpapi.WriteError(w, r, http.StatusGone, "EXEC-003", "token expired")
+		default:
+			acpapi.WriteError(w, r, http.StatusInternalServerError, acpapi.ErrSYS001, err.Error())
+		}
+		return
+	}
+
+	log.Printf("[ACP/EXEC] consumed ET %s by %s (result: %s)", etID, consumerSystem, req.ExecutionResult)
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"et_id":            etID,
+		"state":            string(execution.StateUsed),
+		"consumed_at":      consumedAt,
+		"consumed_by":      consumerSystem,
+		"execution_result": req.ExecutionResult,
+	}, s.institutionPrivKey)
 }
 
-// handleExecTokenStatus is a stub for ET status query (ACP-API-1.0 §8).
+// handleExecTokenStatus returns the current state of an Execution Token (ACP-EXEC-1.0 §9).
 // GET /acp/v1/exec-tokens/{et_id}/status
+//
+// Response 200: {et_id, authorization_id, agent_id, capability, resource,
+//               issued_at, expires_at, state[, consumed_at, consumed_by_system]}
 func (s *server) handleExecTokenStatus(w http.ResponseWriter, r *http.Request) {
-	acpapi.WriteError(w, r, http.StatusNotImplemented, "EXEC-STUB",
-		"execution token status not yet implemented — coming in ACP-EXEC-1.0")
+	etID := r.PathValue("et_id")
+
+	entry, err := s.etRegistry.Get(etID)
+	if err != nil {
+		if errors.Is(err, execution.ErrTokenNotFound) {
+			acpapi.WriteError(w, r, http.StatusNotFound, "EXEC-008", "execution token not found")
+			return
+		}
+		acpapi.WriteError(w, r, http.StatusInternalServerError, acpapi.ErrSYS001, err.Error())
+		return
+	}
+
+	data := map[string]interface{}{
+		"et_id":            entry.ETID,
+		"authorization_id": entry.AuthorizationID,
+		"agent_id":         entry.AgentID,
+		"capability":       entry.Capability,
+		"resource":         entry.Resource,
+		"issued_at":        entry.IssuedAt,
+		"expires_at":       entry.ExpiresAt,
+		"state":            string(entry.State),
+	}
+	if entry.ConsumedAt != nil {
+		data["consumed_at"] = *entry.ConsumedAt
+	}
+	if entry.ConsumedBySystem != nil {
+		data["consumed_by_system"] = *entry.ConsumedBySystem
+	}
+
+	acpapi.WriteSuccess(w, r, http.StatusOK, data, s.institutionPrivKey)
 }
 
 // ─── ACP-API-1.0 §9: Health ───────────────────────────────────────────────────
