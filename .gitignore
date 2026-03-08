@@ -6,3 +6,14 @@
 
 # Certification outputs
 ACP-CERT-*.json
+
+# Agent workflow rules (local only)
+AGENTS.md
+
+# Python cache
+**/.pytest_cache/
+**/__pycache__/
+*.pyc
+
+# Node modules
+node_modules/
