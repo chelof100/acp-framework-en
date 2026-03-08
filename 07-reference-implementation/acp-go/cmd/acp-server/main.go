@@ -657,38 +657,185 @@ func (s *server) handleEscalationResolve(w http.ResponseWriter, r *http.Request)
 
 // ─── ACP-API-1.0 §6: Token Issuance (stub) ───────────────────────────────────
 
-// handleTokensIssue is a stub for CT issuance (ACP-API-1.0 §6).
+// handleTokensIssue issues a Capability Token via delegation (ACP-CT-1.0 §4).
 // POST /acp/v1/tokens
 // Capability required: acp:cap:agent.delegate
 //
-// Full implementation deferred — will be completed alongside ACP-EXEC-1.0.
+// Body: {issuer_id, subject_agent_id, capabilities, resource, action_parameters, expires_in, sig}
+// Response 201: CT {token_id, token_type, issuer_id, subject_agent_id, capabilities,
+//                    resource, action_parameters, issued_at, expires_at, sig}
 func (s *server) handleTokensIssue(w http.ResponseWriter, r *http.Request) {
-	acpapi.WriteError(w, r, http.StatusNotImplemented, "CT-STUB",
-		"token issuance not yet implemented — coming in ACP-EXEC-1.0")
+	var req struct {
+		IssuerID         string                 `json:"issuer_id"`
+		SubjectAgentID   string                 `json:"subject_agent_id"`
+		Capabilities     []string               `json:"capabilities"`
+		Resource         string                 `json:"resource"`
+		ActionParameters map[string]interface{} `json:"action_parameters"`
+		ExpiresIn        int64                  `json:"expires_in"` // seconds; default 3600
+		Sig              string                 `json:"sig"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
+		return
+	}
+	if req.IssuerID == "" {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "issuer_id is required")
+		return
+	}
+	if req.SubjectAgentID == "" {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "subject_agent_id is required")
+		return
+	}
+	if len(req.Capabilities) == 0 {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "capabilities must not be empty")
+		return
+	}
+	if req.Resource == "" {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "resource is required")
+		return
+	}
+	if req.ExpiresIn <= 0 {
+		req.ExpiresIn = 3600 // default: 1 hour
+	}
+
+	now := time.Now().Unix()
+	tokenID := randUUID()
+	issuedAt := now
+	expiresAt := now + req.ExpiresIn
+
+	// Build CT payload (unsigned) — ACP-CT-1.0 §3.
+	ctPayload := map[string]interface{}{
+		"token_id":         tokenID,
+		"token_type":       "CAPABILITY",
+		"issuer_id":        req.IssuerID,
+		"subject_agent_id": req.SubjectAgentID,
+		"capabilities":     req.Capabilities,
+		"resource":         req.Resource,
+		"issued_at":        issuedAt,
+		"expires_at":       expiresAt,
+	}
+	if req.ActionParameters != nil {
+		ctPayload["action_parameters"] = req.ActionParameters
+	}
+
+	// Institution signs the CT (ACP-CT-1.0 §4.2).
+	var ctSig string
+	if s.institutionPrivKey != nil {
+		payloadBytes, _ := json.Marshal(ctPayload)
+		sigBytes := ed25519.Sign(s.institutionPrivKey, payloadBytes)
+		ctSig = base64.RawURLEncoding.EncodeToString(sigBytes)
+	}
+	ctPayload["sig"] = ctSig
+
+	// ACP-LEDGER-1.0: emit TOKEN_ISSUED event (§5.5).
+	s.emitLedgerEvent(ledger.EventTokenIssued, map[string]interface{}{
+		"token_id":         tokenID,
+		"token_type":       "CAPABILITY",
+		"issuer_id":        req.IssuerID,
+		"subject_agent_id": req.SubjectAgentID,
+		"capabilities":     req.Capabilities,
+		"resource":         req.Resource,
+		"expires_at":       expiresAt,
+	})
+
+	log.Printf("[ACP/CT] issued CT %s issuer=%s subject=%s caps=%v", tokenID, req.IssuerID, req.SubjectAgentID, req.Capabilities)
+	acpapi.WriteSuccess(w, r, http.StatusCreated, ctPayload, s.institutionPrivKey)
 }
 
 // ─── ACP-API-1.0 §7: Audit — ACP-LEDGER-1.0 ─────────────────────────────────
 
-// handleAuditQuery returns a range of audit events with chain validity status.
+// handleAuditQuery returns audit events with optional filtering (ACP-LEDGER-1.0 §6).
 // POST /acp/v1/audit/query
 //
-// Body: {from_sequence?, to_sequence?}  — both optional; 0 means unset.
-// Response 200: {events, count, chain_valid}
+// Body (all optional):
+//
+//	{
+//	  "event_type":    string,                     — filter by event type (e.g. "AUTHORIZATION")
+//	  "agent_id":      string,                     — filter by agent_id in payload
+//	  "time_range":    {"from": unix, "to": unix}, — filter by event timestamp
+//	  "from_sequence": int64,                      — lower bound sequence (inclusive)
+//	  "to_sequence":   int64,                      — upper bound sequence (inclusive)
+//	  "limit":         int,                        — max events returned (0 = no limit)
+//	  "offset":        int,                        — pagination offset
+//	}
+//
+// Response 200: {events, count, total, chain_valid}
 func (s *server) handleAuditQuery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		EventType string `json:"event_type"`
+		AgentID   string `json:"agent_id"`
+		TimeRange *struct {
+			From int64 `json:"from"`
+			To   int64 `json:"to"`
+		} `json:"time_range"`
 		FromSequence int64 `json:"from_sequence"`
 		ToSequence   int64 `json:"to_sequence"`
+		Limit        int   `json:"limit"`
+		Offset       int   `json:"offset"`
 	}
-	// Body is optional — ignore decode errors; zero values return all events.
+	// Body is optional — zero values produce no filtering.
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	events := s.auditLedger.List(req.FromSequence, req.ToSequence)
+	// Fetch sequence range from ledger (fast path).
+	raw := s.auditLedger.List(req.FromSequence, req.ToSequence)
+
+	// Apply in-memory filters per ACP-LEDGER-1.0 §6.
+	filtered := make([]ledger.Event, 0, len(raw))
+	for _, ev := range raw {
+		// Filter by event_type.
+		if req.EventType != "" && ev.EventType != req.EventType {
+			continue
+		}
+		// Filter by agent_id in common payload keys.
+		if req.AgentID != "" {
+			if m, ok := ev.Payload.(map[string]interface{}); ok {
+				found := false
+				for _, key := range []string{"agent_id", "issuer_id", "subject_agent_id", "revoked_by"} {
+					if v, ok := m[key]; ok && fmt.Sprintf("%v", v) == req.AgentID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
+			} else {
+				continue
+			}
+		}
+		// Filter by time_range.
+		if req.TimeRange != nil {
+			if req.TimeRange.From > 0 && ev.Timestamp < req.TimeRange.From {
+				continue
+			}
+			if req.TimeRange.To > 0 && ev.Timestamp > req.TimeRange.To {
+				continue
+			}
+		}
+		filtered = append(filtered, ev)
+	}
+
+	// Pagination: offset then limit.
+	total := len(filtered)
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+	if req.Offset >= total {
+		filtered = []ledger.Event{}
+	} else {
+		filtered = filtered[req.Offset:]
+	}
+	if req.Limit > 0 && len(filtered) > req.Limit {
+		filtered = filtered[:req.Limit]
+	}
+
 	errs := s.auditLedger.Verify()
 	chainValid := len(errs) == 0
 
 	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
-		"events":      events,
-		"count":       len(events),
+		"events":      filtered,
+		"count":       len(filtered),
+		"total":       total,
 		"chain_valid": chainValid,
 	}, s.institutionPrivKey)
 }
@@ -974,14 +1121,16 @@ func (s *server) handleRevCheck(w http.ResponseWriter, r *http.Request) {
 	}, s.institutionPrivKey)
 }
 
-// handleRevRevoke emits a revocation for a token.
+// handleRevRevoke emits a revocation for a token (ACP-REV-1.0 §5).
 // POST /acp/v1/rev/revoke
-// Body: {token_id, reason_code, revoked_by}
+// Body: {token_id, reason_code, revoked_by, revoke_descendants, sig}
 func (s *server) handleRevRevoke(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		TokenID    string `json:"token_id"`
-		ReasonCode string `json:"reason_code"`
-		RevokedBy  string `json:"revoked_by"`
+		TokenID           string `json:"token_id"`
+		ReasonCode        string `json:"reason_code"`
+		RevokedBy         string `json:"revoked_by"`
+		RevokeDescendants bool   `json:"revoke_descendants"`
+		Sig               string `json:"sig"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
@@ -1024,8 +1173,8 @@ func (s *server) handleRevRevoke(w http.ResponseWriter, r *http.Request) {
 		"target_id":           req.TokenID,
 		"reason_code":         req.ReasonCode,
 		"revoked_by":          req.RevokedBy,
-		"descendants_revoked": false,
-		"descendant_count":    0,
+		"descendants_revoked": req.RevokeDescendants,
+		"descendant_count":    0, // descendant tracking not yet implemented
 	})
 
 	log.Printf("[ACP/REV] revoked token %s by %s (reason: %s)", req.TokenID, req.RevokedBy, req.ReasonCode)
@@ -1077,14 +1226,14 @@ func (s *server) handleRepEvents(w http.ResponseWriter, r *http.Request) {
 	}, s.institutionPrivKey)
 }
 
-// handleRepState manually sets the administrative state of an agent.
+// handleRepState manually sets the administrative state of an agent (ACP-REP-1.1 §7).
 // POST /acp/v1/rep/{agent_id}/state
-// Body: {state, reason, authorized_by}
+// Body: {new_state, reason, authorized_by}
 func (s *server) handleRepState(w http.ResponseWriter, r *http.Request) {
 	agentID := r.PathValue("agent_id")
 
 	var req struct {
-		State        string `json:"state"`
+		NewState     string `json:"new_state"`
 		Reason       string `json:"reason"`
 		AuthorizedBy string `json:"authorized_by"`
 	}
@@ -1093,14 +1242,14 @@ func (s *server) handleRepState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	targetState := reputation.AgentState(req.State)
+	targetState := reputation.AgentState(req.NewState)
 	switch targetState {
 	case reputation.StateActive, reputation.StateProbation,
 		reputation.StateSuspended, reputation.StateBanned:
 		// valid
 	default:
 		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004,
-			fmt.Sprintf("invalid state %q; valid: ACTIVE, PROBATION, SUSPENDED, BANNED", req.State))
+			fmt.Sprintf("invalid state %q; valid: ACTIVE, PROBATION, SUSPENDED, BANNED", req.NewState))
 		return
 	}
 
