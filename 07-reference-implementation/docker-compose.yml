@@ -4,7 +4,7 @@ version: "3.9"
 #
 # Usage:
 #   # 1. Generate an Ed25519 key pair (one-time setup):
-#   #    go run ./cmd/acp-server/keygen/main.go
+#   #    cd acp-go && go run ./cmd/keygen
 #   #    or: openssl genpkey -algorithm ed25519 | openssl pkey -pubout
 #   #
 #   # 2. Set the institution public key:
@@ -29,7 +29,7 @@ services:
       - "8080:8080"
     environment:
       # Required: base64url-encoded Ed25519 institution public key (32 bytes).
-      # Generate with: go run ./cmd/acp-server/keygen
+      # Generate with: cd acp-go && go run ./cmd/keygen
       ACP_INSTITUTION_PUBLIC_KEY: ${ACP_INSTITUTION_PUBLIC_KEY:?ACP_INSTITUTION_PUBLIC_KEY is required}
       ACP_ADDR: ":8080"
     restart: unless-stopped

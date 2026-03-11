@@ -2,7 +2,7 @@
 ## History Query API Specification
 **Status:** Draft
 **Version:** 1.0
-**Depends-on:** ACP-LEDGER-1.1, ACP-ITA-1.0, ACP-SIGN-1.0
+**Depends-on:** ACP-LEDGER-1.2, ACP-ITA-1.0, ACP-SIGN-1.0
 **Required-by:** ACP-REP-1.2 (historical event query for ERS)
 
 ---
@@ -11,7 +11,7 @@
 
 This document defines the query layer over the ACP Audit Ledger. It specifies filtered and paginated endpoints for programmatic access to event history, the portable export format for sharing audit trail segments between institutions, and the integrity contract that every response must include.
 
-ACP-LEDGER-1.1 defines structure and storage. ACP-HIST-1.0 defines access.
+ACP-LEDGER-1.2 defines structure and storage. ACP-HIST-1.0 defines access.
 
 ---
 
@@ -286,7 +286,7 @@ Generates a signed ExportBundle: a self-verifiable ledger segment designed to be
 3. Verify bundle.expires_at > now()
 4. Verify chain from anchor_event:
    a. first event: E.prev_hash MUST match anchor_event.hash
-   b. verify internal chain per ACP-LEDGER-1.1 §7
+   b. verify internal chain per ACP-LEDGER-1.2 §7
 5. Verify individual sig of each event with issuer pk
 ```
 
@@ -314,7 +314,7 @@ For cross-institutional reputation, the destination institution may request an E
 
 ## 9. Retention and Coverage
 
-Queries cover all events within ACP-LEDGER-1.1's active retention period (90 days in hot storage). Events archived in cold storage (between 90 days and 7 years) SHOULD be available with additional latency declared in the `X-ACP-Archive-Latency-Seconds` header.
+Queries cover all events within ACP-LEDGER-1.2's active retention period (90 days in hot storage). Events archived in cold storage (between 90 days and 7 years) SHOULD be available with additional latency declared in the `X-ACP-Archive-Latency-Seconds` header.
 
 If a queried segment includes archived events, the response includes:
 

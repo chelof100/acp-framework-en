@@ -56,6 +56,7 @@ type DelegationEntry struct {
 	DelegatedBy           string   `json:"delegated_by,omitempty"`
 	Depth                 *int     `json:"depth,omitempty"`
 	InstitutionalMaxDepth *int     `json:"institutional_max_depth,omitempty"`
+	PublicKey             string   `json:"public_key,omitempty"` // base64url Ed25519 pubkey for delegation_signature verification
 }
 
 // VectorExpected is the expected evaluation outcome.
@@ -148,6 +149,26 @@ func Evaluate(vec TestVector) Response {
 	return Response{Decision: "VALID"}
 }
 
+// SignDelegation signs a delegation object using the given Ed25519 private key.
+// The delegation_signature field is removed before signing (if present).
+// Returns base64url-encoded Ed25519 signature over sha256(jcs(delegation)).
+func SignDelegation(del map[string]interface{}, sk ed25519.PrivateKey) (string, error) {
+	d := shallowCopyMap(del)
+	delete(d, "delegation_signature")
+
+	raw, err := json.Marshal(d)
+	if err != nil {
+		return "", fmt.Errorf("marshal: %w", err)
+	}
+	canonical, err := jcs.Transform(raw)
+	if err != nil {
+		return "", fmt.Errorf("jcs: %w", err)
+	}
+	digest := sha256.Sum256(canonical)
+	sig := ed25519.Sign(sk, digest[:])
+	return base64.RawURLEncoding.EncodeToString(sig), nil
+}
+
 // SignCapability signs a capability using the given Ed25519 private key.
 // The signature field is removed before signing (if present).
 // Returns base64url-encoded Ed25519 signature over sha256(jcs(capability)).
@@ -227,6 +248,33 @@ func verifyCapSig(cap map[string]interface{}, pubKey ed25519.PublicKey) error {
 	return nil
 }
 
+// verifyDelegationSig verifies the delegation object's "delegation_signature" field.
+// Computes: ed25519.Verify(pubKey, sha256(jcs(delegation_without_delegation_signature)), sig)
+func verifyDelegationSig(delMap map[string]interface{}, pubKey ed25519.PublicKey, sigStr string) error {
+	sigBytes, err := base64.RawURLEncoding.DecodeString(sigStr)
+	if err != nil {
+		sigBytes, err = base64.StdEncoding.DecodeString(sigStr)
+		if err != nil {
+			return fmt.Errorf("base64 decode: %w", err)
+		}
+	}
+	d := shallowCopyMap(delMap)
+	delete(d, "delegation_signature")
+	raw, err := json.Marshal(d)
+	if err != nil {
+		return err
+	}
+	canonical, err := jcs.Transform(raw)
+	if err != nil {
+		return err
+	}
+	digest := sha256.Sum256(canonical)
+	if !ed25519.Verify(pubKey, digest[:], sigBytes) {
+		return fmt.Errorf("delegation signature mismatch")
+	}
+	return nil
+}
+
 // checkDelegation validates L2 delegation rules.
 // Returns the rejection error code, or "" if delegation is valid.
 func checkDelegation(cap map[string]interface{}, ctx VectorContext) string {
@@ -280,6 +328,20 @@ func checkDelegation(cap map[string]interface{}, ctx VectorContext) string {
 			if !sliceContains(entry.ActionSet, a) {
 				return "ACCESS_DENIED"
 			}
+		}
+	}
+
+	// Rule 6: verify delegation_signature if present and not a development PLACEHOLDER
+	if delSig, _ := delMap["delegation_signature"].(string); delSig != "" && !strings.HasPrefix(delSig, "PLACEHOLDER:") {
+		if entry.PublicKey == "" {
+			return "INVALID_DELEGATION_SIGNATURE"
+		}
+		pubKeyBytes, err := base64.RawURLEncoding.DecodeString(entry.PublicKey)
+		if err != nil || len(pubKeyBytes) != ed25519.PublicKeySize {
+			return "INVALID_DELEGATION_SIGNATURE"
+		}
+		if err := verifyDelegationSig(delMap, ed25519.PublicKey(pubKeyBytes), delSig); err != nil {
+			return "INVALID_DELEGATION_SIGNATURE"
 		}
 	}
 

@@ -3,7 +3,7 @@
 **Status:** Draft
 **Version:** 1.0
 **Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-CAP-REG-1.0
-**Required-by:** ACP-API-1.0, ACP-LEDGER-1.0
+**Required-by:** ACP-API-1.0, ACP-LEDGER-1.2
 
 ---
 

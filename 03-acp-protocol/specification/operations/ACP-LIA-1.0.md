@@ -1,9 +1,9 @@
 # ACP-LIA-1.0
 ## Liability Traceability Specification
-**Status:** Draft
+**Status:** Stable
 **Version:** 1.0
-**Depends-on:** ACP-EXEC-1.0, ACP-LEDGER-1.0, ACP-CT-1.0, ACP-PSN-1.0
-**Required-by:** ACP-LEDGER-1.1, ACP-REP-1.2
+**Depends-on:** ACP-EXEC-1.0, ACP-LEDGER-1.2, ACP-CT-1.0, ACP-PSN-1.0
+**Required-by:** ACP-LEDGER-1.2, ACP-REP-1.2
 
 ---
 
@@ -164,7 +164,7 @@ ELSE liability_assignee = agent_id  (the executing agent)
 
 ## 7. delegation_chain Construction Rules
 
-**7.1 Data source** — The chain is constructed exclusively from events in the Audit Ledger (ACP-LEDGER-1.0). No external input is accepted for construction.
+**7.1 Data source** — The chain is constructed exclusively from events in the Audit Ledger (ACP-LEDGER-1.2). No external input is accepted for construction.
 
 **7.2 Construction order** — The delegation tree is traversed backwards from the ET, following `parent_token_nonce` references until the root token (`depth 0`) is reached.
 
@@ -267,7 +267,7 @@ Lists LIABILITY_RECORDs where `agent_id` or `liability_assignee` match the given
 
 1. Retrieve the LIABILITY_RECORD via `GET /acp/v1/liability/{liability_id}`.
 2. Verify that `ledger_event_id` exists in the ledger and corresponds to the LIABILITY_RECORD.
-3. Verify ledger integrity from genesis to the event (ACP-LEDGER-1.0 §8).
+3. Verify ledger integrity from genesis to the event (ACP-LEDGER-1.2 §8).
 4. Verify the institutional signature `sig` on the event.
 5. Verify that `policy_snapshot_ref` corresponds to a valid Policy Snapshot active at `executed_at` (ACP-PSN-1.0 §10).
 6. Verify that `delegation_chain` is consistent with the tokens in the ledger.
@@ -312,7 +312,7 @@ An implementation conforms to ACP-LIA-1.0 if it:
 2. Constructs `delegation_chain` exclusively from Audit Ledger data.
 3. Applies the §6 assignment rules in the specified order.
 4. Includes a valid `policy_snapshot_ref` in every LIABILITY_RECORD.
-5. Persists the event as an append-only entry in the Audit Ledger (ACP-LEDGER-1.0).
+5. Persists the event as an append-only entry in the Audit Ledger (ACP-LEDGER-1.2).
 6. Exposes the three endpoints in §9 with the specified schemas.
 7. Emits the event with `chain_incomplete: true` when the chain is not reconstructible (never omits the record).
 8. Guarantees idempotency by `liability_id` during emission.

@@ -54,6 +54,24 @@ type server struct {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 func main() {
+	// Health-check mode: invoked by Docker HEALTHCHECK as /acp-server -health
+	// Needed because the distroless image has no wget/curl.
+	if len(os.Args) > 1 && os.Args[1] == "-health" {
+		addr := os.Getenv("ACP_ADDR")
+		if addr == "" {
+			addr = ":8080"
+		}
+		resp, err := http.Get("http://localhost" + addr + "/acp/v1/health")
+		if err != nil {
+			os.Exit(1)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
 	// 1. Load institution public key.
 	pubKeyB64 := os.Getenv("ACP_INSTITUTION_PUBLIC_KEY")
 	if pubKeyB64 == "" {

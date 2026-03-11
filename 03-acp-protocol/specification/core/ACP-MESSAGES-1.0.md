@@ -1,6 +1,17 @@
-ACP v1.0
-Formal Message Specification
-1. General Principles
+# ACP-MESSAGES-1.0
+## Formal Message Specification
+
+**Status:** Normative
+**Version:** 1.0
+**Type:** Core Protocol Specification
+**Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0
+**Required-by:** ACP-CONF-1.1 (L1 — Core Conformance)
+
+> This specification is **normative**. All ACP v1.x implementations MUST comply with the format, signature, and anti-replay requirements defined here.
+
+---
+
+## 1. General Principles
 
 All messages must be serializable as JSON.
 

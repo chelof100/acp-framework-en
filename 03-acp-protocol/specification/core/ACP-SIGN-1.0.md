@@ -3,7 +3,7 @@
 **Status:** Draft
 **Version:** 1.0
 **Depends-on:** RFC 8785 (JCS), RFC 8032 (Ed25519)
-**Required-by:** ACP-CT-1.0, ACP-REV-1.0, ACP-API-1.0, ACP-LEDGER-1.0, ACP-ITA-1.0
+**Required-by:** ACP-CT-1.0, ACP-REV-1.0, ACP-API-1.0, ACP-LEDGER-1.2, ACP-ITA-1.1
 
 ---
 

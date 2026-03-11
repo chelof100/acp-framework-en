@@ -1,9 +1,9 @@
 # ACP-PSN-1.0
 ## Policy Snapshot Specification
-**Status:** Draft
+**Status:** Stable
 **Version:** 1.0
-**Depends-on:** ACP-RISK-1.0, ACP-SIGN-1.0, ACP-LEDGER-1.0
-**Required-by:** ACP-LEDGER-1.1, ACP-LIA-1.0
+**Depends-on:** ACP-RISK-1.0, ACP-SIGN-1.0, ACP-LEDGER-1.2
+**Required-by:** ACP-LEDGER-1.2, ACP-LIA-1.0
 
 ---
 
@@ -154,7 +154,7 @@ When a new policy must be activated:
 3. In an atomic transaction:
    a. Set `effective_until = T_now` on the previous ACTIVE snapshot.
    b. Persist the new snapshot as ACTIVE.
-4. Emit `POLICY_SNAPSHOT_CREATED` event in the Audit Ledger (ACP-LEDGER-1.1 §5.13).
+4. Emit `POLICY_SNAPSHOT_CREATED` event in the Audit Ledger (ACP-LEDGER-1.2 §5.13).
 
 **7.3 Atomicity:** If step 3 fails, the state MUST revert. The system cannot be left without an ACTIVE snapshot or with two simultaneous ACTIVE snapshots.
 

@@ -3,7 +3,7 @@
 **Status:** Draft
 **Version:** 1.0
 **Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-HP-1.0, ACP-RISK-1.0, ACP-REV-1.0, ACP-CAP-REG-1.0
-**Required-by:** ACP-EXEC-1.0, ACP-LEDGER-1.0
+**Required-by:** ACP-EXEC-1.0, ACP-LEDGER-1.2
 
 ---
 

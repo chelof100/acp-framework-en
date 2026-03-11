@@ -68,6 +68,23 @@ TS-{LAYER}-{POS|NEG}-{NNN}-{description}.json
 
 ---
 
+## Token Schema: ACP-TS-1.1 vs ACP-CT-1.0
+
+Test vectors use the **ACP-TS-1.1 test schema**, which differs from the production **ACP-CT-1.0 schema**.
+
+| Field | ACP-TS-1.1 (test vectors) | ACP-CT-1.0 (production tokens) |
+|---|---|---|
+| Issuer | `issuer` | `iss` |
+| Capability set | `action_set` (string) | `cap` (array of strings) |
+| Token ID | `jti` | `nonce` |
+| Signature | `signature` | `sig` (under `proof`) |
+
+The IUT evaluator (`cmd/acp-evaluate`) operates on ACP-TS-1.1 test vectors.
+The production token verifier (`pkg/tokens`) operates on ACP-CT-1.0 tokens.
+These two pipelines are intentionally separate — do not mix schemas.
+
+---
+
 ## Validation
 
 Vectors MUST validate against `../compliance/ACP-TS-SCHEMA-1.0.md`.

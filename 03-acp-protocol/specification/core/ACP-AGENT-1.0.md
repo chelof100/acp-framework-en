@@ -1,8 +1,19 @@
-> ⚠️ **DEPRECATED** — This file has been renamed to **ACP-AGENT-1.0.md**.
-> Use ACP-AGENT-1.0.md. This file is maintained for historical reference.
+# ACP-AGENT-1.0
+## Agent Data Model — Formal Agent Specification
 
-4. Formal Agent Specification
-4.1 Agent Definition
+**Status:** Normative
+**Version:** 1.0
+**Type:** Core Protocol Specification
+**Supersedes:** ACP-AGENT-SPEC-0.3
+**Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-LEDGER-1.2
+**Required-by:** ACP-CONF-1.1 (L1 — Core Conformance)
+
+> This specification is **normative**. It defines the formal ACP agent model, including identity, capabilities, autonomy level, and provable security properties.
+
+---
+
+## 4. Formal Agent Specification
+### 4.1 Agent Definition
 
 An ACP Agent is an autonomous computational entity capable of:
 

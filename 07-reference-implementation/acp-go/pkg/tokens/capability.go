@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/gowebpki/jcs"
@@ -154,6 +155,9 @@ func ParseAndVerify(rawJSON []byte, issuerPubKey ed25519.PublicKey, req Verifica
 	}
 
 	// ── Step 5: Verify revocation status (ACP-REV-1.0) ──────────────────
+	if token.Rev != nil && req.RevocationChecker == nil {
+		log.Printf("[ACP-CT] WARN: token %q carries rev hints but no RevocationChecker was provided — revocation NOT checked (ACP-REV-1.0)", token.Nonce)
+	}
 	if token.Rev != nil && req.RevocationChecker != nil {
 		revoked, err := req.RevocationChecker.IsRevoked(token.Nonce, token.Rev)
 		if err != nil {

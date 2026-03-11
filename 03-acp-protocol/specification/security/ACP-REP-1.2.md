@@ -4,7 +4,7 @@
 **Status:** Stable
 **Version:** 1.2
 **Supersedes:** ACP-REP-1.1
-**Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-REV-1.0, ACP-HP-1.0, ACP-LEDGER-1.1, ACP-LIA-1.0
+**Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-REV-1.0, ACP-HP-1.0, ACP-LEDGER-1.2, ACP-LIA-1.0
 **Required-by:** ACP-AGS-1.0 (L7 — Reputation & Trust)
 
 ---
@@ -13,7 +13,7 @@
 
 ACP-REP-1.2 extends ACP-REP-1.1 with three new mechanisms that close L7 of the Agent Governance Stack:
 
-1. **ExternalReputationScore** — formal external reputation score computed from `REPUTATION_UPDATED` events in ACP-LEDGER-1.1, portable across institutions under controlled conditions.
+1. **ExternalReputationScore** — formal external reputation score computed from `REPUTATION_UPDATED` events in ACP-LEDGER-1.2, portable across institutions under controlled conditions.
 2. **Dual Trust Bootstrap** — mechanism by which a new agent can initialize its external reputation from a signed attestation of its internal institutional reputation.
 3. **Reputation Decay** — temporal degradation of the external score on inactivity, preventing dormant agents from retaining privileges indefinitely.
 
@@ -52,7 +52,7 @@ ACP-REP-1.2 formalizes the distinction between two reputation dimensions that co
 
 **InternalTrustScore (ITS):** The reputation score as defined in ACP-REP-1.1. It is the score calculated by the institution operating the agent, based on events recorded within its own ledger. It is private, institutional, and contextual.
 
-**ExternalReputationScore (ERS):** The agent's reputation score in the external ecosystem. It is built from `REPUTATION_UPDATED` events in ACP-LEDGER-1.1 and reflects the agent's behavior in cross-institutional interactions. It is portable (within conditions defined in §3) and verifiably computable.
+**ExternalReputationScore (ERS):** The agent's reputation score in the external ecosystem. It is built from `REPUTATION_UPDATED` events in ACP-LEDGER-1.2 and reflects the agent's behavior in cross-institutional interactions. It is portable (within conditions defined in §3) and verifiably computable.
 
 ### 1.2 Orthogonality
 
@@ -72,7 +72,7 @@ The two scores are orthogonal dimensions — an agent can have:
 | Responsible | Domain |
 |---|---|
 | Operating institution | ITS — computes and custodies the internal score |
-| ACP-LEDGER-1.1 | Recording of `REPUTATION_UPDATED` events |
+| ACP-LEDGER-1.2 | Recording of `REPUTATION_UPDATED` events |
 | ERS engine (§2) | Computation of ExternalReputationScore from LEDGER |
 | Institution | Policy for using ITS vs ERS in authorization decisions |
 
@@ -90,11 +90,11 @@ null  = no external activity recorded
 1.0   = maximum observable external score
 ```
 
-ERS is computed from the set of `REPUTATION_UPDATED` events in ACP-LEDGER-1.1 where `agent_id` matches the evaluated agent.
+ERS is computed from the set of `REPUTATION_UPDATED` events in ACP-LEDGER-1.2 where `agent_id` matches the evaluated agent.
 
 ### 2.2 Structure of REPUTATION_UPDATED event
 
-The `REPUTATION_UPDATED` event (defined in ACP-LEDGER-1.1) carries:
+The `REPUTATION_UPDATED` event (defined in ACP-LEDGER-1.2) carries:
 
 ```json
 {
@@ -493,7 +493,7 @@ The institution MUST have pre-computed the TrustAttestation per §3.3 and signed
 
 ---
 
-## 8. Integration with ACP-LEDGER-1.1
+## 8. Integration with ACP-LEDGER-1.2
 
 ### 8.1 Consuming REPUTATION_UPDATED events
 
@@ -727,7 +727,7 @@ An implementation is **ACP-REP-1.2 conformant** if it meets all requirements of 
 
 ### ExternalReputationScore
 - [ ] Implements ERS computation per §2.3 with parameters from §2.2
-- [ ] Consumes `REPUTATION_UPDATED` events from ACP-LEDGER-1.1
+- [ ] Consumes `REPUTATION_UPDATED` events from ACP-LEDGER-1.2
 - [ ] Distinguishes `evaluation_context` in event processing
 - [ ] Exposes `external_score` in `GET /rep/{agent_id}`
 - [ ] Exposes the `last_external_event_at` field
@@ -765,7 +765,7 @@ No IANA assignments required.
 - ACP-CT-1.0 — Capability Token format
 - ACP-REV-1.0 — Revocation Protocol
 - ACP-HP-1.0 — HTTP Protocol + authentication
-- ACP-LEDGER-1.1 — Audit log + REPUTATION_UPDATED events
+- ACP-LEDGER-1.2 — Audit log + REPUTATION_UPDATED events
 - ACP-LIA-1.0 — Liability Traceability
 - ACP-ITA-1.0 — Institutional Trust Authority
 - ACP-REP-1.1 — Base specification (superseded by this document)

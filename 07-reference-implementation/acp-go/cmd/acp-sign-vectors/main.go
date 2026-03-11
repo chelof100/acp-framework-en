@@ -13,6 +13,7 @@ package main
 
 import (
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -23,9 +24,35 @@ import (
 	"github.com/chelof100/acp-framework/acp-go/pkg/iut"
 )
 
-// RFC 8037 test key A — seed (32 bytes, hex).
+// RFC 8037 test key A — institution key (32-byte seed, hex).
 // DID: did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2
 const testKeySeedHex = "9d61b19deffd59985ba34a442fa1c54cd044c9c565b66f2699171d66c9682252"
+
+// Secondary test key seeds for DCMA delegation signing — one per delegating agent.
+// These deterministic seeds are used only in test vectors; never in production.
+const (
+	aliceKeySeedHex = "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4d0bd6d8" // alice (RFC 8037 key B)
+	bobKeySeedHex   = "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7" // bob
+	a3KeySeedHex    = "f5e287302bfa55e4ae4b18c2f793a3a09e74e5c9547e80d22b55d3a51b3ddbc1" // agent-a3
+)
+
+// delegationKeys maps delegator DID → Ed25519 private key for delegation_signature signing.
+var delegationKeys map[string]ed25519.PrivateKey
+
+func init() {
+	mustKey := func(seedHex string) ed25519.PrivateKey {
+		b, err := hex.DecodeString(seedHex)
+		if err != nil {
+			panic("bad delegation key seed: " + err.Error())
+		}
+		return ed25519.NewKeyFromSeed(b)
+	}
+	delegationKeys = map[string]ed25519.PrivateKey{
+		"did:example:agent-alice": mustKey(aliceKeySeedHex),
+		"did:example:agent-bob":   mustKey(bobKeySeedHex),
+		"did:example:agent-a3":    mustKey(a3KeySeedHex),
+	}
+}
 
 func main() {
 	dir := "../../03-acp-protocol/test-vectors"
@@ -71,8 +98,14 @@ func main() {
 	}
 }
 
-// signVectorFile reads a test vector JSON file, replaces any PLACEHOLDER
-// capability signature with a real Ed25519 signature, and writes it back.
+// signVectorFile reads a test vector JSON file, replaces PLACEHOLDER signatures
+// with real Ed25519 signatures, and writes it back.
+//
+// Signing order for vectors with delegation:
+//  1. Sign delegation_signature first (with the delegator's key).
+//  2. Re-sign the top-level capability signature (with the institution key)
+//     because the signed payload includes the updated delegation object.
+//
 // Returns true if the file was modified.
 func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
 	data, err := os.ReadFile(path)
@@ -95,16 +128,61 @@ func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
 		return false, nil
 	}
 
-	sig, _ := cap["signature"].(string)
-	if !strings.HasPrefix(sig, "PLACEHOLDER:") {
-		return false, nil // nothing to do
+	changed := false
+
+	// Step 1: sign delegation_signature if PLACEHOLDER.
+	// Must be done before signing the capability because the capability signature
+	// covers the entire delegation object (including delegation_signature).
+	if delegation, _ := cap["delegation"].(map[string]interface{}); delegation != nil {
+		delSig, _ := delegation["delegation_signature"].(string)
+		if strings.HasPrefix(delSig, "PLACEHOLDER:") {
+			delegator, _ := delegation["delegator"].(string)
+			delSK, ok := delegationKeys[delegator]
+			if !ok {
+				return false, fmt.Errorf("no delegation key for delegator %q", delegator)
+			}
+			realDelSig, err := iut.SignDelegation(delegation, delSK)
+			if err != nil {
+				return false, fmt.Errorf("sign delegation: %w", err)
+			}
+			delegation["delegation_signature"] = realDelSig
+			cap["delegation"] = delegation
+
+			// Update the delegator's public_key in context.delegation_registry so
+			// the evaluator can verify the signature during test execution.
+			if context, _ := vec["context"].(map[string]interface{}); context != nil {
+				if reg, _ := context["delegation_registry"].(map[string]interface{}); reg != nil {
+					if entry, _ := reg[delegator].(map[string]interface{}); entry != nil {
+						pubKey := delSK.Public().(ed25519.PublicKey)
+						entry["public_key"] = base64.RawURLEncoding.EncodeToString(pubKey)
+						reg[delegator] = entry
+						context["delegation_registry"] = reg
+						vec["context"] = context
+					}
+				}
+			}
+
+			// Force re-sign of the capability signature below (delegation changed).
+			cap["signature"] = "PLACEHOLDER:needs-resign-after-delegation"
+			changed = true
+		}
 	}
 
-	realSig, err := iut.SignCapability(cap, sk)
-	if err != nil {
-		return false, fmt.Errorf("sign: %w", err)
+	// Step 2: sign top-level capability signature if PLACEHOLDER (or forced above).
+	sig, _ := cap["signature"].(string)
+	if strings.HasPrefix(sig, "PLACEHOLDER:") {
+		realSig, err := iut.SignCapability(cap, sk)
+		if err != nil {
+			return false, fmt.Errorf("sign: %w", err)
+		}
+		cap["signature"] = realSig
+		changed = true
 	}
-	cap["signature"] = realSig
+
+	if !changed {
+		return false, nil
+	}
+
 	input["capability"] = cap
 	vec["input"] = input
 

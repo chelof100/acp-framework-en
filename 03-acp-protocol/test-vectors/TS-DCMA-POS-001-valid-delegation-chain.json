@@ -7,6 +7,7 @@
           "read",
           "write"
         ],
+        "public_key": "YbpNfZpGun1v9UCEqxfhWkexj4WADnmk_YsPkfFbry4",
         "resource": "doc:finance:report-2024",
         "revoked": false
       }
@@ -38,7 +39,7 @@
           "resource": "doc:finance:report-2024"
         },
         "delegatee": "did:example:agent-bob",
-        "delegation_signature": "PLACEHOLDER:ed25519-sign(alice-key, canonical-json-of-delegation)",
+        "delegation_signature": "IBdb0H3Ohlnj8pQ05QAtjnan-t77eu6-5IvOOTfHP6A3AwcmORqX00eDNPta8Apl1L6aeaRIAnusKXEzKJHFCQ",
         "delegator": "did:example:agent-alice",
         "depth": 1,
         "max_depth": 2
@@ -48,7 +49,7 @@
       "jti": "cap-dcma-pos-001",
       "nonce": "1ae5d9c8b6f47023ae5d9c8b6f47023",
       "resource": "doc:finance:report-2024",
-      "signature": "qqmbtD2YtbyEUV1gK7Swj7CIozV5Bc9Ws5G0sG2wMvguWaWNIolgMO8fELxagZ0PTrPeEa7iBtKpYrzxQYKHBw",
+      "signature": "K4p0BB-Jj04bk8uUbma9axEzZILXI8gTOYkTO57_ASfnkHrhcEskt1QiLPBNredgxqDjV6NPUb9dcIVjaZVEDw",
       "sub": "did:example:agent-bob",
       "ver": "1.1"
     }

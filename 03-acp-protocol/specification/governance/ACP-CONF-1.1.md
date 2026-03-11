@@ -3,6 +3,8 @@ ACP Conformance Specification
 Version: 1.1
 Status: Standards Track
 Updated: 2026-02-25 (corrective revision — profile model replaced by level model)
+Depends-on: ACP-SIGN-1.0, ACP-CT-1.0, ACP-CAP-REG-1.0, ACP-HP-1.0, ACP-RISK-1.0, ACP-REV-1.0, ACP-ITA-1.1, ACP-API-1.0, ACP-EXEC-1.0, ACP-LEDGER-1.2, ACP-MESSAGES-1.0, ACP-DCMA-1.0
+Required-by: —
 
 ---
 
@@ -157,7 +159,7 @@ An L3-conformant implementation MUST satisfy L2 and additionally:
 - Invalidate an Execution Token immediately after its first use
 - Reject reuse of Execution Tokens
 
-6.3 Audit Ledger (ACP-LEDGER-1.0)
+6.3 Audit Ledger (ACP-LEDGER-1.2)
 
 - Maintain an append-only ledger of all executed actions
 - Chain entries via hash of the previous record
@@ -191,11 +193,11 @@ The implementation MUST:
 
 The reputation calculation MUST be deterministic.
 
-7.3 BFT Trust Anchor (ACP-ITA-1.1)
+7.3 Federation Trust (ACP-ITA-1.1)
 
 The implementation MUST:
 
-- Operate the Trust Anchor as a BFT quorum with n ≥ 3f+1 nodes
+- Operate the Federation Trust Anchor per ACP-ITA-1.1
 - Require threshold t ≥ 2f+1 for issuance decisions
 - Tolerate f Byzantine nodes without compromising quorum integrity
 

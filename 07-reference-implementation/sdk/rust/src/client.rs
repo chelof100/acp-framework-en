@@ -54,13 +54,13 @@ impl<'a> ACPClient<'a> {
             .ok_or_else(|| ACPError::UnexpectedResponse("missing 'challenge' field".into()))?
             .to_string();
 
-        // Step 2: Build token JSON body
-        let body_bytes = serde_json::to_vec(capability_token)?;
+        // Step 2: Empty body — ACP-HP-1.0: token travels in Authorization header only
+        let body_bytes: Vec<u8> = vec![];
 
-        // Step 3: Compute PoP signature
+        // Step 3: Compute PoP signature over empty body
         let pop = self.sign_pop("POST", "/acp/v1/verify", &challenge, &body_bytes);
 
-        // Step 4: POST with ACP headers
+        // Step 4: POST with ACP headers — token as Bearer, body empty
         let token_json = serde_json::to_string(capability_token)?;
         let url = format!("{}/acp/v1/verify", self.server_url);
 
@@ -70,7 +70,7 @@ impl<'a> ACPClient<'a> {
             .set("X-ACP-Agent-ID", &self.identity.agent_id())
             .set("X-ACP-Challenge", &challenge)
             .set("X-ACP-Signature", &pop)
-            .send_bytes(&body_bytes)
+            .send_string("")
             .map_err(|e| map_ureq_error(e))?;
 
         let status = resp.status();

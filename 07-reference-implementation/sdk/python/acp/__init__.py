@@ -1,7 +1,7 @@
 """ACP SDK — Agent Control Protocol client library for Python agents."""
 from .identity import AgentIdentity
 from .signer import ACPSigner
-from .client import ACPClient
+from .client import ACPClient, ACPError
 
-__all__ = ["AgentIdentity", "ACPSigner", "ACPClient"]
-__version__ = "1.3.0"
+__all__ = ["AgentIdentity", "ACPSigner", "ACPClient", "ACPError"]
+__version__ = "1.6.0"

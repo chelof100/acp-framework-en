@@ -25,6 +25,7 @@
         ],
         "delegated_by": "did:example:agent-a2",
         "depth": 3,
+        "public_key": "dqm86K0l8RgvuDwA2j3i46zjjxLGKPXnyTMcXifZq60",
         "resource": "doc:ops:runbook",
         "revoked": false
       }
@@ -59,7 +60,7 @@
           "resource": "doc:ops:runbook"
         },
         "delegatee": "did:example:agent-a4",
-        "delegation_signature": "PLACEHOLDER:ed25519-sign(a3-key, canonical-json-of-delegation)",
+        "delegation_signature": "P537ZQj24p_dyn7tZwKFyTuf2-iCp85lVbmYNOriV1bRyCENkxFy3Qf6WRPaGIl53Hl5UbA_FObI260txVjMBw",
         "delegator": "did:example:agent-a3",
         "depth": 4,
         "max_depth": 3
@@ -69,7 +70,7 @@
       "jti": "cap-dcma-neg-003",
       "nonce": "4dh8g2f1e9c70356dh8g2f1e9c70356",
       "resource": "doc:ops:runbook",
-      "signature": "HxMavrHRqUmDJD0lQJsn-GQIUbVnGE1aF_jAVRjjv5aie_ahFL2UoMqex9nTXaQVwIemzBR3OifO35YU3ZbTCg",
+      "signature": "HzXeCHtFttYIldkcH1-VcwFU8rktGd55eJ5Tx23QIv-UF--JlS8VzG5rx_AdlBOBX6EN5T_m0LZkIlIhTEBcDQ",
       "sub": "did:example:agent-a4",
       "ver": "1.1"
     }

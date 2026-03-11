@@ -1,4 +1,17 @@
-1. Extension of the Formal Space
+# ACP-DCMA-1.0
+## Delegation Chain Model & Attestation
+
+**Status:** Normative
+**Version:** 1.0
+**Type:** Core Protocol Specification
+**Depends-on:** ACP-CT-1.0, ACP-SIGN-1.0, ACP-LEDGER-1.2
+**Required-by:** ACP-CONF-1.1 (L1 — Core Conformance)
+
+> This specification is **normative**. It defines the formal chained delegation model, no-escalation constraints, and transitive revocation. All ACP v1.x implementations that support delegation MUST comply with the formal properties defined here.
+
+---
+
+## 1. Extension of the Formal Space
 
 We add:
 
