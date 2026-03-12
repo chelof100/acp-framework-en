@@ -35,6 +35,34 @@ No agent action executes unless all four conditions hold simultaneously and are 
 
 ---
 
+## System Overview
+
+```mermaid
+flowchart TD
+    INST(["🏛️ Institution — Root of Trust"])
+    AGENT(["🤖 Agent — A = (ID, C, P, D, L, S)"])
+
+    INST -->|"issues Capability Token (CT)"| AGENT
+    AGENT -->|"HP handshake · DCMA delegation chain"| GATE
+
+    GATE{"EXEC Validation\n① ValidIdentity\n② ValidCapability\n③ ValidDelegationChain\n④ AcceptableRisk"}
+
+    GATE -->|"DENY"| REJECT(["❌ Rejected"])
+    GATE -->|"PERMIT"| ET[/"Execution Token\nsingle-use · 300s"/]
+
+    ET --> ACTION(["⚡ Action Executed"])
+
+    ACTION --> PROV[/"PROVENANCE\nDelegation chain proof"/]
+    ACTION --> PCTX[/"POLICY-CTX\nPolicy snapshot"/]
+    ACTION --> LEDGER[("LEDGER\nHash-chained · Append-only")]
+
+    LEDGER --> HIST["HIST · History API"]
+    LEDGER --> REP["REP · 0.6·ITS + 0.4·ERS"]
+    LEDGER --> LIA["LIA · Liability Chain"]
+```
+
+---
+
 ## Architecture: 8-Layer Governance Stack
 
 ACP is organized in eight cumulative layers. Each layer depends on all layers below it.
@@ -101,6 +129,34 @@ The critical dependency chains every implementer must understand:
 | **L5** | DECENTRALIZED | 1–8 | L4 + ACP-D · ITA-1.1 BFT quorum |
 
 → Normative conformance definition: [`spec/governance/ACP-CONF-1.1.md`](spec/governance/ACP-CONF-1.1.md)
+
+---
+
+## How to Implement ACP Incrementally
+
+ACP is designed for layered adoption. Every implementation starts with L1 and extends upward.
+
+```
+L1 · Execution Core      → Agent identity · Capability Tokens · Delegation · Signing
+         ↓ adds
+L2 · Trust Layer         → Risk scoring · Revocation · Institutional Trust Anchors
+         ↓ adds
+L3 · Verifiable Execution → Execution Tokens · Audit Ledger · Retrospective proof
+         ↓ adds
+L4 · Governance          → Reputation · History API · Liability traceability · Gov events
+         ↓ adds
+L5 · Federation          → Decentralized BFT · DIDs · Self-sovereign capabilities
+```
+
+| Level | Focus | What you gain |
+|---|---|---|
+| **L1** | Execution Core | Verifiable identity, signed Capability Tokens, multi-hop delegation — minimum to run ACP |
+| **L2** | Trust Layer | Deterministic risk scoring, revocation, institutional trust anchors |
+| **L3** | Verifiable Execution | Single-use Execution Tokens, hash-chained audit ledger, retrospective proof (PROVENANCE + POLICY-CTX) |
+| **L4** | Governance | Reputation scoring, queryable history, liability traceability, governance event stream |
+| **L5** | Federation | Decentralized BFT quorum, DID-based identity, self-sovereign capabilities |
+
+**Minimum Viable ACP (L1):** An agent with a verified identity, a signed Capability Token from a trusted institution, and a working HP handshake can execute authorized actions under ACP. Layers 2–5 add evidentiary depth, risk controls, and governance reach.
 
 ---
 
