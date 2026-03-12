@@ -1,4 +1,12 @@
-> ⚠️ **DEPRECATED** — This file has been renamed to **ACP-AGENT-1.0.md**.
+ACP Agent Specification
+
+Version: 0.3
+Status: Superseded
+Superseded-by: ACP-AGENT-1.0
+
+---
+
+> ⚠️ **SUPERSEDED** — This file has been renamed and superseded by **ACP-AGENT-1.0.md**.
 > Use ACP-AGENT-1.0.md. This file is maintained for historical reference.
 
 4. Formal Agent Specification

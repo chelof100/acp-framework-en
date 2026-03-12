@@ -1,7 +1,8 @@
 ACP Conformance Specification
 
 Version: 1.1
-Status: Standards Track
+Status: Superseded
+Superseded-by: ACP-CONF-1.2
 Updated: 2026-02-25 (corrective revision — profile model replaced by level model)
 Depends-on: ACP-SIGN-1.0, ACP-CT-1.0, ACP-CAP-REG-1.0, ACP-HP-1.0, ACP-RISK-1.0, ACP-REV-1.0, ACP-ITA-1.1, ACP-API-1.0, ACP-EXEC-1.0, ACP-LEDGER-1.2, ACP-MESSAGES-1.0, ACP-DCMA-1.0
 Required-by: —

@@ -1,16 +1,16 @@
 # ACP-CONF-1.0
 ## Conformance Specification
 
-> **DEPRECATED** — This document defines the conformance levels for ACP v1.0 (L1–L3).
-> It has been superseded by **ACP-CONF-1.1** (L1–L5, includes PAY, REP, ACP-D).
-> New implementations should use ACP-CONF-1.1.
+> **SUPERSEDED** — This document defines the conformance levels for ACP v1.0 (L1–L3).
+> It has been superseded by **ACP-CONF-1.2** (current active version).
+> New implementations MUST use ACP-CONF-1.2.
 > This document is maintained for historical reference of ACP v1.0.
 
-**Status:** Deprecated (superseded by ACP-CONF-1.1)
+**Status:** Superseded
 **Version:** 1.0
 **Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-CAP-REG-1.0, ACP-HP-1.0, ACP-RISK-1.0, ACP-REV-1.0, ACP-ITA-1.0, ACP-API-1.0, ACP-EXEC-1.0, ACP-LEDGER-1.0
 **Blocks:** none — terminal document of the v1.0 specification
-**Superseded-by:** ACP-CONF-1.1
+**Superseded-by:** ACP-CONF-1.2
 
 ---
 

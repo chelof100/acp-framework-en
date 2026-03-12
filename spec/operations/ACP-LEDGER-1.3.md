@@ -1,10 +1,12 @@
-# ACP-LEDGER-1.2
+# ACP-LEDGER-1.3
 ## Audit Ledger Specification
 **Status:** Stable
-**Version:** 1.2
+**Version:** 1.3
+**Supersedes:** ACP-LEDGER-1.2
 **Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-RISK-1.0, ACP-REV-1.0, ACP-EXEC-1.0, ACP-LIA-1.0, ACP-PSN-1.0
-**Required-by:** ACP-CONF-1.0, ACP-REP-1.2
+**Required-by:** ACP-CONF-1.2
 **Changelog:**
+- v1.3 — Makes `sig` normatively mandatory in all production implementations. Adds LEDGER-012 error code for absent or empty signature. Removes ambiguity in §4.4 (was descriptive only; now uses MUST). Updates §7 chain verification (step 1 now rejects absent sig before attempting cryptographic check). Updates §8 and §12 with LEDGER-012. Updates §13 conformance requirements. Clarifies testing posture: test implementations MUST use a real key (MAY be a deterministic test key per ACP-TS-1.1); nil keys are not conformant even in development mode.
 - v1.2 — Schema bug fixes: adds `resolver_type` field to `ESCALATION_RESOLVED` §5.11 (required by ACP-LIA-1.0 §6 Rule 1); corrects score type to `float` (scale 0.0–1.0) in `REPUTATION_UPDATED` §5.14 to align with ACP-REP-1.2.
 - v1.1 — Adds event types `LIABILITY_RECORD`, `POLICY_SNAPSHOT_CREATED`, `REPUTATION_UPDATED`; adds `policy_snapshot_ref` and `policy_version` to AUTHORIZATION and RISK_EVALUATION payloads; defines backwards compatibility with v1.0.
 
@@ -12,23 +14,32 @@
 
 ## 1. Scope
 
-This document defines the structure of the ACP Audit Ledger, the unified event format, the hash-chaining mechanism, event types and their schemas, the integrity verification process, and behavior upon detected corruption.
+This document defines the structure of the ACP Audit Ledger, the unified
+event format, the hash-chaining mechanism, event types and their schemas,
+the integrity verification process, and behavior upon detected corruption.
 
 ---
 
 ## 2. Definitions
 
-**Audit Ledger:** Append-only log of ACP events ordered chronologically and linked by hash chaining.
+**Audit Ledger:** Append-only log of ACP events ordered chronologically and
+linked by hash chaining.
 
-**Event:** Atomic unit of record. Represents a fact that occurred in the ACP system at a specific point in time.
+**Event:** Atomic unit of record. Represents a fact that occurred in the ACP
+system at a specific point in time.
 
-**Chain hash:** SHA-256 hash of the previous event. Links events in a verifiable order.
+**Chain hash:** SHA-256 hash of the previous event. Links events in a
+verifiable order.
 
-**Genesis event:** First event in the ledger. Its `prev_hash` is the constant genesis value.
+**Genesis event:** First event in the ledger. Its `prev_hash` is the
+constant genesis value.
 
-**Ledger segment:** Contiguous subset of events, independently verifiable if the hash of the initial event is known.
+**Ledger segment:** Contiguous subset of events, independently verifiable if
+the hash of the initial event is known.
 
-**policy_snapshot_ref:** UUID of the Policy Snapshot (ACP-PSN-1.0) active at the time of the event. Allows exact reconstruction of the rules that governed a decision.
+**policy_snapshot_ref:** UUID of the Policy Snapshot (ACP-PSN-1.0) active at
+the time of the event. Allows exact reconstruction of the rules that governed
+a decision.
 
 ---
 
@@ -53,9 +64,11 @@ This document defines the structure of the ACP Audit Ledger, the unified event f
 
 ## 4. Base Field Specification
 
-**4.1 `sequence`** — Positive integer, monotonically increasing, without gaps. Genesis: sequence 1.
+**4.1 `sequence`** — Positive integer, monotonically increasing, without
+gaps. Genesis: sequence 1.
 
-**4.2 `prev_hash`** — `base64url(SHA-256(JCS(previous_event without hash and sig fields)))`.
+**4.2 `prev_hash`** — `base64url(SHA-256(JCS(previous_event without hash
+and sig fields)))`.
 
 For the genesis event:
 ```
@@ -65,16 +78,31 @@ prev_hash = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 **4.3 `hash`** — `base64url(SHA-256(JCS(event without hash and sig fields)))`.
 
-Coverage: `ver`, `event_id`, `event_type`, `sequence`, `timestamp`, `institution_id`, `prev_hash`, `payload`.
+Coverage: `ver`, `event_id`, `event_type`, `sequence`, `timestamp`,
+`institution_id`, `prev_hash`, `payload`.
 
-**4.4 `sig`** — ACP institutional signature over all fields except `sig`. Covers `hash` transitively.
+**4.4 `sig`** — ACP institutional Ed25519 signature over all fields except
+`sig`. Covers `hash` transitively.
+
+`sig` MUST be present and non-empty on all events in production
+implementations.
+
+An implementation MUST NOT store events without `sig`.
+
+An implementation MUST NOT accept unsigned events during ingestion.
+
+Testing implementations MAY use a dedicated deterministic test key as
+defined in ACP-TS-1.1. The use of nil keys or absent signatures is NOT
+conformant in any deployment mode, including development. Test suites MUST
+use a real key (MAY be a well-known deterministic test key).
 
 ---
 
 ## 5. Event Types and Schemas
 
 ### 5.1 `LEDGER_GENESIS`
-First event. Emitted exactly once. `prev_hash` MUST be the constant value. `sequence` MUST be 1.
+First event. Emitted exactly once. `prev_hash` MUST be the constant value.
+`sequence` MUST be 1.
 
 ```json
 {
@@ -110,9 +138,11 @@ Generated by POST /acp/v1/authorize upon completing evaluation.
 }
 ```
 
-DENIED and ESCALATED decisions MUST be recorded — the ledger is not only a record of successes.
+DENIED and ESCALATED decisions MUST be recorded — the ledger is not only a
+record of successes.
 
-`policy_snapshot_ref` and `policy_version` are REQUIRED in v1.1. Events without these fields are treated as legacy v1.0.
+`policy_snapshot_ref` and `policy_version` are REQUIRED in v1.1+. Events
+without these fields are treated as legacy v1.0.
 
 ### 5.3 `RISK_EVALUATION`
 Generated by the ACP-RISK-1.0 risk engine.
@@ -282,7 +312,10 @@ Generated by POST /acp/v1/agents/{agent_id}/state.
 ```
 
 ### 5.12 `LIABILITY_RECORD`
-Generated by ACP-LIA-1.0 immediately after recording `EXECUTION_TOKEN_CONSUMED`. Captures the complete delegation chain and the assigned responsible party for each execution. Always emitted — for both `success` and `failure` or `unknown`.
+Generated by ACP-LIA-1.0 immediately after recording
+`EXECUTION_TOKEN_CONSUMED`. Captures the complete delegation chain and the
+assigned responsible party for each execution. Always emitted — for both
+`success` and `failure` or `unknown`.
 
 ```json
 {
@@ -325,10 +358,14 @@ Generated by ACP-LIA-1.0 immediately after recording `EXECUTION_TOKEN_CONSUMED`.
 }
 ```
 
-`chain_incomplete: true` is emitted when any token in the chain is unavailable for reconstruction (expired historical token or token from an external institution). This does not invalidate the record — it marks it as partially verifiable.
+`chain_incomplete: true` is emitted when any token in the chain is
+unavailable for reconstruction (expired historical token or token from an
+external institution). This does not invalidate the record — it marks it as
+partially verifiable.
 
 ### 5.13 `POLICY_SNAPSHOT_CREATED`
-Generated by ACP-PSN-1.0 when creating a new active policy snapshot. Records each policy transition in the ledger for historical traceability.
+Generated by ACP-PSN-1.0 when creating a new active policy snapshot. Records
+each policy transition in the ledger for historical traceability.
 
 ```json
 {
@@ -347,7 +384,9 @@ Generated by ACP-PSN-1.0 when creating a new active policy snapshot. Records eac
 `previous_snapshot_id` is `null` for the institution's first snapshot.
 
 ### 5.14 `REPUTATION_UPDATED`
-Generated by ACP-REP-1.2 after processing execution events. Makes reputation scoring auditable — each score update is recorded in the ledger with its triggering event.
+Generated by ACP-REP-1.2 after processing execution events. Makes reputation
+scoring auditable — each score update is recorded in the ledger with its
+triggering event.
 
 ```json
 {
@@ -383,7 +422,8 @@ JCS (RFC 8785) is mandatory to guarantee determinism across implementations.
 
 ```
 For each event E_i:
-  1. Verify sig with ACP institutional pk
+  1. Verify sig is present and non-empty. If absent or empty: LEDGER-012.
+     Verify sig with ACP institutional pk. If invalid: LEDGER-002.
   2. Compute computed_hash = base64url(SHA-256(JCS(E_i without hash and sig)))
   3. Verify computed_hash == E_i.hash
   4. Verify E_i.prev_hash == E_i-1.hash
@@ -406,12 +446,18 @@ Failure at any step: segment invalid from E_i onward.
 
 | Type | Code | MUST Behavior |
 |------|------|---------------|
+| Modification rejected | LEDGER-001 | Reject, return LEDGER-001 |
 | Invalid signature | LEDGER-002 | Report with event_id and sequence |
 | Hash mismatch | LEDGER-003 | Report, E_i and subsequent events untrusted |
 | Broken prev_hash | LEDGER-004 | Report, indicates insertion/deletion |
 | Sequence gap | LEDGER-005 | Report, indicates deleted event |
 | Regressive timestamp | LEDGER-006 | Report |
 | Missing genesis | LEDGER-007 | Report |
+| Unrecognized event type | LEDGER-008 | Report, continue chain verification |
+| Incomplete payload | LEDGER-009 | Report with event_id |
+| Missing policy_snapshot_ref in AUTHORIZATION | LEDGER-010 | Report as legacy v1.0 |
+| Missing policy_snapshot_ref in RISK_EVALUATION | LEDGER-011 | Report as legacy v1.0 |
+| Missing or empty sig | LEDGER-012 | Report with event_id and sequence; segment invalid |
 
 Upon corruption:
 - MUST NOT suppress the error
@@ -452,7 +498,7 @@ Institution B verifying events from institution A:
 ```
 1. Obtain A's pk via ACP-ITA-1.0
 2. Request segment via GET /acp/v1/audit/query
-3. Verify signatures with A's pk
+3. Verify signatures with A's pk (including LEDGER-012 check for absent sig)
 4. Verify chain integrity
 ```
 
@@ -473,14 +519,15 @@ The result is verifiable without trusting institution A.
 | LEDGER-007 | Missing or invalid genesis event |
 | LEDGER-008 | Unrecognized event type |
 | LEDGER-009 | Incomplete payload for declared type |
-| LEDGER-010 | `policy_snapshot_ref` absent in AUTHORIZATION (required in v1.1) |
-| LEDGER-011 | `policy_snapshot_ref` absent in RISK_EVALUATION (required in v1.1) |
+| LEDGER-010 | `policy_snapshot_ref` absent in AUTHORIZATION (required in v1.1+) |
+| LEDGER-011 | `policy_snapshot_ref` absent in RISK_EVALUATION (required in v1.1+) |
+| LEDGER-012 | Missing or empty `sig` field — event has no institutional signature |
 
 ---
 
 ## 13. Conformance
 
-An implementation is ACP-LEDGER-1.2 conformant if it:
+An implementation is ACP-LEDGER-1.3 conformant if it:
 
 - Generates events with the complete base structure from §3
 - Implements all event types from §5 (including §5.12–5.14)
@@ -491,17 +538,32 @@ An implementation is ACP-LEDGER-1.2 conformant if it:
 - Retains events for a minimum of 7 years
 - Includes `chain_valid` in query responses
 - Includes `policy_snapshot_ref` in AUTHORIZATION and RISK_EVALUATION events
-- Implements event types LIABILITY_RECORD, POLICY_SNAPSHOT_CREATED, REPUTATION_UPDATED
+- Implements event types LIABILITY_RECORD, POLICY_SNAPSHOT_CREATED,
+  REPUTATION_UPDATED
 - Includes `resolver_type` in ESCALATION_RESOLVED events
-- Uses `float` type (0.0–1.0) for `previous_score` and `new_score` fields in REPUTATION_UPDATED
+- Uses `float` type (0.0–1.0) for `previous_score` and `new_score` fields
+  in REPUTATION_UPDATED
+- Produces a valid `sig` on every event before storing it
+- Rejects unsigned events on ingestion with LEDGER-012
+- Does not provide any mode (development, test, or otherwise) that bypasses
+  institutional signing for stored events
 
 ---
 
-## 14. Backwards Compatibility with v1.0
+## 14. Backwards Compatibility
 
-ACP-LEDGER-1.2 is backwards-compatible with v1.0 and v1.1:
+ACP-LEDGER-1.3 is backwards-compatible with v1.0, v1.1, and v1.2 with the
+following notes:
 
-- Existing events without `policy_snapshot_ref` are valid and processed as **legacy v1.0**. They are not rejected — they are marked as `policy_context: "legacy"` in query responses.
-- The new event types (§5.12, §5.13, §5.14) are gracefully ignored by v1.0 verifiers without breaking chain integrity — the hash-chain is agnostic to `event_type`.
-- A v1.1 implementation MUST accept ledgers with a mix of v1.0 and v1.1 events.
-- A v1.0 implementation that encounters unknown event types MUST report LEDGER-008 but MUST continue verifying the chain.
+- Existing events without `policy_snapshot_ref` are valid and processed as
+  **legacy v1.0**. They are not rejected — they are marked as
+  `policy_context: "legacy"` in query responses.
+- The event types introduced in v1.1 (§5.12, §5.13, §5.14) are gracefully
+  ignored by v1.0 verifiers without breaking chain integrity.
+- A v1.3 implementation reading a ledger created under v1.2 MUST accept
+  events that carry a valid `sig`. Events without `sig` in a pre-existing
+  v1.2 ledger MAY be treated as legacy unsigned events for read purposes,
+  but MUST NOT be re-emitted or stored without `sig` going forward.
+- New implementations MUST be deployed with a real institutional key from
+  the first event (genesis). There is no conformant path for a production
+  ledger that begins with unsigned events.

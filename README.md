@@ -333,6 +333,44 @@ Interoperability across independent institutions.
 
 ---
 
+## Active Specification Versions
+
+Current active version per specification. This table is the authoritative reference for "which version to implement".
+
+| Spec | Active version | Level |
+|---|---|---|
+| ACP-SIGN | 1.0 | L1 |
+| ACP-AGENT | 1.0 | L1 |
+| ACP-CT | 1.0 | L1 |
+| ACP-CAP-REG | 1.0 | L1 |
+| ACP-HP | 1.0 | L1 |
+| ACP-DCMA | 1.0 | L1 |
+| ACP-MESSAGES | 1.0 | L1 |
+| ACP-RISK | 1.0 | L2 |
+| ACP-REV | 1.0 | L2 |
+| ACP-ITA | 1.1 | L2/L4 |
+| ACP-API | 1.0 | L3 |
+| ACP-EXEC | 1.0 | L3 |
+| ACP-LEDGER | **1.3** | L3 |
+| ACP-PROVENANCE | 1.0 | L3 |
+| ACP-POLICY-CTX | 1.0 | L3 |
+| ACP-PSN | 1.0 | L3 |
+| ACP-PAY | 1.0 | L4 |
+| ACP-REP | **1.2** | L4 |
+| ACP-GOV-EVENTS | 1.0 | L4 |
+| ACP-LIA | 1.0 | L4 |
+| ACP-HIST | 1.0 | L4 |
+| ACP-NOTIFY | 1.0 | L4 |
+| ACP-DISC | 1.0 | L4 |
+| ACP-BULK | 1.0 | L4 |
+| ACP-CROSS-ORG | 1.0 | L4 |
+| ACP-REP-PORTABILITY | 1.0 | L4 |
+| **ACP-CONF** | **1.2** | — |
+
+Superseded versions are archived in [`archive/specs/`](archive/specs/README.md).
+
+---
+
 ## Conformance Levels
 
 Implementations may adopt ACP incrementally, starting from L1.
@@ -351,11 +389,11 @@ Full normative requirements per level:
 |---|---|
 | **L1** | SIGN · AGENT · CT · CAP-REG · HP · DCMA · MESSAGES |
 | **L2** | L1 + RISK · REV · ITA-1.0 |
-| **L3** | L2 + API · EXEC · LEDGER · PROVENANCE · POLICY-CTX |
-| **L4** | L3 + GOV-EVENTS · REP · LIA · HIST · ITA-1.1 · PAY · NOTIFY · DISC · BULK · CROSS-ORG · REP-PORTABILITY |
+| **L3** | L2 + API · EXEC · LEDGER · PROVENANCE · POLICY-CTX · PSN |
+| **L4** | L3 + PAY · REP-1.2 · ITA-1.1 · GOV-EVENTS · LIA · HIST · NOTIFY · DISC · BULK · CROSS-ORG · REP-PORTABILITY |
 | **L5** | L4 + ACP-D · ITA-1.1 BFT quorum |
 
-→ Normative conformance definition: [`spec/governance/ACP-CONF-1.1.md`](spec/governance/ACP-CONF-1.1.md)
+→ Normative conformance definition: [`spec/governance/ACP-CONF-1.2.md`](spec/governance/ACP-CONF-1.2.md)
 
 ---
 
@@ -380,7 +418,8 @@ Full normative requirements per level:
 - [ACP-EXEC-1.0](spec/operations/ACP-EXEC-1.0.md) — Execution Tokens, single-use, 300s validity
 - [ACP-POLICY-CTX-1.0](spec/operations/ACP-POLICY-CTX-1.0.md) — signed policy state at execution time
 - [ACP-PROVENANCE-1.0](spec/core/ACP-PROVENANCE-1.0.md) — retrospective proof of delegation chain at execution
-- [ACP-LEDGER-1.2](spec/operations/ACP-LEDGER-1.2.md) — audit ledger, append-only, hash-chained
+- [ACP-LEDGER-1.3](spec/operations/ACP-LEDGER-1.3.md) — audit ledger, append-only, hash-chained, mandatory institutional sig
+- [ACP-PSN-1.0](spec/operations/ACP-PSN-1.0.md) — Process-Session Node, execution session tracking
 - [ACP-API-1.0](spec/operations/ACP-API-1.0.md) — HTTP API, all institutional endpoints
 
 ### L4 · Governance
@@ -398,7 +437,7 @@ Full normative requirements per level:
 - [ACP-D-1.0](spec/decentralized/ACP-D-1.0.md) — decentralized ACP, cross-institution federation, BFT quorum
 
 ### Governance
-- [ACP-CONF-1.1](spec/governance/ACP-CONF-1.1.md) — normative conformance definition
+- [ACP-CONF-1.2](spec/governance/ACP-CONF-1.2.md) — normative conformance definition (current)
 - [ACP-CHANGELOG](CHANGELOG.md) — version history
 
 ---
@@ -413,6 +452,8 @@ acp-framework/
 │   ├── operations/    ← L3–L4: execution, ledger, governance
 │   ├── governance/    ← conformance, events, process
 │   └── decentralized/ ← L5: ACP-D
+├── archive/
+│   └── specs/         ← superseded specification versions (historical reference)
 ├── impl/
 │   └── go/            ← reference implementation
 ├── ARCHITECTURE.md    ← formal domain model, dependency graph
@@ -443,8 +484,10 @@ curl http://localhost:8080/acp/v1/health
 
 ## Roadmap
 
-| Version | Status |
+| Item | Status |
 |---|---|
+| ACP-CONF-1.2 | ✅ Complete — restores CONF as sole normative source |
+| ACP-LEDGER-1.3 | ✅ Complete — sig normatively mandatory |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
 | future | ZK verification, decentralized governance |
