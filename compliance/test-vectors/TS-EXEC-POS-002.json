@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "id": "TS-EXEC-POS-002",
+    "layer": "EXEC",
+    "severity": "mandatory",
+    "acp_version": "1.0",
+    "conformance_level": "L3",
+    "description": "Valid execution token — data.read capability with 300s window"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "token": {
+      "action_parameters_hash": "Y-LXBGBDKsBsXSRGaxBKylJ1-jN0hjox3QE_gv96_po",
+      "agent_id": "agent.example.analytics",
+      "authorization_id": "auth-req-0000-0002",
+      "capability": "acp:cap:data.read",
+      "et_id": "a1b2c3d4-0000-4000-8000-000000000002",
+      "expires_at": 1773993900,
+      "issued_at": 1773993600,
+      "resource": "db://reports/daily",
+      "sig": "Ecm5q-VbF3DRgjL3auwrO14OSC80BVMrn92xjWEhVZ5Orr5jv9s5lrcypDY6ayMhvs5k07vsrlPcjY981kZQAA",
+      "used": false,
+      "ver": "1.0"
+    },
+    "verify_at": 1773993630,
+    "expected_agent_id": "agent.example.analytics",
+    "expected_resource": "db://reports/daily",
+    "expected_params_hash": "Y-LXBGBDKsBsXSRGaxBKylJ1-jN0hjox3QE_gv96_po"
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "id": "TS-EXEC-NEG-003",
+    "layer": "EXEC",
+    "severity": "mandatory",
+    "acp_version": "1.0",
+    "conformance_level": "L3",
+    "description": "Invalid execution token — verify_at is 120s after issued_at (expires_at = issued_at+60)"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "token": {
+      "action_parameters_hash": "z84h9CNeqHOIgMT3f30FxGbaLpkmPm1mEuMts-mmstA",
+      "agent_id": "agent.example.banking",
+      "authorization_id": "auth-req-0000-0001",
+      "capability": "acp:cap:financial.payment",
+      "et_id": "a1b2c3d4-0000-4000-8000-000000000001",
+      "expires_at": 1773993660,
+      "issued_at": 1773993600,
+      "resource": "bank://accounts/12345",
+      "sig": "NIhB-jtf5s4ZLecsJ62PNjdxiDMRPs8XF0cMADqoIuGMpesAwMZXAAKgbp76RlTv38THcYdSpcN7BP8ODcBzAg",
+      "used": false,
+      "ver": "1.0"
+    },
+    "verify_at": 1773993720
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "EXEC-003"
+  }
+}
