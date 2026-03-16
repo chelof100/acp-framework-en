@@ -1,0 +1,1079 @@
+openapi: 3.1.0
+
+info:
+  title: ACP HTTP API
+  version: "1.0"
+  description: |
+    Formal HTTP API specification for the Agent Capability Protocol (ACP).
+    Defined in ACP-API-1.0.
+    Depends on: ACP-SIGN-1.0, ACP-CT-1.0, ACP-HP-1.0, ACP-RISK-1.0, ACP-REV-1.0, ACP-CAP-REG-1.0
+  contact:
+    name: ACP Framework
+    url: https://github.com/chelof100/acp-framework-en
+  license:
+    name: MIT
+
+servers:
+  - url: https://{host}/acp/v1
+    variables:
+      host:
+        default: localhost:8080
+        description: ACP server host
+
+# ─── Security Schemes ────────────────────────────────────────────────────────
+
+components:
+  securitySchemes:
+    ACPAgent:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: |
+        ACP-Agent authentication. Value: `ACP-Agent <base64url_encoded_capability_token>`
+    ACPPoP:
+      type: apiKey
+      in: header
+      name: X-ACP-PoP
+      description: |
+        Proof-of-Possession token per ACP-HP-1.0. Value: base64url-encoded JSON PoP token.
+
+  # ─── Common Parameters ──────────────────────────────────────────────────────
+
+  parameters:
+    RequestID:
+      name: X-ACP-Request-ID
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Client-generated UUID for idempotency and correlation.
+
+    AgentIDPath:
+      name: agent_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Agent identifier (base58(SHA-256(decode_base64url(public_key)))).
+
+    EtIDPath:
+      name: et_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Execution token UUID.
+
+    EscalationIDPath:
+      name: escalation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Escalation UUID returned by POST /authorize.
+
+  # ─── Common Headers ─────────────────────────────────────────────────────────
+
+  headers:
+    XACPVersion:
+      schema:
+        type: string
+        example: "1.0"
+      description: ACP API version implemented by the server.
+    XACPRequestID:
+      schema:
+        type: string
+        format: uuid
+      description: Echo of the X-ACP-Request-ID sent by the client.
+
+  # ─── Schemas ────────────────────────────────────────────────────────────────
+
+  schemas:
+
+    # Base wrappers
+    SuccessResponse:
+      type: object
+      required: [acp_version, request_id, timestamp, data, sig]
+      properties:
+        acp_version:
+          type: string
+          example: "1.0"
+        request_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: integer
+          description: Unix timestamp (seconds).
+        data:
+          type: object
+          description: Endpoint-specific payload.
+        sig:
+          type: string
+          description: |
+            base64url Ed25519 institutional signature covering
+            acp_version, request_id, timestamp, data (per ACP-SIGN-1.0).
+
+    ErrorResponse:
+      type: object
+      required: [acp_version, request_id, timestamp, error]
+      properties:
+        acp_version:
+          type: string
+          example: "1.0"
+        request_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: integer
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: AUTH-001
+            message:
+              type: string
+            detail:
+              type: object
+
+    # Agent
+    AgentRegistrationRequest:
+      type: object
+      required: [agent_id, public_key, institution_id, autonomy_level, authority_domain, sig]
+      properties:
+        agent_id:
+          type: string
+          description: Must equal base58(SHA-256(decode_base64url(public_key))).
+        public_key:
+          type: string
+          description: base64url-encoded Ed25519 public key.
+        institution_id:
+          type: string
+          example: org.example.banking
+        autonomy_level:
+          type: integer
+          minimum: 0
+          maximum: 4
+        authority_domain:
+          type: string
+          description: Must be registered in ACP-CAP-REG-1.0.
+          example: financial
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            version:
+              type: string
+        sig:
+          type: string
+          description: base64url requester signature over the request per ACP-SIGN-1.0.
+
+    AgentRegistrationData:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        status:
+          type: string
+          example: active
+        registered_at:
+          type: integer
+
+    AgentStatusData:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        status:
+          type: string
+          enum: [active, restricted, suspended, revoked]
+        autonomy_level:
+          type: integer
+        authority_domain:
+          type: string
+        registered_at:
+          type: integer
+        last_active_at:
+          type: integer
+        trust_score:
+          type: number
+          nullable: true
+          description: Reserved for ACP-REP-1.1. MAY be null in v1.0.
+
+    AgentStateRequest:
+      type: object
+      required: [state, sig]
+      properties:
+        state:
+          type: string
+          enum: [active, restricted, suspended, revoked]
+        sig:
+          type: string
+
+    # Authorization
+    AuthorizeRequest:
+      type: object
+      required: [request_id, agent_id, capability, resource, sig]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+        capability:
+          type: string
+          example: acp:cap:financial.payment
+        resource:
+          type: string
+          example: org.example/accounts/ACC-001
+        action_parameters:
+          type: object
+          additionalProperties: true
+        context:
+          type: object
+          properties:
+            timestamp:
+              type: integer
+            ip_type:
+              type: string
+            geo:
+              type: string
+            channel:
+              type: string
+            hour_of_day:
+              type: integer
+            day_of_week:
+              type: integer
+        sig:
+          type: string
+
+    AuthorizeApprovedData:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [APPROVED]
+        risk_score:
+          type: integer
+        risk_eval_id:
+          type: string
+          format: uuid
+        valid_until:
+          type: integer
+        execution_token:
+          type: object
+
+    AuthorizeDeniedData:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [DENIED]
+        risk_score:
+          type: integer
+        reason_code:
+          type: string
+        retry_allowed:
+          type: boolean
+
+    AuthorizeEscalatedData:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [ESCALATED]
+        risk_score:
+          type: integer
+        escalation_id:
+          type: string
+          format: uuid
+        escalated_to:
+          type: string
+        expires_at:
+          type: integer
+
+    EscalationResolveRequest:
+      type: object
+      required: [resolution, resolved_by, sig]
+      properties:
+        resolution:
+          type: string
+          enum: [APPROVED, DENIED]
+        resolved_by:
+          type: string
+        sig:
+          type: string
+
+    # Tokens
+    TokenIssueRequest:
+      type: object
+      required: [sub, capabilities, expires_at, sig]
+      properties:
+        sub:
+          type: string
+          description: Agent ID receiving the delegated token.
+        capabilities:
+          type: array
+          items:
+            type: string
+          example: ["acp:cap:financial.payment"]
+        resource_scope:
+          type: string
+        expires_at:
+          type: integer
+        max_delegation_depth:
+          type: integer
+          minimum: 0
+        sig:
+          type: string
+
+    # Audit
+    AuditQueryRequest:
+      type: object
+      properties:
+        from_sequence:
+          type: integer
+        to_sequence:
+          type: integer
+        event_types:
+          type: array
+          items:
+            type: string
+        agent_id:
+          type: string
+        from_timestamp:
+          type: integer
+        to_timestamp:
+          type: integer
+        limit:
+          type: integer
+          default: 100
+          maximum: 1000
+
+    AuditQueryData:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerEvent'
+        chain_valid:
+          type: boolean
+        total_count:
+          type: integer
+
+    AuditVerifyData:
+      type: object
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        chain_valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+
+    LedgerEvent:
+      type: object
+      properties:
+        ver:
+          type: string
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        sequence:
+          type: integer
+        timestamp:
+          type: integer
+        institution_id:
+          type: string
+        prev_hash:
+          type: string
+        payload:
+          type: object
+        hash:
+          type: string
+        sig:
+          type: string
+
+    # Execution Tokens
+    ETConsumeRequest:
+      type: object
+      required: [consumed_by, sig]
+      properties:
+        consumed_by:
+          type: string
+        consumed_at:
+          type: integer
+        sig:
+          type: string
+
+    ETStatusData:
+      type: object
+      properties:
+        et_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum: [issued, used, expired]
+        expires_at:
+          type: integer
+        consumed_at:
+          type: integer
+          nullable: true
+
+    # Handshake
+    ChallengeData:
+      type: object
+      properties:
+        challenge_id:
+          type: string
+        challenge:
+          type: string
+          description: 128-bit random value, base64url-encoded.
+        expires_at:
+          type: integer
+
+    # Health
+    HealthData:
+      type: object
+      properties:
+        acp_version:
+          type: string
+          example: "1.0"
+        status:
+          type: string
+          enum: [operational, degraded, unavailable]
+        timestamp:
+          type: integer
+        components:
+          type: object
+          properties:
+            policy_engine:
+              type: string
+              enum: [operational, degraded, unavailable]
+            audit_ledger:
+              type: string
+              enum: [operational, degraded, unavailable]
+            agent_registry:
+              type: string
+              enum: [operational, degraded, unavailable]
+            rev_endpoint:
+              type: string
+              enum: [operational, degraded, unavailable]
+
+  # ─── Common Responses ────────────────────────────────────────────────────────
+
+  responses:
+    400BadRequest:
+      description: Malformed request body or invalid field values.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    401Unauthorized:
+      description: Authentication failed (missing, expired, or invalid token / PoP).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    403Forbidden:
+      description: Insufficient capability or forbidden transition.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    404NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    409Conflict:
+      description: Resource already exists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    429TooManyRequests:
+      description: Rate limit exceeded per agent_id.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+        X-ACP-RateLimit-Limit:
+          schema:
+            type: integer
+        X-ACP-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-ACP-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    503ServiceUnavailable:
+      description: Internal component unavailable (fail-closed).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    504GatewayTimeout:
+      description: Internal processing exceeded 5-second limit (SYS-005).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+# ─── Global Security (overridden for /health and /handshake/challenge) ───────
+
+security:
+  - ACPAgent: []
+    ACPPoP: []
+
+# ─── Paths ───────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Health ──────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      operationId: getHealth
+      summary: Server health check
+      description: |
+        Returns operational status of all internal components.
+        Does not require authentication.
+      security: []
+      tags: [Health]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      responses:
+        "200":
+          description: Health status.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthData'
+
+  # ── Handshake ───────────────────────────────────────────────────────────────
+
+  /handshake/challenge:
+    post:
+      operationId: issueChallenge
+      summary: Issue a PoP challenge
+      description: |
+        Phase 1 of the ACP-HP-1.0 handshake. Returns a single-use challenge
+        that the agent must include in its X-ACP-PoP token on the next request.
+        Does not require CT authentication (no Authorization header required).
+      security: []
+      tags: [Handshake]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      responses:
+        "200":
+          description: Challenge issued.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChallengeData'
+        "429":
+          $ref: '#/components/responses/429TooManyRequests'
+
+  # ── Agent Registry ───────────────────────────────────────────────────────────
+
+  /agents:
+    post:
+      operationId: registerAgent
+      summary: Register a new agent
+      description: |
+        Registers a new agent in the ACP Agent Registry.
+        Required capability: `acp:cap:agent.register`
+        Validations: agent_id == base58(SHA-256(decode_base64url(public_key))),
+        autonomy_level ∈ {0,1,2,3,4}, authority_domain registered, sig valid,
+        agent_id not previously existing.
+      tags: [Agents]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRegistrationRequest'
+      responses:
+        "201":
+          description: Agent registered.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentRegistrationData'
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "409":
+          $ref: '#/components/responses/409Conflict'
+        "429":
+          $ref: '#/components/responses/429TooManyRequests'
+        "503":
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  /agents/{agent_id}:
+    get:
+      operationId: getAgent
+      summary: Get agent status
+      description: |
+        Returns the current status and metadata of an agent.
+        Required capability: `acp:cap:agent.read`
+      tags: [Agents]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - $ref: '#/components/parameters/AgentIDPath'
+      responses:
+        "200":
+          description: Agent status.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentStatusData'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "404":
+          $ref: '#/components/responses/404NotFound'
+        "503":
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  /agents/{agent_id}/state:
+    post:
+      operationId: setAgentState
+      summary: Modify agent state
+      description: |
+        Transitions an agent to a new state.
+        Valid states: active, restricted, suspended, revoked.
+        Allowed transitions per ACP-API-1.0 §4 table.
+        The `revoked` state is irreversible.
+      tags: [Agents]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - $ref: '#/components/parameters/AgentIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentStateRequest'
+      responses:
+        "200":
+          description: State updated.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentStatusData'
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "404":
+          $ref: '#/components/responses/404NotFound'
+        "503":
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  # ── Authorization ────────────────────────────────────────────────────────────
+
+  /authorize:
+    post:
+      operationId: authorize
+      summary: Evaluate an authorization request
+      description: |
+        Central authorization evaluation. Validates the CT, runs ACP-RISK-1.0,
+        applies autonomy-level thresholds, and returns APPROVED / DENIED / ESCALATED.
+        Processing order per ACP-API-1.0 §5.
+        Required: PoP validated before CT (HP-004 returned if X-ACP-PoP absent).
+      tags: [Authorization]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeRequest'
+      responses:
+        "200":
+          description: Authorization decision (APPROVED, DENIED, or ESCALATED).
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/AuthorizeApprovedData'
+                          - $ref: '#/components/schemas/AuthorizeDeniedData'
+                          - $ref: '#/components/schemas/AuthorizeEscalatedData'
+                        discriminator:
+                          propertyName: decision
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "429":
+          $ref: '#/components/responses/429TooManyRequests'
+        "503":
+          $ref: '#/components/responses/503ServiceUnavailable'
+        "504":
+          $ref: '#/components/responses/504GatewayTimeout'
+
+  /authorize/escalations/{escalation_id}/resolve:
+    post:
+      operationId: resolveEscalation
+      summary: Resolve a pending escalation
+      description: |
+        Resolves an escalation with APPROVED or DENIED.
+        Required capability: `acp:cap:agent.modify` with autonomy_level ≥ 3.
+      tags: [Authorization]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - $ref: '#/components/parameters/EscalationIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscalationResolveRequest'
+      responses:
+        "200":
+          description: Escalation resolved.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "404":
+          $ref: '#/components/responses/404NotFound'
+
+  # ── Capability Tokens ────────────────────────────────────────────────────────
+
+  /tokens:
+    post:
+      operationId: issueToken
+      summary: Issue a new capability token
+      description: |
+        Issues a delegated Capability Token (CT) per ACP-CT-1.0.
+        Required capability: `acp:cap:agent.delegate`
+        The resulting CT will have sub equal to the `sub` field in the request.
+      tags: [Tokens]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenIssueRequest'
+      responses:
+        "201":
+          description: Capability token issued.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token:
+                            type: string
+                            description: base64url-encoded CT.
+                          expires_at:
+                            type: integer
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "429":
+          $ref: '#/components/responses/429TooManyRequests'
+
+  # ── Audit ────────────────────────────────────────────────────────────────────
+
+  /audit/query:
+    post:
+      operationId: queryAuditLedger
+      summary: Query the audit ledger
+      description: |
+        Queries the ACP Audit Ledger per ACP-LEDGER-1.3.
+        Required capability: `acp:cap:audit.query`
+        Response always includes `chain_valid` field.
+      tags: [Audit]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditQueryRequest'
+      responses:
+        "200":
+          description: Audit query results.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuditQueryData'
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "429":
+          $ref: '#/components/responses/429TooManyRequests'
+        "503":
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  /audit/verify/{event_id}:
+    get:
+      operationId: verifyAuditEvent
+      summary: Verify integrity of an audit event
+      description: |
+        Verifies the hash chain integrity of a specific ledger event.
+        Required capability: `acp:cap:audit.verify`
+      tags: [Audit]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Ledger event UUID.
+      responses:
+        "200":
+          description: Verification result.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuditVerifyData'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "404":
+          $ref: '#/components/responses/404NotFound'
+        "503":
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  # ── Execution Tokens ─────────────────────────────────────────────────────────
+
+  /exec-tokens/{et_id}/consume:
+    post:
+      operationId: consumeExecToken
+      summary: Consume an execution token
+      description: |
+        Reports consumption of an execution token by the target system.
+        Per ACP-EXEC-1.0 §9.1.
+        An ET may only be consumed once; subsequent attempts return 409.
+      tags: [ExecutionTokens]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - $ref: '#/components/parameters/EtIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ETConsumeRequest'
+      responses:
+        "200":
+          description: Execution token consumed.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ETStatusData'
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "404":
+          $ref: '#/components/responses/404NotFound'
+        "409":
+          $ref: '#/components/responses/409Conflict'
+
+  /exec-tokens/{et_id}/status:
+    get:
+      operationId: getExecTokenStatus
+      summary: Get execution token status
+      description: |
+        Returns the current state of an execution token.
+        States: issued, used, expired.
+      tags: [ExecutionTokens]
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - $ref: '#/components/parameters/EtIDPath'
+      responses:
+        "200":
+          description: Execution token status.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ETStatusData'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "404":
+          $ref: '#/components/responses/404NotFound'
+
+# ─── Tags ─────────────────────────────────────────────────────────────────────
+
+tags:
+  - name: Health
+    description: Server health — no authentication required.
+  - name: Handshake
+    description: ACP-HP-1.0 PoP challenge issuance — no CT authentication required.
+  - name: Agents
+    description: Agent Registry operations (register, read, state transitions).
+  - name: Authorization
+    description: Authorization evaluation and escalation resolution.
+  - name: Tokens
+    description: Capability token issuance.
+  - name: Audit
+    description: Audit ledger query and event verification.
+  - name: ExecutionTokens
+    description: Execution token lifecycle (consume, status).

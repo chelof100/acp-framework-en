@@ -1,6 +1,13 @@
 // Command acp-sign-vectors replaces PLACEHOLDER signatures in ACP-TS-1.1 test
-// vector files with real Ed25519 signatures computed from the RFC 8037 test
-// key A.  It operates in-place on the vector directory.
+// vector files with real Ed25519 signatures. It operates in-place on the
+// vector directory.
+//
+// For CORE/DCMA vectors: signs capability.signature and
+// delegation.delegation_signature using the institution key (RFC 8037 key A)
+// and per-agent delegation keys.
+//
+// For HP vectors (meta.layer == "HP"): signs input.pop_token.sig using the
+// agent's private key identified by pop_token.agent_id.
 //
 // Usage:
 //
@@ -8,7 +15,7 @@
 //
 // Default dir (relative to the acp-go module root):
 //
-//	../../03-acp-protocol/test-vectors
+//	../../compliance/test-vectors
 package main
 
 import (
@@ -36,14 +43,15 @@ const (
 	a3KeySeedHex    = "f5e287302bfa55e4ae4b18c2f793a3a09e74e5c9547e80d22b55d3a51b3ddbc1" // agent-a3
 )
 
-// delegationKeys maps delegator DID → Ed25519 private key for delegation_signature signing.
+// delegationKeys maps agent DID → Ed25519 private key.
+// Used for delegation_signature (DCMA) and pop_token.sig (HP) signing.
 var delegationKeys map[string]ed25519.PrivateKey
 
 func init() {
 	mustKey := func(seedHex string) ed25519.PrivateKey {
 		b, err := hex.DecodeString(seedHex)
 		if err != nil {
-			panic("bad delegation key seed: " + err.Error())
+			panic("bad key seed: " + err.Error())
 		}
 		return ed25519.NewKeyFromSeed(b)
 	}
@@ -55,7 +63,7 @@ func init() {
 }
 
 func main() {
-	dir := "../../03-acp-protocol/test-vectors"
+	dir := "../../compliance/test-vectors"
 	if len(os.Args) > 1 {
 		dir = os.Args[1]
 	}
@@ -101,10 +109,8 @@ func main() {
 // signVectorFile reads a test vector JSON file, replaces PLACEHOLDER signatures
 // with real Ed25519 signatures, and writes it back.
 //
-// Signing order for vectors with delegation:
-//  1. Sign delegation_signature first (with the delegator's key).
-//  2. Re-sign the top-level capability signature (with the institution key)
-//     because the signed payload includes the updated delegation object.
+// Dispatch: HP vectors (meta.layer == "HP") use signHPVector; all other vectors
+// use signCoreVector (capability + optional delegation).
 //
 // Returns true if the file was modified.
 func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
@@ -113,12 +119,42 @@ func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
 		return false, err
 	}
 
-	// Use a generic map so we can round-trip without losing unknown fields.
 	var vec map[string]interface{}
 	if err := json.Unmarshal(data, &vec); err != nil {
 		return false, fmt.Errorf("parse: %w", err)
 	}
 
+	// Dispatch on layer.
+	meta, _ := vec["meta"].(map[string]interface{})
+	layer, _ := meta["layer"].(string)
+
+	var changed bool
+	if layer == "HP" {
+		changed, err = signHPVector(vec)
+	} else {
+		changed, err = signCoreVector(vec, sk)
+	}
+	if err != nil || !changed {
+		return changed, err
+	}
+
+	out, err := json.MarshalIndent(vec, "", "  ")
+	if err != nil {
+		return false, fmt.Errorf("marshal: %w", err)
+	}
+	if err := os.WriteFile(path, append(out, '\n'), 0644); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// signCoreVector handles CORE and DCMA vectors (capability + optional delegation).
+//
+// Signing order for vectors with delegation:
+//  1. Sign delegation_signature first (with the delegator's key).
+//  2. Re-sign the top-level capability signature (with the institution key)
+//     because the signed payload includes the updated delegation object.
+func signCoreVector(vec map[string]interface{}, sk ed25519.PrivateKey) (bool, error) {
 	input, _ := vec["input"].(map[string]interface{})
 	if input == nil {
 		return false, nil
@@ -131,8 +167,6 @@ func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
 	changed := false
 
 	// Step 1: sign delegation_signature if PLACEHOLDER.
-	// Must be done before signing the capability because the capability signature
-	// covers the entire delegation object (including delegation_signature).
 	if delegation, _ := cap["delegation"].(map[string]interface{}); delegation != nil {
 		delSig, _ := delegation["delegation_signature"].(string)
 		if strings.HasPrefix(delSig, "PLACEHOLDER:") {
@@ -148,8 +182,7 @@ func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
 			delegation["delegation_signature"] = realDelSig
 			cap["delegation"] = delegation
 
-			// Update the delegator's public_key in context.delegation_registry so
-			// the evaluator can verify the signature during test execution.
+			// Update the delegator's public_key in context.delegation_registry.
 			if context, _ := vec["context"].(map[string]interface{}); context != nil {
 				if reg, _ := context["delegation_registry"].(map[string]interface{}); reg != nil {
 					if entry, _ := reg[delegator].(map[string]interface{}); entry != nil {
@@ -162,7 +195,7 @@ func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
 				}
 			}
 
-			// Force re-sign of the capability signature below (delegation changed).
+			// Force re-sign of the capability signature (delegation changed).
 			cap["signature"] = "PLACEHOLDER:needs-resign-after-delegation"
 			changed = true
 		}
@@ -173,26 +206,65 @@ func signVectorFile(path string, sk ed25519.PrivateKey) (bool, error) {
 	if strings.HasPrefix(sig, "PLACEHOLDER:") {
 		realSig, err := iut.SignCapability(cap, sk)
 		if err != nil {
-			return false, fmt.Errorf("sign: %w", err)
+			return false, fmt.Errorf("sign capability: %w", err)
 		}
 		cap["signature"] = realSig
 		changed = true
 	}
 
-	if !changed {
+	if changed {
+		input["capability"] = cap
+		vec["input"] = input
+	}
+	return changed, nil
+}
+
+// signHPVector handles HP (handshake) vectors.
+// Signs pop_token.sig with the agent's private key (identified by pop_token.agent_id).
+// Also updates context.agent_registry[agent_id].public_key if needed.
+func signHPVector(vec map[string]interface{}) (bool, error) {
+	input, _ := vec["input"].(map[string]interface{})
+	if input == nil {
+		return false, nil
+	}
+	pop, _ := input["pop_token"].(map[string]interface{})
+	if pop == nil {
+		// Vector has no pop_token (e.g. HP-004 missing header test) — nothing to sign.
 		return false, nil
 	}
 
-	input["capability"] = cap
-	vec["input"] = input
+	sig, _ := pop["sig"].(string)
+	if !strings.HasPrefix(sig, "PLACEHOLDER:") {
+		return false, nil
+	}
 
-	out, err := json.MarshalIndent(vec, "", "  ")
+	agentID, _ := pop["agent_id"].(string)
+	agentSK, ok := delegationKeys[agentID]
+	if !ok {
+		return false, fmt.Errorf("no agent key for agent_id %q", agentID)
+	}
+
+	realSig, err := iut.SignPoP(pop, agentSK)
 	if err != nil {
-		return false, fmt.Errorf("marshal: %w", err)
+		return false, fmt.Errorf("sign PoP: %w", err)
 	}
-	if err := os.WriteFile(path, append(out, '\n'), 0644); err != nil {
-		return false, err
+	pop["sig"] = realSig
+
+	// Update context.agent_registry[agent_id].public_key with the actual public key.
+	if context, _ := vec["context"].(map[string]interface{}); context != nil {
+		if reg, _ := context["agent_registry"].(map[string]interface{}); reg != nil {
+			if entry, _ := reg[agentID].(map[string]interface{}); entry != nil {
+				pubKey := agentSK.Public().(ed25519.PublicKey)
+				entry["public_key"] = base64.RawURLEncoding.EncodeToString(pubKey)
+				reg[agentID] = entry
+				context["agent_registry"] = reg
+				vec["context"] = context
+			}
+		}
 	}
+
+	input["pop_token"] = pop
+	vec["input"] = input
 	return true, nil
 }
 

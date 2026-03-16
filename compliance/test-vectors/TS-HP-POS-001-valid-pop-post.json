@@ -1,0 +1,64 @@
+{
+  "context": {
+    "agent_registry": {
+      "did:example:agent-alice": {
+        "public_key": "YbpNfZpGun1v9UCEqxfhWkexj4WADnmk_YsPkfFbry4"
+      }
+    },
+    "challenge_registry": {
+      "chg-hp-pos-001": {
+        "agent_id": "did:example:agent-alice",
+        "challenge": "AAAAAAAAAAAAAAAAAAAAAA",
+        "expires_at": 1700000030,
+        "issued_at": 1700000000
+      }
+    },
+    "current_time": 1700000010,
+    "trusted_issuers": [
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
+    ]
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-hp-pos-001",
+      "nonce": "a3f8c2d1e9b74056a3f8c2d1e9b74056",
+      "resource": "doc:finance:report-2024",
+      "signature": "Z5bhBylNQ9Z11XChXcXlT4xmkJ7gGj--cmW5-SPJtpwobNQ2uBYNOwmbAKSkVW9LrvUeRoqqVNKt_TsN4wUcBA",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    },
+    "pop_token": {
+      "agent_id": "did:example:agent-alice",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAA",
+      "challenge_id": "chg-hp-pos-001",
+      "issued_at": 1700000010,
+      "request_body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "request_method": "POST",
+      "request_path": "/acp/v1/authorize",
+      "sig": "-Gz8KAKoApWHHnQ3IOmILgxSaHpF81btGoW4PpwdI-fV9fUTIkb9CSZqh47MJyECA52toBV3def2bz2Se5eDCg",
+      "ver": "1.0"
+    },
+    "request": {
+      "body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "method": "POST",
+      "path": "/acp/v1/authorize"
+    }
+  },
+  "meta": {
+    "acp_version": "1.1",
+    "conformance_level": "L1",
+    "description": "Valid PoP — POST /acp/v1/authorize with JSON body, challenge within 30-second window",
+    "id": "TS-HP-POS-001",
+    "layer": "HP",
+    "severity": "mandatory"
+  }
+}

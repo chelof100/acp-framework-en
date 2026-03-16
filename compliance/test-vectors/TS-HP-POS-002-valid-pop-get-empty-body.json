@@ -1,0 +1,64 @@
+{
+  "context": {
+    "agent_registry": {
+      "did:example:agent-alice": {
+        "public_key": "YbpNfZpGun1v9UCEqxfhWkexj4WADnmk_YsPkfFbry4"
+      }
+    },
+    "challenge_registry": {
+      "chg-hp-pos-002": {
+        "agent_id": "did:example:agent-alice",
+        "challenge": "BBBBBBBBBBBBBBBBBBBBBB",
+        "expires_at": 1700000030,
+        "issued_at": 1700000000
+      }
+    },
+    "current_time": 1700000015,
+    "trusted_issuers": [
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
+    ]
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-hp-pos-002",
+      "nonce": "b4e9d3f2a0c85167b4e9d3f2a0c85167",
+      "resource": "doc:finance:report-2024",
+      "signature": "Z5bhBylNQ9Z11XChXcXlT4xmkJ7gGj--cmW5-SPJtpwobNQ2uBYNOwmbAKSkVW9LrvUeRoqqVNKt_TsN4wUcBA",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    },
+    "pop_token": {
+      "agent_id": "did:example:agent-alice",
+      "challenge": "BBBBBBBBBBBBBBBBBBBBBB",
+      "challenge_id": "chg-hp-pos-002",
+      "issued_at": 1700000015,
+      "request_body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "request_method": "GET",
+      "request_path": "/acp/v1/agents/did:example:agent-alice",
+      "sig": "LAs0P5yUW0A8ti1tYz_tfCrKzpI4tzTE9Cpo_MUNFU0GkRdfcWw2NWk5rHWvzUCo_eSZyu0XNdFrr_U_ZYTEBw",
+      "ver": "1.0"
+    },
+    "request": {
+      "body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "method": "GET",
+      "path": "/acp/v1/agents/did:example:agent-alice"
+    }
+  },
+  "meta": {
+    "acp_version": "1.1",
+    "conformance_level": "L1",
+    "description": "Valid PoP — GET request with empty body (body_hash is SHA-256 of empty string)",
+    "id": "TS-HP-POS-002",
+    "layer": "HP",
+    "severity": "mandatory"
+  }
+}

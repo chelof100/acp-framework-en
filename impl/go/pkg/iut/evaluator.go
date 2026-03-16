@@ -149,6 +149,26 @@ func Evaluate(vec TestVector) Response {
 	return Response{Decision: "VALID"}
 }
 
+// SignPoP signs a PoP Token per ACP-HP-1.0 §9.
+// The sig field is removed before signing (if present).
+// Returns base64url-encoded Ed25519 signature over sha256(jcs(pop_without_sig)).
+func SignPoP(pop map[string]interface{}, sk ed25519.PrivateKey) (string, error) {
+	p := shallowCopyMap(pop)
+	delete(p, "sig")
+
+	raw, err := json.Marshal(p)
+	if err != nil {
+		return "", fmt.Errorf("marshal: %w", err)
+	}
+	canonical, err := jcs.Transform(raw)
+	if err != nil {
+		return "", fmt.Errorf("jcs: %w", err)
+	}
+	digest := sha256.Sum256(canonical)
+	sig := ed25519.Sign(sk, digest[:])
+	return base64.RawURLEncoding.EncodeToString(sig), nil
+}
+
 // SignDelegation signs a delegation object using the given Ed25519 private key.
 // The delegation_signature field is removed before signing (if present).
 // Returns base64url-encoded Ed25519 signature over sha256(jcs(delegation)).

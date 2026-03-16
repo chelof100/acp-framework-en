@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "id": "TS-HP-NEG-006",
+    "acp_version": "1.1",
+    "layer": "HP",
+    "conformance_level": "L1",
+    "description": "HP-010 — agent_id in PoP does not match CT sub: PoP claims alice but CT is issued to bob",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-hp-neg-006",
+      "nonce": "1ae5d9c8b6f47023ae5d9c8b6f47023b",
+      "resource": "doc:finance:report-2024",
+      "signature": "Z5bhBylNQ9Z11XChXcXlT4xmkJ7gGj--cmW5-SPJtpwobNQ2uBYNOwmbAKSkVW9LrvUeRoqqVNKt_TsN4wUcBA",
+      "sub": "did:example:agent-bob",
+      "ver": "1.1"
+    },
+    "pop_token": {
+      "agent_id": "did:example:agent-alice",
+      "challenge": "HHHHHHHHHHHHHHHHHHHHHH",
+      "challenge_id": "chg-hp-neg-006",
+      "issued_at": 1700000010,
+      "request_body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "request_method": "POST",
+      "request_path": "/acp/v1/authorize",
+      "sig": "aGVsbG8gd29ybGQ",
+      "ver": "1.0"
+    },
+    "request": {
+      "body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "method": "POST",
+      "path": "/acp/v1/authorize"
+    }
+  },
+  "context": {
+    "agent_registry": {
+      "did:example:agent-alice": {
+        "public_key": "YbpNfZpGun1v9UCEqxfhWkexj4WADnmk_YsPkfFbry4"
+      },
+      "did:example:agent-bob": {
+        "public_key": "did:example:agent-bob-placeholder"
+      }
+    },
+    "challenge_registry": {
+      "chg-hp-neg-006": {
+        "agent_id": "did:example:agent-alice",
+        "challenge": "HHHHHHHHHHHHHHHHHHHHHH",
+        "expires_at": 1700000030,
+        "issued_at": 1700000000
+      }
+    },
+    "current_time": 1700000010,
+    "trusted_issuers": [
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "HP-010"
+  }
+}

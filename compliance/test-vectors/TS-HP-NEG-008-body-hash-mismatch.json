@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "id": "TS-HP-NEG-008",
+    "acp_version": "1.1",
+    "layer": "HP",
+    "conformance_level": "L1",
+    "description": "HP-014 — request_body_hash in PoP does not match received request body hash",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-hp-neg-008",
+      "nonce": "3ca7f1e0d8b69245ca7f1e0d8b692452",
+      "resource": "doc:finance:report-2024",
+      "signature": "Z5bhBylNQ9Z11XChXcXlT4xmkJ7gGj--cmW5-SPJtpwobNQ2uBYNOwmbAKSkVW9LrvUeRoqqVNKt_TsN4wUcBA",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    },
+    "pop_token": {
+      "agent_id": "did:example:agent-alice",
+      "challenge": "JJJJJJJJJJJJJJJJJJJJJJ",
+      "challenge_id": "chg-hp-neg-008",
+      "issued_at": 1700000010,
+      "request_body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "request_method": "POST",
+      "request_path": "/acp/v1/authorize",
+      "sig": "aGVsbG8gd29ybGQ",
+      "ver": "1.0"
+    },
+    "request": {
+      "body_hash": "n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg",
+      "method": "POST",
+      "path": "/acp/v1/authorize"
+    }
+  },
+  "context": {
+    "agent_registry": {
+      "did:example:agent-alice": {
+        "public_key": "YbpNfZpGun1v9UCEqxfhWkexj4WADnmk_YsPkfFbry4"
+      }
+    },
+    "challenge_registry": {
+      "chg-hp-neg-008": {
+        "agent_id": "did:example:agent-alice",
+        "challenge": "JJJJJJJJJJJJJJJJJJJJJJ",
+        "expires_at": 1700000030,
+        "issued_at": 1700000000
+      }
+    },
+    "current_time": 1700000010,
+    "trusted_issuers": [
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "HP-014"
+  }
+}

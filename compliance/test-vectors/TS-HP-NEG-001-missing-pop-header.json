@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "id": "TS-HP-NEG-001",
+    "acp_version": "1.1",
+    "layer": "HP",
+    "conformance_level": "L1",
+    "description": "HP-004 — X-ACP-PoP header absent: no pop_token in request",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-hp-neg-001",
+      "nonce": "c5f0e4a3b1d96278c5f0e4a3b1d96278",
+      "resource": "doc:finance:report-2024",
+      "signature": "Z5bhBylNQ9Z11XChXcXlT4xmkJ7gGj--cmW5-SPJtpwobNQ2uBYNOwmbAKSkVW9LrvUeRoqqVNKt_TsN4wUcBA",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    },
+    "pop_token": null,
+    "request": {
+      "body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "method": "POST",
+      "path": "/acp/v1/authorize"
+    }
+  },
+  "context": {
+    "agent_registry": {},
+    "challenge_registry": {},
+    "current_time": 1700000010,
+    "trusted_issuers": [
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "HP-004"
+  }
+}

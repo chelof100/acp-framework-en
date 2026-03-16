@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "id": "TS-HP-NEG-007",
+    "acp_version": "1.1",
+    "layer": "HP",
+    "conformance_level": "L1",
+    "description": "HP-011 — PoP issued_at is after challenge expires_at: window exceeded",
+    "severity": "mandatory"
+  },
+  "input": {
+    "capability": {
+      "action_set": [
+        "read"
+      ],
+      "exp": 1893456000,
+      "issuer": "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ",
+      "jti": "cap-hp-neg-007",
+      "nonce": "2bf6e0d9c7a58134bf6e0d9c7a581341",
+      "resource": "doc:finance:report-2024",
+      "signature": "Z5bhBylNQ9Z11XChXcXlT4xmkJ7gGj--cmW5-SPJtpwobNQ2uBYNOwmbAKSkVW9LrvUeRoqqVNKt_TsN4wUcBA",
+      "sub": "did:example:agent-alice",
+      "ver": "1.1"
+    },
+    "pop_token": {
+      "agent_id": "did:example:agent-alice",
+      "challenge": "IIIIIIIIIIIIIIIIIIIIII",
+      "challenge_id": "chg-hp-neg-007",
+      "issued_at": 1700000050,
+      "request_body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "request_method": "POST",
+      "request_path": "/acp/v1/authorize",
+      "sig": "aGVsbG8gd29ybGQ",
+      "ver": "1.0"
+    },
+    "request": {
+      "body_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+      "method": "POST",
+      "path": "/acp/v1/authorize"
+    }
+  },
+  "context": {
+    "agent_registry": {
+      "did:example:agent-alice": {
+        "public_key": "YbpNfZpGun1v9UCEqxfhWkexj4WADnmk_YsPkfFbry4"
+      }
+    },
+    "challenge_registry": {
+      "chg-hp-neg-007": {
+        "agent_id": "did:example:agent-alice",
+        "challenge": "IIIIIIIIIIIIIIIIIIIIII",
+        "expires_at": 1700000030,
+        "issued_at": 1700000000
+      }
+    },
+    "current_time": 1700000050,
+    "trusted_issuers": [
+      "did:key:z6MkekQTaq7vjX7Vdy6pxabbjgkauuzprRGbBWNAXDs1NZdQ"
+    ]
+  },
+  "expected": {
+    "decision": "REJECT",
+    "error_code": "HP-011"
+  }
+}

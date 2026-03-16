@@ -1,4 +1,4 @@
-// Package ledger implements ACP-LEDGER-1.0.
+// Package ledger implements ACP-LEDGER-1.3.
 //
 // An ACP Audit Ledger is an append-only, hash-chained sequence of events that
 // provides tamper-evident, cryptographically verifiable audit records of all
@@ -29,8 +29,8 @@ import (
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const (
-	// Version is the ACP-LEDGER-1.0 protocol version string.
-	Version = "1.0"
+	// Version is the ACP-LEDGER-1.3 protocol version string.
+	Version = "1.3"
 
 	// GenesisHash is the fixed prev_hash for the first ledger event (§4.2).
 	// Represents 32 zero bytes encoded as base64url with padding.
