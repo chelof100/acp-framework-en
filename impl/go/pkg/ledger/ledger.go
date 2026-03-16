@@ -66,6 +66,14 @@ var (
 
 	// ErrIncompletePayload is returned when payload is missing required fields.
 	ErrIncompletePayload = errors.New("LEDGER-009: incomplete payload")
+
+	// ErrMissingPolicySnapshotRef is returned when an AUTHORIZATION or RISK_EVALUATION
+	// event is missing the required policy_snapshot_ref field (ACP-LEDGER-1.3 §5.2, §5.3).
+	ErrMissingPolicySnapshotRef = errors.New("LEDGER-010: missing policy_snapshot_ref")
+
+	// ErrSigMissing is returned when sig is absent or empty on a production event.
+	// Per ACP-LEDGER-1.3 §4.4, sig MUST be present and non-empty.
+	ErrSigMissing = errors.New("LEDGER-012: sig missing or empty")
 )
 
 // ─── Event Types (ACP-LEDGER-1.3 §5) ─────────────────────────────────────────
@@ -464,7 +472,41 @@ func prevEventOrNil(events []Event, i int) *Event {
 func verifySingleEvent(ev Event, prev *Event, pubKey ed25519.PublicKey) []VerificationError {
 	var errs []VerificationError
 
-	// Step 1: Verify institutional signature (when key and sig are available).
+	// Step 0a: Verify event_type is in the registered set (LEDGER-008).
+	if _, known := validEventTypes[ev.EventType]; !known {
+		errs = append(errs, VerificationError{
+			Code: "LEDGER-008", EventID: ev.EventID, Sequence: ev.Sequence,
+			Message: fmt.Sprintf("unrecognized event_type %q", ev.EventType),
+		})
+	}
+
+	// Step 0b: Verify payload completeness for typed events (LEDGER-010, LEDGER-011).
+	if ev.EventType == EventAuthorization || ev.EventType == EventRiskEvaluation {
+		raw, _ := json.Marshal(ev.Payload)
+		var m map[string]interface{}
+		if json.Unmarshal(raw, &m) == nil {
+			if _, ok := m["policy_snapshot_ref"]; !ok {
+				code := "LEDGER-010"
+				if ev.EventType == EventRiskEvaluation {
+					code = "LEDGER-011"
+				}
+				errs = append(errs, VerificationError{
+					Code: code, EventID: ev.EventID, Sequence: ev.Sequence,
+					Message: fmt.Sprintf("%s payload missing required field policy_snapshot_ref", ev.EventType),
+				})
+			}
+		}
+	}
+
+	// Step 1a: Check sig presence (LEDGER-012). Per §4.4, sig MUST be non-empty in production.
+	if pubKey != nil && ev.Sig == "" {
+		errs = append(errs, VerificationError{
+			Code: "LEDGER-012", EventID: ev.EventID, Sequence: ev.Sequence,
+			Message: "sig field missing or empty (MUST per ACP-LEDGER-1.3 §4.4)",
+		})
+	}
+
+	// Step 1b: Verify institutional signature value (LEDGER-002).
 	if pubKey != nil && ev.Sig != "" {
 		if err := verifyEventSig(ev, pubKey); err != nil {
 			errs = append(errs, VerificationError{

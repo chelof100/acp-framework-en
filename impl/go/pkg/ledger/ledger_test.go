@@ -310,7 +310,10 @@ func TestList_EmptyLedger(t *testing.T) {
 
 func TestVerify_ValidChain_Unsigned(t *testing.T) {
 	l := newUnsignedLedger(t)
-	l.Append(ledger.EventAuthorization, map[string]interface{}{"req": "r1"})
+	l.Append(ledger.EventAuthorization, map[string]interface{}{
+		"req":                 "r1",
+		"policy_snapshot_ref": "psn-v-001",
+	})
 	l.Append(ledger.EventAgentRegistered, map[string]interface{}{"agent_id": "ag1"})
 	errs := l.Verify()
 	if len(errs) != 0 {
@@ -321,7 +324,10 @@ func TestVerify_ValidChain_Unsigned(t *testing.T) {
 func TestVerify_ValidChain_Signed(t *testing.T) {
 	_, priv := newTestKey(t)
 	l := newSignedLedger(t, priv)
-	l.Append(ledger.EventAuthorization, map[string]interface{}{"decision": "APPROVED"})
+	l.Append(ledger.EventAuthorization, map[string]interface{}{
+		"decision":            "APPROVED",
+		"policy_snapshot_ref": "psn-v-002",
+	})
 	errs := l.Verify()
 	if len(errs) != 0 {
 		t.Errorf("Verify() signed chain errors = %v, want none", errs)
@@ -330,7 +336,7 @@ func TestVerify_ValidChain_Signed(t *testing.T) {
 
 func TestVerify_TamperedHash_Detected(t *testing.T) {
 	l := newUnsignedLedger(t)
-	ev, _ := l.Append(ledger.EventAuthorization, nil)
+	ev, _ := l.Append(ledger.EventTokenIssued, map[string]interface{}{"token_id": "tok-1"})
 
 	// Corrupt the hash stored in the retrieved event — we need to tamper the
 	// internal state. Since InMemoryLedger encapsulates state, we verify that
@@ -363,7 +369,11 @@ func TestVerify_AllAppendableEventTypes(t *testing.T) {
 		ledger.EventEscalationResolved,
 	}
 	for _, et := range appendableTypes {
-		_, err := l.Append(et, map[string]interface{}{"type": et})
+		payload := map[string]interface{}{"type": et}
+		if et == ledger.EventAuthorization || et == ledger.EventRiskEvaluation {
+			payload["policy_snapshot_ref"] = "psn-all-types-test"
+		}
+		_, err := l.Append(et, payload)
 		if err != nil {
 			t.Errorf("Append(%q): unexpected error %v", et, err)
 		}
@@ -378,7 +388,10 @@ func TestVerify_AllAppendableEventTypes(t *testing.T) {
 
 func TestVerifyEvent_Found_ValidEvent(t *testing.T) {
 	l := newUnsignedLedger(t)
-	ev, _ := l.Append(ledger.EventAuthorization, map[string]interface{}{"req": "r1"})
+	ev, _ := l.Append(ledger.EventAuthorization, map[string]interface{}{
+		"req":                 "r1",
+		"policy_snapshot_ref": "psn-v-003",
+	})
 	got, errs := l.VerifyEvent(ev.EventID)
 	if got.EventID != ev.EventID {
 		t.Errorf("VerifyEvent returned wrong event")
@@ -413,7 +426,10 @@ func TestVerifyEvent_Genesis(t *testing.T) {
 func TestVerify_Signed_CorrectKey(t *testing.T) {
 	_, priv := newTestKey(t)
 	l := newSignedLedger(t, priv)
-	l.Append(ledger.EventAuthorization, map[string]interface{}{"r": "1"})
+	l.Append(ledger.EventAuthorization, map[string]interface{}{
+		"r":                   "1",
+		"policy_snapshot_ref": "psn-test-001",
+	})
 	errs := l.Verify()
 	if len(errs) != 0 {
 		t.Errorf("Verify with correct key: %v", errs)
@@ -429,7 +445,10 @@ func TestConcurrentAppend_RaceDetector(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			l.Append(ledger.EventAuthorization, map[string]interface{}{"n": n})
+			l.Append(ledger.EventAuthorization, map[string]interface{}{
+				"n":                   n,
+				"policy_snapshot_ref": "psn-concurrent-test",
+			})
 		}(i)
 	}
 	wg.Wait()
