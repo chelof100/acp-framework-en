@@ -68,9 +68,10 @@ var (
 	ErrIncompletePayload = errors.New("LEDGER-009: incomplete payload")
 )
 
-// ─── Event Types (ACP-LEDGER-1.0 §5) ─────────────────────────────────────────
+// ─── Event Types (ACP-LEDGER-1.3 §5) ─────────────────────────────────────────
 
 const (
+	// Core event types (v1.0)
 	EventLedgerGenesis          = "LEDGER_GENESIS"
 	EventAuthorization          = "AUTHORIZATION"
 	EventRiskEvaluation         = "RISK_EVALUATION"
@@ -82,6 +83,16 @@ const (
 	EventAgentStateChange       = "AGENT_STATE_CHANGE"
 	EventEscalationCreated      = "ESCALATION_CREATED"
 	EventEscalationResolved     = "ESCALATION_RESOLVED"
+
+	// Extended event types (v1.1 — ACP-LIA-1.0, ACP-PSN-1.0, ACP-REP-1.2)
+	EventLiabilityRecord       = "LIABILITY_RECORD"
+	EventPolicySnapshotCreated = "POLICY_SNAPSHOT_CREATED"
+	EventReputationUpdated     = "REPUTATION_UPDATED"
+
+	// Evidence layer event types (v1.3 — ACP-PROVENANCE-1.0, ACP-POLICY-CTX-1.0, ACP-GOV-EVENTS-1.0)
+	EventProvenance      = "PROVENANCE"
+	EventPolicySnapshot  = "POLICY_SNAPSHOT"
+	EventGovernance      = "GOVERNANCE"
 )
 
 // validEventTypes is the canonical set of recognized event types.
@@ -97,6 +108,12 @@ var validEventTypes = map[string]struct{}{
 	EventAgentStateChange:       {},
 	EventEscalationCreated:      {},
 	EventEscalationResolved:     {},
+	EventLiabilityRecord:        {},
+	EventPolicySnapshotCreated:  {},
+	EventReputationUpdated:      {},
+	EventProvenance:             {},
+	EventPolicySnapshot:         {},
+	EventGovernance:             {},
 }
 
 // ─── Structures ───────────────────────────────────────────────────────────────

@@ -53,8 +53,8 @@ func TestGenesisHash_IsCorrectConstant(t *testing.T) {
 }
 
 func TestVersion_IsCorrect(t *testing.T) {
-	if ledger.Version != "1.0" {
-		t.Errorf("Version = %q, want %q", ledger.Version, "1.0")
+	if ledger.Version != "1.3" {
+		t.Errorf("Version = %q, want %q", ledger.Version, "1.3")
 	}
 }
 
@@ -130,8 +130,8 @@ func TestNewLedger_Genesis_HashNonEmpty(t *testing.T) {
 func TestNewLedger_Genesis_Version(t *testing.T) {
 	l := newUnsignedLedger(t)
 	ev, _ := l.GetBySequence(1)
-	if ev.Ver != "1.0" {
-		t.Errorf("genesis ver = %q, want %q", ev.Ver, "1.0")
+	if ev.Ver != "1.3" {
+		t.Errorf("genesis ver = %q, want %q", ev.Ver, "1.3")
 	}
 }
 
