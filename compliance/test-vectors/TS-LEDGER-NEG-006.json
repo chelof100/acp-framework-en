@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-NEG-006",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Invalid — event 3 timestamp (2001-09-09) is before event 2 timestamp; verifier MUST report LEDGER-006"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "21eb89e3-cb4a-4e6a-ad46-4030f57f4e25",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "bYHT4-LbkeQJh1bPxgNpvn2chVFZfz_8G-_nc4Zf_Cc=",
+        "sig": "UmU0nK_i17g21hdB3pCLS2hgYGvF__P444QcqinbTHU0VYH4XECQJSKOVtPEQ7W3aeIvlCr3AxMgIK5Rip2iBg"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "4206cd0c-7207-42d8-bcd8-87527361367b",
+        "event_type": "AGENT_REGISTERED",
+        "sequence": 2,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "bYHT4-LbkeQJh1bPxgNpvn2chVFZfz_8G-_nc4Zf_Cc=",
+        "payload": {
+          "agent_id": "did:example:agent-bob",
+          "registered_at": 1718920700
+        },
+        "hash": "nVI4M-vIylBl6kC4DhrutuxGhxBdNEElsN6oHw7ab7U=",
+        "sig": "AAQYgxBnmyF5YWepHT5TbsX_5rSQjo_zL7q9QJb1k1opxdUKjyEDUXMyhhEYsuooEOHCOpZi3F7n54LkUVFuBg"
+      },
+      {
+        "event_id": "882c1960-4fe2-44f3-8b48-7754055904bd",
+        "event_type": "AGENT_STATE_CHANGE",
+        "hash": "uMR47-la8QAOPHOwiid05Fy_bj8x0Yxif1VqCmW3YN4=",
+        "institution_id": "org.example.banking",
+        "payload": {
+          "agent_id": "did:example:agent-bob",
+          "changed_at": 1718920705,
+          "state": "active"
+        },
+        "prev_hash": "nVI4M-vIylBl6kC4DhrutuxGhxBdNEElsN6oHw7ab7U=",
+        "sequence": 3,
+        "sig": "NhfJ-GXD3fta87c9Lgyl0X1PnCrfuPERIcCXjvxeTCQRgRebfTlZG0QtXU0k4waxs_Q0vkdAs4B6gNOydDIeAw",
+        "timestamp": 1000000000,
+        "ver": "1.3"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "LEDGER-006"
+  }
+}

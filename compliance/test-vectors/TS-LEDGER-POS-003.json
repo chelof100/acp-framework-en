@@ -1,0 +1,130 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-POS-003",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Valid 6-event chain — full lifecycle: GENESIS + AGENT_REGISTERED + RISK_EVALUATION + AUTHORIZATION + EXECUTION_TOKEN_ISSUED + EXECUTION_TOKEN_CONSUMED"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "034a6f04-cc37-4bbd-8d46-550aae85d646",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "r2AEo51DImvBfZgm6GNMUlkur0BHDAOaSwu_1PyiXiw=",
+        "sig": "Y5Cg5IHCK834YDb7an8txvp69bAWUhTMcbITVnvd0ADbo6j3gwQF09fuXg39Jb32Pj_lEqNpromRpxg6WfauDw"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "6ce73792-ebd9-4a15-9538-5f6407680972",
+        "event_type": "AGENT_REGISTERED",
+        "sequence": 2,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "r2AEo51DImvBfZgm6GNMUlkur0BHDAOaSwu_1PyiXiw=",
+        "payload": {
+          "agent_id": "did:example:agent-bob",
+          "capabilities": [
+            "acp:cap:data.read",
+            "acp:cap:report.write"
+          ],
+          "institution_id": "org.example.banking",
+          "registered_at": 1718920100
+        },
+        "hash": "cH496rP_qpBitLuyZSJlRbke4GZp6JnintHbQe67XA4=",
+        "sig": "Vu5h5RPvPKbM_7dWovzHHboeJDeSuJt1-kmGnbMXoL3dCkFHUXzxTe5oeP-BLnpwLEdBOsSsVKTkZkB3VwwnBQ"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "e38d8fd0-2faa-4ae9-8d3e-891c1c507ffd",
+        "event_type": "RISK_EVALUATION",
+        "sequence": 3,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "cH496rP_qpBitLuyZSJlRbke4GZp6JnintHbQe67XA4=",
+        "payload": {
+          "agent_id": "did:example:agent-bob",
+          "decision": "LOW",
+          "evaluated_at": 1718920101,
+          "policy_snapshot_ref": "policy:v2.1:abc123",
+          "risk_score": 0.15
+        },
+        "hash": "x6wDbLlIGvexHZGR9rJGBnMgywcmAmKpcodNh33BaCQ=",
+        "sig": "P7VbSI5Yc_6vxq8nqZN7mQ0EyRR-q6QifJruNiWqm1PsarVpm6Ocog58DEydjG6ahOwEBwC7HEclnPaRSeVjCw"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "c85b18d0-17c1-4f99-be8b-eeac901f773c",
+        "event_type": "AUTHORIZATION",
+        "sequence": 4,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "x6wDbLlIGvexHZGR9rJGBnMgywcmAmKpcodNh33BaCQ=",
+        "payload": {
+          "agent_id": "did:example:agent-bob",
+          "authorization_id": "auth-ledger-pos-003",
+          "authorized_at": 1718920102,
+          "capability": "acp:cap:data.read",
+          "decision": "APPROVED",
+          "policy_snapshot_ref": "policy:v2.1:abc123",
+          "resource": "doc:hr:employees"
+        },
+        "hash": "GOCXEU6pjZcqVRqHZ1FTCzPMhIJWtQl6apdEdtzi1uY=",
+        "sig": "e2Yc5gHjSr3CSim4FYb_l1x8tCv86G2_l_fMqazv3MryfRoGTo5vS7R7hBB9DO4UkoDGzzPLIXLRDvhza_zVCw"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "dceee1a7-4437-43c0-b0c5-5f36af7239fa",
+        "event_type": "EXECUTION_TOKEN_ISSUED",
+        "sequence": 5,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "GOCXEU6pjZcqVRqHZ1FTCzPMhIJWtQl6apdEdtzi1uY=",
+        "payload": {
+          "agent_id": "did:example:agent-bob",
+          "authorization_id": "auth-ledger-pos-003",
+          "capability": "acp:cap:data.read",
+          "et_id": "et-ledger-pos-003",
+          "expires_at": 1718920402,
+          "resource": "doc:hr:employees"
+        },
+        "hash": "BhSAFv2gTgA3spsVXk6fco7fbODx8DDeoJVrD-4UHqQ=",
+        "sig": "bGa3nHNB5Izf0wrZWTtJ-l-_y4ISdCSYc-DmjnSHzfn60dWGpch5OelBDhtAURrq7UM_ljMzzw30rbGPqL53Dw"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "03b06bf9-8751-4660-ab11-a047eb8ea92d",
+        "event_type": "EXECUTION_TOKEN_CONSUMED",
+        "sequence": 6,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "BhSAFv2gTgA3spsVXk6fco7fbODx8DDeoJVrD-4UHqQ=",
+        "payload": {
+          "consumed_at": 1718920110,
+          "consumed_by": "system:hr-service",
+          "et_id": "et-ledger-pos-003",
+          "execution_result": "success"
+        },
+        "hash": "SBdimLbB15Dfa9HW0Ztn7T7d4UFGnYM_EBYOn0ZrXhw=",
+        "sig": "bJFR4FA_75muegceKg6Rjmn3u596nsbTVsVFEF9jYmdnbdxWDm_kleJ6Qrsw9izaCm46eA4_O50kHuwe4p_5CQ"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

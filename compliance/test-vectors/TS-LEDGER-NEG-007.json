@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-NEG-007",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Invalid — event 2 event_type is 'CUSTOM_UNKNOWN_EVENT_TYPE' (not in registry); verifier MUST report LEDGER-008"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "18222e06-69fd-4415-a26d-0b2171c911f8",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "oxjXsJw-w103mYBWf5mAC_CeT0qaRRGhHs5CsLbos0w=",
+        "sig": "o90-gIcIUipXN33e7B5nlY_W24Ie7hggBEsa7iPvm1EBkQWvLXI2JY1UZ-cwY0iWjhfaR-uJLzK68g8z0DnNBw"
+      },
+      {
+        "event_id": "80dde8a8-b94b-44f3-a94e-edc81ea4f39f",
+        "event_type": "CUSTOM_UNKNOWN_EVENT_TYPE",
+        "hash": "uGrT9Lj-I6KWP1C1JLR6lTiG1mXIm2dMQXa6ps5Uhus=",
+        "institution_id": "org.example.banking",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "issued_at": 1718920800,
+          "token_id": "tok-neg-007"
+        },
+        "prev_hash": "oxjXsJw-w103mYBWf5mAC_CeT0qaRRGhHs5CsLbos0w=",
+        "sequence": 2,
+        "sig": "wPZCPn_3BIWPaE_RvBwm7IW2LVCEgAq48DfS4nGNnC5PueM8Fo7LZGSkhO2zDfr-B_q7acLQh1b7VDD5qD7PCQ",
+        "timestamp": 1773697292,
+        "ver": "1.3"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "LEDGER-008"
+  }
+}

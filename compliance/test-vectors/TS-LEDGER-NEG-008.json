@@ -1,0 +1,53 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-NEG-008",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Invalid — AUTHORIZATION payload missing required policy_snapshot_ref field; conformant verifier MUST report LEDGER-010 per §5.2"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "4e892cd4-a0f3-4f71-aa7c-c74b6bdf6570",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "0IYESafVqYwOLQyc4L39zbBGP4XzXe_YM8r1NCW91ZE=",
+        "sig": "Som73bKLaxe12NOd7HL_AAerWq-Nfes5uxHfME96P4-Tg3nW7N9hgR4QVSEdf9I5kArYObcwzq8I-AOkn4BRBg"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "fae039f5-dfc9-4f57-a878-b3d1f9a0eebe",
+        "event_type": "AUTHORIZATION",
+        "sequence": 2,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "0IYESafVqYwOLQyc4L39zbBGP4XzXe_YM8r1NCW91ZE=",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "authorization_id": "auth-neg-008",
+          "authorized_at": 1718920900,
+          "decision": "APPROVED"
+        },
+        "hash": "hfGtqbqlvFZ7kxU_Ich1n5AkYZ9PifF0wi4gU6EGrf0=",
+        "sig": "_IR3UdrKnHVvO9IwCZ3oD9V656lbOeMyt3fooINhoildYQ_EYl5LIt2MNfzmb_WBrxyWJ1X6EbWCUnfgQEgICQ"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "LEDGER-010"
+  }
+}

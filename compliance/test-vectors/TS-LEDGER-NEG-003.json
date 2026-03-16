@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-NEG-003",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Invalid — event 2 hash tampered to genesis hash sentinel (re-signed to isolate LEDGER-003); stored hash != recomputed hash"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "c54d7b5d-f82a-47cd-a8f5-f92587e1e1ce",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "up62Sq6hWVGEqgQrdKJ8SFCZ6t0Cao-c9W7vWpo8exM=",
+        "sig": "0bYOt99qWCnea1hr3OHiSAH7hFaj3xzj30pXJmnP-IujgB4EdsYfNJ1UYYoBXoicj7FRcVE1gfbMRpRrvuQODw"
+      },
+      {
+        "event_id": "9a3aa563-9e65-4ec2-ab39-bb244ab59bec",
+        "event_type": "AUTHORIZATION",
+        "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "institution_id": "org.example.banking",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "authorization_id": "auth-neg-003",
+          "authorized_at": 1718920400,
+          "decision": "APPROVED",
+          "policy_snapshot_ref": "policy:v2.1:abc123"
+        },
+        "prev_hash": "up62Sq6hWVGEqgQrdKJ8SFCZ6t0Cao-c9W7vWpo8exM=",
+        "sequence": 2,
+        "sig": "NzPIug8vYlDcnyLoJnLQkWH5NPbNgL2JuliJyvz7hDqjxN9Myx6kAbMmTFiqUmFUSsgiYiIUC0dv-pCqGgvYCQ",
+        "timestamp": 1773697292,
+        "ver": "1.3"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "LEDGER-003"
+  }
+}

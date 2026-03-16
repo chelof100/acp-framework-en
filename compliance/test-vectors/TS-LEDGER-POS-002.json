@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-POS-002",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Valid 3-event chain — LEDGER_GENESIS + AUTHORIZATION + EXECUTION_TOKEN_ISSUED"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "794ac34b-4cb2-4b69-83c4-0d846c0cb009",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "Z985cYC-oA5UDAUDkoIS-2kse7rNALcDaCnUr9506fU=",
+        "sig": "EaVfXLZUakNDNCyQP7pj_vkmdgKbwQmCFyocuzLl3TvAmzlJa7BYwXXKbppTvfS0cu2C3sjEoOm6yDDFJ5utAw"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "ec2e143a-7b27-492f-bc22-93924724c5c1",
+        "event_type": "AUTHORIZATION",
+        "sequence": 2,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "Z985cYC-oA5UDAUDkoIS-2kse7rNALcDaCnUr9506fU=",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "authorization_id": "auth-ledger-pos-002",
+          "authorized_at": 1718920000,
+          "capability": "acp:cap:data.read",
+          "decision": "APPROVED",
+          "policy_snapshot_ref": "policy:v2.1:abc123",
+          "resource": "doc:finance:report-2024"
+        },
+        "hash": "qsMrvaHkv-npMCciDij0tCtdDtEjelZ8s47HFYaO2KQ=",
+        "sig": "s8hW9vz41Tew3VMJzR14ZhWQCyhojlxJdXyNp9U_sz4CBERn9jQEfz0fFvsShTN7dBQBBaYgy9rFtuaC9sI6CQ"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "ad5e2220-79fe-4977-a96e-73a86b408f09",
+        "event_type": "EXECUTION_TOKEN_ISSUED",
+        "sequence": 3,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "qsMrvaHkv-npMCciDij0tCtdDtEjelZ8s47HFYaO2KQ=",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "authorization_id": "auth-ledger-pos-002",
+          "capability": "acp:cap:data.read",
+          "et_id": "et-ledger-pos-002",
+          "expires_at": 1718920300,
+          "resource": "doc:finance:report-2024"
+        },
+        "hash": "p8SPZmEagOfSGtHyfChCkue2u8JI6S-iLM0eF_fyTGw=",
+        "sig": "5MxUJ7QAZsq2LV326jsDy7ciQ150CWeTZ0KXETya1uiMRKIVwEqtsWWUD4c4E1YUO2ZvmPezJMBXqrhBOA-xDg"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

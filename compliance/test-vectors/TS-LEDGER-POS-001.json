@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-POS-001",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Valid single-event ledger — genesis event only; hash and signature correct"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "488560ba-3c64-44c9-89ab-7d9faee0c194",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "nInLNPwMDUQiKCkTDIDZ3k8EAu4QZEq8WBvfLzv3968=",
+        "sig": "iZtuwF3Js_jnDv-UGQqsSG0c_Pqm3AGm9zijuNNL2Yek7WrRUJP8oDVOewF3iRIITrndH0HFNJni0yEXrcx8AA"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

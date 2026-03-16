@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-NEG-002",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Invalid — event 2 sig is 64 zero bytes (wrong signature); verifier MUST report LEDGER-002"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "ffb9c577-5ad9-420f-9242-23d75fa1e0b3",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "UH6OazHGhsgzASBn5jZPLMyeFb1E3rWjUIqCo8qnc6w=",
+        "sig": "gygw7jWN-CZ82lcpAL8uslpXN1MgDCAvtxef-ZxEJB5FIHHLcNDbGe_6AnMmNrvLEiHENSIiyNc3Wfi5st6PCw"
+      },
+      {
+        "event_id": "fb022cba-cb08-4368-9747-6e1bba8803c4",
+        "event_type": "AUTHORIZATION",
+        "hash": "q0SoQFbHd9v8e1eagHQ-H5U86Bf9Wq0YCgRVjcrNTJ8=",
+        "institution_id": "org.example.banking",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "authorization_id": "auth-neg-002",
+          "authorized_at": 1718920300,
+          "decision": "APPROVED",
+          "policy_snapshot_ref": "policy:v2.1:abc123"
+        },
+        "prev_hash": "UH6OazHGhsgzASBn5jZPLMyeFb1E3rWjUIqCo8qnc6w=",
+        "sequence": 2,
+        "sig": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "timestamp": 1773697292,
+        "ver": "1.3"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "LEDGER-002"
+  }
+}

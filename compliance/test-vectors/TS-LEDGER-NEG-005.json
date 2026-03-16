@@ -1,0 +1,70 @@
+{
+  "meta": {
+    "id": "TS-LEDGER-NEG-005",
+    "layer": "LEDGER",
+    "severity": "mandatory",
+    "acp_version": "1.3",
+    "conformance_level": "L1",
+    "description": "Invalid — event 3 sequence tampered to 5 (gap from 2); verifier MUST report LEDGER-005"
+  },
+  "input": {
+    "institution_public_key": "BGRjGlZ7f9Q5edQ0e2nen4My_V-sHdeOnsxxYVOPQEc",
+    "events": [
+      {
+        "ver": "1.3",
+        "event_id": "e8cc4ee6-053e-4fe2-b117-0b9103519dbf",
+        "event_type": "LEDGER_GENESIS",
+        "sequence": 1,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "payload": {
+          "acp_version": "1.3",
+          "created_at": 1773697292,
+          "created_by": "system",
+          "institution_id": "org.example.banking"
+        },
+        "hash": "4FZdE1Zy3pH7gMieICCuZXQcC9fwpGQKmSYhlTEuJrc=",
+        "sig": "NvHQm2ba4Jkf4qjm2Z3QQiJDlk2IU_wa4JrJjLmSN_1C5h_iCOQsXm-RNL4SQu5ak30Sk5RewS_V9O8p-NP_CQ"
+      },
+      {
+        "ver": "1.3",
+        "event_id": "6c74638f-6084-40f3-a6b0-fb2eef42a767",
+        "event_type": "AUTHORIZATION",
+        "sequence": 2,
+        "timestamp": 1773697292,
+        "institution_id": "org.example.banking",
+        "prev_hash": "4FZdE1Zy3pH7gMieICCuZXQcC9fwpGQKmSYhlTEuJrc=",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "authorization_id": "auth-neg-005",
+          "authorized_at": 1718920600,
+          "decision": "APPROVED",
+          "policy_snapshot_ref": "policy:v2.1:abc123"
+        },
+        "hash": "xcRov3jCZ6eJQ_fl1aFrwlreNPr_8isNG3FCGQWTBNU=",
+        "sig": "f26Z52WyEoW6r6T-Nf-CI8e6Iq0d4qyGSIeWg2wWQI1lG995mUwdHFAOtPiIVG6d0k2CBSjXdkdtt0W_9-hNCQ"
+      },
+      {
+        "event_id": "495fc331-7d70-453d-8840-70f1bea91245",
+        "event_type": "TOKEN_ISSUED",
+        "hash": "t036Gn2p16pVtECog2r4kQbmpTdv5-75IFRNKP_5RTQ=",
+        "institution_id": "org.example.banking",
+        "payload": {
+          "agent_id": "did:example:agent-alice",
+          "authorization_id": "auth-neg-005",
+          "token_id": "tok-neg-005"
+        },
+        "prev_hash": "xcRov3jCZ6eJQ_fl1aFrwlreNPr_8isNG3FCGQWTBNU=",
+        "sequence": 5,
+        "sig": "WWQdG33e8FahT6HXVjxinhBwrm_7KYVx9_Ml1ZbnlCRCjJi8f8exuCtNO4syWD8LTjSxJsvAyShtrDKrZBBVDQ",
+        "timestamp": 1773697292,
+        "ver": "1.3"
+      }
+    ]
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "LEDGER-005"
+  }
+}
