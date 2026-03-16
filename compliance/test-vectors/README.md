@@ -84,6 +84,28 @@ Negative test vectors with wrong signatures use `aGVsbG8gd29ybGQ` (base64url of 
 | TS-HP-NEG-006 | HP | L1 | Negative | HP-010: agent_id ≠ CT sub |
 | TS-HP-NEG-007 | HP | L1 | Negative | HP-011: issued_at outside challenge window |
 | TS-HP-NEG-008 | HP | L1 | Negative | HP-014: request_body_hash mismatch |
+| TS-LEDGER-POS-001 | LEDGER | L3 | Positive | Valid single-event chain (genesis only) |
+| TS-LEDGER-POS-002 | LEDGER | L3 | Positive | Valid 3-event chain (GENESIS + AUTHORIZATION + TOKEN_ISSUED) |
+| TS-LEDGER-POS-003 | LEDGER | L3 | Positive | Valid 6-event full lifecycle |
+| TS-LEDGER-NEG-001 | LEDGER | L3 | Negative | LEDGER-012: sig deleted (empty string) |
+| TS-LEDGER-NEG-002 | LEDGER | L3 | Negative | LEDGER-002: sig = 64 zero bytes (invalid) |
+| TS-LEDGER-NEG-003 | LEDGER | L3 | Negative | LEDGER-003: hash tampered + re-signed |
+| TS-LEDGER-NEG-004 | LEDGER | L3 | Negative | LEDGER-004: prev_hash = genesis hash (broken chain) |
+| TS-LEDGER-NEG-005 | LEDGER | L3 | Negative | LEDGER-005: sequence gap (seq jumps from 1 to 5) |
+| TS-LEDGER-NEG-006 | LEDGER | L3 | Negative | LEDGER-006: timestamp regression (event 2 before event 1) |
+| TS-LEDGER-NEG-007 | LEDGER | L3 | Negative | LEDGER-008: unknown event_type "CUSTOM_UNKNOWN" |
+| TS-LEDGER-NEG-008 | LEDGER | L3 | Negative | LEDGER-010: AUTHORIZATION missing policy_snapshot_ref |
+| TS-EXEC-POS-001 | EXEC | L3 | Positive | Valid ET — financial.payment, 60s window, sig correct |
+| TS-EXEC-POS-002 | EXEC | L3 | Positive | Valid ET — data.read, 300s window, sig correct |
+| TS-EXEC-NEG-001 | EXEC | L3 | Negative | EXEC-001: unsupported version ver=2.0 |
+| TS-EXEC-NEG-002 | EXEC | L3 | Negative | EXEC-002: sig last byte corrupted |
+| TS-EXEC-NEG-003 | EXEC | L3 | Negative | EXEC-003: expired (verify_at > expires_at) |
+| TS-EXEC-NEG-004 | EXEC | L3 | Negative | EXEC-004: ET already consumed (_test_state=used) |
+| TS-EXEC-NEG-005 | EXEC | L3 | Negative | EXEC-005: agent_id mismatch |
+| TS-EXEC-NEG-006 | EXEC | L3 | Negative | EXEC-006: resource mismatch |
+| TS-EXEC-NEG-007 | EXEC | L3 | Negative | EXEC-007: action_parameters_hash mismatch |
+
+**Total: 42 vectors** — 8 CORE (L1) + 4 DCMA (L2) + 10 HP (L1) + 11 LEDGER (L3) + 9 EXEC (L3)
 
 ---
 
