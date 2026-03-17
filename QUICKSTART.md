@@ -1,5 +1,34 @@
 # ACP Framework — Quickstart
 
+## One-liner (Docker)
+
+```bash
+# Start ACP server with the RFC 8037 dev key
+docker run -p 8080:8080 \
+  -e ACP_INSTITUTION_PUBLIC_KEY=cA4s58S2dEJ-qye6EpJaJKKaVfvPT8mAQf97Vo8TInk \
+  ghcr.io/chelof100/acp-server:latest
+```
+
+```bash
+# Health check
+curl http://localhost:8080/acp/v1/health
+```
+
+> For production: replace `ACP_INSTITUTION_PUBLIC_KEY` with your own Ed25519 public key.
+> See `impl/go/.env.example` for all configuration options.
+
+---
+
+## Make targets
+
+```bash
+make demo          # start server in dev mode + health check
+make test          # run all Go tests
+make vectors       # run 42 conformance test vectors
+make python-demo   # run Python admission control demo (no server needed)
+make build         # build the Go server binary
+```
+
 ---
 
 ## Choose your path
@@ -8,11 +37,12 @@
 
 Start here to understand what ACP solves and how it is structured.
 
-1. [`README.md`](README.md) — What ACP is and why it exists
-2. [`ARCHITECTURE.md`](ARCHITECTURE.md) — Formal domain model and dependency graph
-3. [`spec/core/ACP-SIGN-1.0.md`](spec/core/ACP-SIGN-1.0.md) — Base cryptographic layer
-4. [`spec/core/ACP-CT-1.0.md`](spec/core/ACP-CT-1.0.md) — Capability Token format
-5. [`spec/core/ACP-HP-1.0.md`](spec/core/ACP-HP-1.0.md) — Handshake Protocol
+1. [`docs/admission-flow.md`](docs/admission-flow.md) — **Start here**: complete 6-step admission check guide
+2. [`README.md`](README.md) — What ACP is and why it exists
+3. [`ARCHITECTURE.md`](ARCHITECTURE.md) — Formal domain model and dependency graph
+4. [`spec/core/ACP-SIGN-1.0.md`](spec/core/ACP-SIGN-1.0.md) — Base cryptographic layer
+5. [`spec/core/ACP-CT-1.0.md`](spec/core/ACP-CT-1.0.md) — Capability Token format
+6. [`spec/core/ACP-HP-1.0.md`](spec/core/ACP-HP-1.0.md) — Handshake Protocol
 
 ### Path B — Implement ACP
 
@@ -75,7 +105,7 @@ go run ./cmd/acp-runner \
   --impl ./acp-evaluate \
   --suite ../../compliance/test-vectors
 
-# Expected: 22/22 PASS → CONFORMANT L1 (CORE + DCMA + HP)
+# Expected: 42/42 PASS → CONFORMANT L1 (CORE + DCMA + HP + LEDGER + EXEC)
 ```
 
 ### Path D — Contribute to the framework

@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - "07-reference-implementation/acp-go/**"
+      - "impl/go/**"
       - ".github/workflows/docker.yml"
   workflow_dispatch:
 
@@ -47,8 +47,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: 07-reference-implementation/acp-go
-          file: 07-reference-implementation/acp-go/Dockerfile
+          context: impl/go
+          file: impl/go/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
