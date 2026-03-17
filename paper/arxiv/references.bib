@@ -1,0 +1,126 @@
+% ============================================================
+% ACP arXiv — Bibliography
+% ============================================================
+
+@techreport{rfc8785,
+  author       = {Rundgren, Anders and Jordan, Bret and Erdtman, Samuel},
+  title        = {{JSON} Canonicalization Scheme ({JCS})},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {8785},
+  year         = {2020},
+  month        = jun,
+  url          = {https://www.rfc-editor.org/rfc/rfc8785},
+  note         = {IETF RFC 8785}
+}
+
+@techreport{rfc8032,
+  author       = {Josefsson, Simon and Liusvaara, Ilari},
+  title        = {Edwards-Curve Digital Signature Algorithm ({EdDSA})},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {8032},
+  year         = {2017},
+  month        = jan,
+  url          = {https://www.rfc-editor.org/rfc/rfc8032},
+  note         = {IETF RFC 8032}
+}
+
+@techreport{rfc6749,
+  author       = {Hardt, Dick},
+  title        = {The {OAuth} 2.0 Authorization Framework},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {6749},
+  year         = {2012},
+  month        = oct,
+  url          = {https://www.rfc-editor.org/rfc/rfc6749},
+  note         = {IETF RFC 6749}
+}
+
+@techreport{rfc7519,
+  author       = {Jones, Michael B. and Bradley, John and Sakimura, Nat},
+  title        = {{JSON} Web Token ({JWT})},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {7519},
+  year         = {2015},
+  month        = may,
+  url          = {https://www.rfc-editor.org/rfc/rfc7519},
+  note         = {IETF RFC 7519}
+}
+
+@techreport{rfc8037,
+  author       = {Liusvaara, Ilari},
+  title        = {{CFRG} Elliptic Curves for {JOSE}},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {8037},
+  year         = {2017},
+  month        = jan,
+  url          = {https://www.rfc-editor.org/rfc/rfc8037},
+  note         = {IETF RFC 8037. RFC 8037 Test Key A used for conformance test vectors.}
+}
+
+@misc{opa,
+  author       = {{Open Policy Agent Contributors}},
+  title        = {Open Policy Agent},
+  year         = {2024},
+  url          = {https://www.openpolicyagent.org},
+  note         = {Policy evaluation engine. ACP-RISK-1.0 Step~3 is compatible with OPA as backend.}
+}
+
+@misc{spiffe,
+  author       = {{SPIFFE Project}},
+  title        = {{SPIFFE} / {SPIRE}: Secure Production Identity Framework For Everyone},
+  year         = {2024},
+  url          = {https://spiffe.io},
+  note         = {Cryptographic workload identity. ACP builds on SPIFFE identity to add capability scoping.}
+}
+
+@article{saltzer1975,
+  author       = {Saltzer, Jerome H. and Schroeder, Michael D.},
+  title        = {The Protection of Information in Computer Systems},
+  journal      = {Proceedings of the IEEE},
+  volume       = {63},
+  number       = {9},
+  pages        = {1278--1308},
+  year         = {1975},
+  doi          = {10.1109/PROC.1975.9939},
+  note         = {Foundational reference for the principle of least privilege and fail-closed design.}
+}
+
+@misc{acp-spec,
+  author       = {Fernandez, Marcelo},
+  title        = {Agent Control Protocol --- Specification and Reference Implementation},
+  year         = {2026},
+  url          = {https://github.com/chelof100/acp-framework-en},
+  note         = {Complete specification (36 documents), Go reference implementation (22 packages), 42 conformance test vectors.}
+}
+
+@misc{acp-website,
+  author       = {Fernandez, Marcelo},
+  title        = {Agent Control Protocol --- Official Website},
+  year         = {2026},
+  url          = {https://agentcontrolprotocol.xyz}
+}
+
+@misc{kubernetes-admission,
+  author       = {{Kubernetes Contributors}},
+  title        = {Admission Controllers Reference},
+  year         = {2024},
+  url          = {https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/},
+  note         = {Kubernetes admission control architecture that inspired the ACP admission flow model.}
+}
+
+@inproceedings{capability-security,
+  author       = {Miller, Mark S. and Shapiro, Jonathan S.},
+  title        = {Paradigm Regained: Abstraction Mechanisms for Access Control},
+  booktitle    = {Advances in Computing Science --- {ASIAN} 2003},
+  series       = {Lecture Notes in Computer Science},
+  volume       = {2896},
+  pages        = {224--242},
+  publisher    = {Springer},
+  year         = {2003},
+  note         = {Foundational reference for capability-based security, which underlies ACP Capability Tokens.}
+}

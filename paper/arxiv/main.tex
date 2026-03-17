@@ -1,0 +1,930 @@
+% ============================================================
+% Agent Control Protocol — arXiv Submission
+% ACP v1.11 — Admission Control for Agent Actions
+% Marcelo Fernandez, TraslaIA, March 2026
+% Categories: cs.CR (primary), cs.AI (secondary)
+% ============================================================
+
+\documentclass[11pt]{article}
+
+% --- Encoding & fonts ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% --- Page geometry ---
+\usepackage[margin=1in, top=1.1in, bottom=1.1in]{geometry}
+
+% --- Math ---
+\usepackage{amsmath,amssymb}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+
+% --- Code listings ---
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codegreen}{rgb}{0,0.5,0}
+\definecolor{codeblue}{rgb}{0,0,0.6}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+
+\lstdefinestyle{acp}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\small\ttfamily,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{codegray}\itshape,
+  frame=single,
+  framesep=4pt,
+  keepspaces=true,
+  keywordstyle=\color{codeblue}\bfseries,
+  numbers=none,
+  numberstyle=\tiny\color{codegray},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  stringstyle=\color{codegreen},
+  tabsize=2,
+  columns=flexible
+}
+
+\lstset{style=acp}
+
+% --- Hyperlinks ---
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!70!black,
+  urlcolor=blue!70!black,
+  citecolor=blue!70!black,
+  pdftitle={Agent Control Protocol: Admission Control for Agent Actions},
+  pdfauthor={Marcelo Fernandez},
+  pdfsubject={Formal protocol for governance of autonomous agents},
+  pdfkeywords={autonomous agents, admission control, capability tokens, cryptographic governance, agent authorization, audit ledger}
+}
+
+% --- Section formatting ---
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+% --- Spacing ---
+\usepackage{setspace}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+
+% --- Misc ---
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{footnote}
+\usepackage[utf8]{inputenc}
+
+% ============================================================
+\begin{document}
+% ============================================================
+
+\title{%
+  \textbf{Agent Control Protocol}\\[0.4em]
+  \large ACP v1.11: Admission Control for Agent Actions\\[0.3em]
+  \normalsize Technical Specification and Reference Implementation%
+}
+
+\author{
+  Marcelo Fernandez\\
+  TraslaIA\\
+  \texttt{info@traslaia.com}\\
+  \url{https://agentcontrolprotocol.xyz}
+}
+
+\date{March 2026 \\ \small Draft Standard}
+
+\maketitle
+
+% ============================================================
+\begin{abstract}
+% ============================================================
+Agent Control Protocol (ACP) is a formal technical specification for governance of autonomous agents in B2B institutional environments.
+ACP is the \textbf{admission control layer between agent intent and system state mutation}: before any agent action reaches execution, it must pass a cryptographic admission check that validates identity, capability scope, delegation chain, and policy compliance simultaneously.
+
+ACP defines the mechanisms of cryptographic identity, capability-based authorization, deterministic risk evaluation, verifiable chained delegation, transitive revocation, and immutable auditing that a system must implement for autonomous agents to operate under explicit institutional control.
+
+ACP operates as an additional layer on top of RBAC and Zero Trust, without replacing them.
+It is designed specifically for the problem that neither model solves: governing what an autonomous agent can do, under what conditions, with what limits, and with complete traceability for external auditing---including across organizational boundaries.
+
+The v1.11 specification comprises 36 technical documents organized into five conformance levels (L1--L5).
+It includes a Go reference implementation of 22 packages covering all L1--L4 capabilities,
+42 signed conformance test vectors (Ed25519 + SHA-256), and an OpenAPI 3.1.0 specification for all HTTP endpoints.
+It defines more than 62 verifiable requirements, 12 prohibited behaviors,
+and the mechanisms for interoperability between institutions.
+
+\textbf{Specification and implementation:} \url{https://github.com/chelof100/acp-framework-en}
+\end{abstract}
+
+\tableofcontents
+
+\newpage
+
+% ============================================================
+\section{The Problem ACP Solves}
+% ============================================================
+
+Autonomous agents are being deployed in institutional environments without a technical standard to govern their behavior.
+This is not a tooling problem---it is a protocol problem.
+
+\subsection{The Structural Gap}
+
+When an autonomous agent makes a decision and executes it, there is a critical moment between both actions.
+In current models, that moment does not formally exist: the decision and the execution are the same event.
+The agent decides and acts. There is no intermediate validation.
+There is no point of intervention. There is no structured record of why the decision was made.
+
+This is acceptable when a human executes that action, because the human bears responsibility and can be questioned.
+An autonomous agent cannot be questioned. It can only be audited---and only if there is something to audit.
+
+\begin{quote}
+\textit{The problem is not whether agents are trustworthy.
+The problem is that currently no formal technical mechanism exists that allows an institution to demonstrate that its agents operated within authorized limits.}
+\end{quote}
+
+\subsection{ACP as Admission Control}
+
+The clearest frame for understanding what ACP does is the Kubernetes Admission Controller analogy.
+
+Kubernetes intercepts every API request before it reaches the cluster and runs it through a sequence of admission checks---\texttt{ValidatingWebhookConfiguration},
+\texttt{ResourceQuota} enforcement, OPA Gatekeeper policies.
+If any check fails, the request is rejected before touching cluster state.
+
+ACP applies this pattern to agent actions:
+
+\begin{lstlisting}
+agent intent
+    |
+[1] Identity check     (ACP-AGENT-1.0, ACP-HP-1.0)
+    |    is this agent who they claim to be?
+[2] Capability check   (ACP-CT-1.0, ACP-DCMA-1.0)
+    |    does the agent hold a valid token for this action?
+[3] Policy check       (ACP-RISK-1.0, ACP-PSN-1.0)
+    |    is this action within current policy?
+[4] ADMIT / DENY / ESCALATE
+    |    (if ADMIT)
+[5] Execution token    (ACP-EXEC-1.0)
+    |    single-use cryptographic proof of admission
+[6] Ledger record      (ACP-LEDGER-1.3)
+    |    immutable signed audit entry
+system state mutation
+\end{lstlisting}
+
+The critical difference from Kubernetes: ACP's admission check operates across institutional boundaries.
+An agent from Bank~A can be admitted by Bank~B without Bank~B trusting Bank~A's internal infrastructure---the
+cryptographic proof is self-contained and verifiable with Bank~A's published public key alone.
+
+This \emph{admission control} framing also clarifies the relationship with related tools:
+\begin{itemize}[noitemsep]
+  \item \textbf{OPA (Open Policy Agent)} \cite{opa} can serve as the policy evaluation engine inside Step~3.
+        ACP does not replace OPA; it adds the identity and delegation chain layers above it.
+  \item \textbf{AWS IAM / Azure RBAC} model static role permissions for humans.
+        ACP adds dynamic agent delegation with execution proof.
+  \item \textbf{OAuth 2.0} \cite{rfc6749} handles API access tokens.
+        ACP extends delegation to multi-agent chains with non-escalation and verifiable provenance.
+  \item \textbf{SPIFFE / SPIRE} \cite{spiffe} provides cryptographic workload identity.
+        ACP builds on that identity to add capability scoping and governance.
+\end{itemize}
+
+\subsection{Why RBAC and Zero Trust Are Insufficient}
+
+RBAC and Zero Trust are the predominant control layers in enterprise environments.
+Both are necessary. Neither solves the problem of governing autonomous agents:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Criterion} & \textbf{RBAC} & \textbf{Zero Trust} & \textbf{ACP} \\
+\midrule
+Designed for & Human roles & Network access & Autonomous agents \\
+Cryptographic identity & No & Partial & Yes (Ed25519, mandatory) \\
+Verifiable dynamic delegation & No & No & Yes (chained, auditable) \\
+Decision/execution separation & No & No & Yes (Execution Tokens) \\
+Real-time risk evaluation & No & Partial & Yes (deterministic) \\
+Multi-institutional auditing & Non-standard & Non-standard & Native (signed ledger) \\
+Transitive delegation revocation & No & No & Yes (formal propagation) \\
+B2B interoperability for agents & Unstructured & Unstructured & Central protocol design \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of ACP with RBAC and Zero Trust across agent governance criteria.}
+\end{table}
+
+ACP does not replace RBAC or Zero Trust. It adds a governance layer oriented specifically to autonomous agents that operates above existing controls.
+
+\subsection{The Concrete Scenario ACP Prevents}
+
+\textbf{Without ACP:}
+A financial processing agent receives instructions from another agent to execute a transfer.
+The agent executes the action.
+If the instruction was legitimate, everything works.
+If it was compromised, injected, or generated by an unauthorized agent, the transfer occurs anyway.
+No formal mechanism exists to prevent it, nor is there a technical record that allows reconstructing the authorization chain.
+
+\textbf{With ACP:}
+The agent requesting the transfer must present a Capability Token cryptographically signed by the issuing institution,
+demonstrate possession of the associated private key,
+and the request passes through the risk engine before receiving an Execution Token.
+The ET is single-use.
+The entire chain is recorded in the Audit Ledger with an externally verifiable institutional signature.
+
+% ============================================================
+\section{What ACP Is}
+% ============================================================
+
+A formal technical specification---not a framework, not a platform, not a set of best practices.
+A protocol with precise definitions, formal state models, verifiable flows, and explicit conformance requirements.
+
+\subsection{Definition}
+
+Agent Control Protocol (ACP) is a technical specification that defines the mechanisms by which autonomous institutional agents are identified, authorized, monitored, and governed in B2B environments.
+It establishes the formal contract between an agent, the institution that operates it, and the institutions with which it interacts.
+
+\textbf{Core invariant:}
+\[
+\textit{Execute}(\text{request}) \Longrightarrow
+\textit{ValidIdentity}(\text{agent})
+\;\wedge\; \textit{ValidCapability}
+\;\wedge\; \textit{ValidDelegationChain}
+\;\wedge\; \textit{AcceptableRisk}
+\]
+
+No action of an ACP agent can be executed without all four predicates being simultaneously true.
+If any fails, the action is denied. No exceptions.
+
+\subsection{Design Principles}
+
+ACP was designed with five principles that are non-negotiable at implementation time:
+
+\begin{itemize}[noitemsep]
+  \item[\textbf{P1}] \textbf{Fail Closed.}
+        On any internal component failure, the action is denied. Never approved by default.
+  \item[\textbf{P2}] \textbf{Identity is cryptography.}
+        $\text{AgentID} = \text{base58}(\text{SHA-256}(\text{public\_key}))$.
+        No usernames. No arbitrary IDs. Identity cannot be claimed---it must be demonstrated in every request.
+  \item[\textbf{P3}] \textbf{Delegation does not expand privileges.}
+        The delegated agent's permissions are always a strict subset of the delegator's permissions.
+        This property is cryptographically verified at every chain hop.
+  \item[\textbf{P4}] \textbf{Complete auditability.}
+        Every decision---approved, denied, or escalated---is recorded in an append-only ledger with institutional signature. Not just successes. Everything.
+  \item[\textbf{P5}] \textbf{External verification possible.}
+        Any institution can verify ACP artifacts from another institution using only the public key registered in the ITA. No dependency on proprietary systems.
+\end{itemize}
+
+\subsection{Formal Agent Model}
+
+In ACP, an agent is a formal tuple with well-defined state:
+\[
+A = (\, \text{AgentID},\; \text{capabilities},\; \text{autonomy\_level},\; \text{state},\; \text{limits} \,)
+\]
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+\textbf{Field} & \textbf{Type} & \textbf{Description} \\
+\midrule
+AgentID & String (43--44 chars) & \texttt{base58(SHA-256(pk))}. Derived from public key. Immutable. \\
+capabilities & List of strings & Explicit permissions. Format: \texttt{acp:cap:<domain>.<action>}. Never abstract roles. \\
+autonomy\_level & Integer 0--4 & Determines risk evaluation thresholds. 0 = no autonomy. 4 = maximum. \\
+state & Enum & \texttt{active | restricted | suspended | revoked}. Transition to \texttt{revoked} is unidirectional. \\
+limits & Object & Rate limits, maximum amounts, time windows. Not modifiable at runtime. \\
+\bottomrule
+\end{tabular}
+\caption{ACP formal agent tuple fields.}
+\end{table}
+
+\subsection{Layered Architecture}
+
+ACP does not replace existing security infrastructure. It is added as an upper layer:
+
+\begin{lstlisting}
+ACP Layer   -- Autonomous agent governance: identity, authorization, risk, auditing
+RBAC Layer  -- Role-based access control for human users
+Zero Trust  -- Continuous identity and network access verification
+\end{lstlisting}
+
+% ============================================================
+\section{Technical Mechanisms}
+% ============================================================
+
+ACP defines six interdependent mechanisms. Each has its own formal specification, state model, data structure, protocol flow, and error codes.
+
+\subsection{Serialization and Signing (ACP-SIGN-1.0)}
+
+Every verification in ACP begins with signature verification.
+ACP-SIGN-1.0 defines the exact process that produces a binary result---valid or invalid---without ambiguity:
+
+\begin{enumerate}[noitemsep]
+  \item \textbf{Canonicalization with JCS (RFC~8785) \cite{rfc8785}.}
+        Produces a deterministic representation of the JSON object, independent of field order and the system that generated it.
+  \item \textbf{SHA-256 hash} over the canonical output in UTF-8.
+  \item \textbf{Ed25519 signature (RFC~8032) \cite{rfc8032}} over the hash.
+        32-byte key, 64-byte signature.
+  \item \textbf{Base64url encoding} without padding for transmission.
+\end{enumerate}
+
+Signature verification precedes all semantic validation.
+An object with an invalid signature is rejected without processing its content.
+This rule has no exceptions (PROHIB-003, PROHIB-012).
+
+\subsection{Capability Token (ACP-CT-1.0)}
+
+The Capability Token is ACP's central artifact.
+It is a signed JSON object that specifies exactly what an agent can do, on what resource, for how long, and whether it can delegate that capability to other agents.
+
+\begin{lstlisting}[language={}]
+{
+  "ver": "1.0",
+  "iss": "<AgentID_issuer>",
+  "sub": "<AgentID_subject>",
+  "cap": ["acp:cap:financial.payment"],
+  "res": "org.example/accounts/ACC-001",
+  "exp": 1718923600,
+  "nonce": "<128bit_CSPRNG_base64url>",
+  "deleg": { "allowed": true, "max_depth": 2 },
+  "parent_hash": null,
+  "sig": "<Ed25519_base64url>"
+}
+\end{lstlisting}
+
+\textbf{Critical fields:}
+\texttt{exp} is mandatory---a token without expiry is invalid by definition.
+The 128-bit nonce prevents replay attacks.
+\texttt{parent\_hash} chains delegated tokens in a verifiable way.
+The signature covers all fields except \texttt{sig}.
+
+\subsection{Handshake and Proof-of-Possession (ACP-HP-1.0)}
+
+Possessing a valid Capability Token is not sufficient to act.
+ACP-HP-1.0 requires that the bearer demonstrate in every request that they possess the private key corresponding to the AgentID declared in the token.
+This eliminates the possibility of impersonating an agent with a stolen token.
+
+The protocol is stateless---it does not establish sessions, does not produce a \texttt{session\_id}, does not require server-side state between requests. The proof occurs in every interaction:
+
+\begin{enumerate}[noitemsep]
+  \item The receiving system issues a 128-bit challenge generated by CSPRNG, valid for 30 seconds and single-use.
+  \item The agent signs the challenge together with the HTTP method, path, and body hash of the request.
+  \item The receiver verifies the signature using the agent's public key, obtained from the ITA.
+  \item The challenge is deleted immediately after use---it cannot be reused.
+\end{enumerate}
+
+This sequence guarantees four formal properties:
+identity authentication, cryptographic request binding, anti-replay, and transport channel independence.
+
+\subsection{Deterministic Risk Evaluation (ACP-RISK-1.0)}
+
+Each authorization request passes through a deterministic risk function that produces a Risk Score (RS) in the range $[0, 100]$.
+The same input always produces the same result---no stochastic elements, no machine learning in the critical path.
+
+\[
+\text{RS} = \min\!\bigl(100,\; B(c) + F_{\text{ctx}}(x) + F_{\text{hist}}(h) + F_{\text{res}}(r)\bigr)
+\]
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}llp{5.5cm}@{}}
+\toprule
+\textbf{Factor} & \textbf{Description} & \textbf{Example values} \\
+\midrule
+$B(c)$ & Baseline by capability & \texttt{*.read = 0}, \texttt{financial.payment = 35} \\
+$F_{\text{ctx}}(x)$ & Request context & Non-corporate IP $+20$; outside hours $+15$ \\
+$F_{\text{hist}}(h)$ & Agent history (24h) & Recent denial $+20$; anomalous frequency $+15$ \\
+$F_{\text{res}}(r)$ & Resource classification & \texttt{public = 0}; \texttt{sensitive = 15}; \texttt{restricted = 45} \\
+\bottomrule
+\end{tabular}
+\caption{ACP-RISK-1.0 risk scoring factors.}
+\end{table}
+
+The RS determines the decision according to the thresholds configured for the agent's \texttt{autonomy\_level}.
+With \texttt{autonomy\_level}~2 (standard):
+$\text{RS} \leq 39$ $\rightarrow$ APPROVED;
+$\text{RS} \in [40, 69]$ $\rightarrow$ ESCALATED;
+$\text{RS} \geq 70$ $\rightarrow$ DENIED.
+An agent with \texttt{autonomy\_level}~0 always receives DENIED.
+
+\subsection{Verifiable Chained Delegation (ACP-DCMA-1.0)}
+
+ACP allows an agent to delegate capabilities to another agent, which in turn can delegate to a third,
+up to the maximum depth defined in the root token.
+Delegation guarantees three properties:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{No privilege escalation.}
+        The delegated agent's capability set is always $\subseteq$ the delegator's set.
+        Cryptographically verified at every hop via the \texttt{parent\_hash} field.
+  \item \textbf{Bounded depth.}
+        The \texttt{max\_depth} field establishes the chain limit. A chain that exceeds it is invalid.
+  \item \textbf{Transitive revocation.}
+        Revoking an agent's token automatically invalidates all delegated tokens that descend from it.
+\end{itemize}
+
+\subsection{Execution Token (ACP-EXEC-1.0)}
+
+The separation between authorization and execution is a core principle of ACP.
+When the authorization engine approves a request, it returns an Execution Token (ET):
+a single-use artifact with a short lifetime that authorizes exactly that action, on that resource, at that moment.
+
+\begin{itemize}[noitemsep]
+  \item An ET can only be consumed once.
+        A second presentation is rejected (PROHIB-002).
+  \item An expired ET is invalid even if it was never used.
+  \item The target system that consumes the ET notifies the ACP endpoint, closing the audit cycle.
+\end{itemize}
+
+\subsection{Audit Ledger (ACP-LEDGER-1.3)}
+
+The Audit Ledger is a chain of cryptographically signed events where each event includes the hash of the previous event:
+
+\[
+h_n = \text{SHA-256}(\,e_n \;\|\; h_{n-1}\,)
+\]
+
+This structure makes it impossible to modify or delete an event without invalidating the entire subsequent chain.
+The ledger records all lifecycle event types: GENESIS, AUTHORIZATION (including DENIED and ESCALATED),
+RISK\_EVALUATION, TOKEN\_ISSUED, TOKEN\_REVOKED, EXECUTION\_TOKEN\_ISSUED, and EXECUTION\_TOKEN\_CONSUMED.
+
+Institutions with FULL conformance expose the ledger via \texttt{GET /acp/v1/audit/query},
+allowing external partners to verify chain integrity using only the institutional ITA public key.
+Modifying or deleting ledger events is prohibited (PROHIB-007, PROHIB-008).
+
+% ============================================================
+\section{Inter-Institutional Trust}
+% ============================================================
+
+In a B2B environment, agents of one institution interact with another institution's systems.
+ACP defines the exact mechanism by which this trust is established, verified, and can be revoked.
+
+\subsection{Institutional Trust Anchor (ACP-ITA-1.0)}
+
+The ITA is the authoritative registry that links an \texttt{institution\_id} to an Ed25519 public key.
+It is the only point where ACP depends on an out-of-band mechanism: the initial distribution of the ITA authority's public key.
+Once that key is resolved, all subsequent verification is autonomous and cryptographic.
+
+Each institution registers in the ITA its Root Institutional Key (RIK)---the private key held in HSM that never leaves it.
+All ACP artifacts from that institution (tokens, ledger events, API responses) are signed with that key.
+Any third party can verify them by resolving the public key from the ITA.
+
+\subsection{Mutual Recognition (ACP-ITA-1.1)}
+
+When two institutions operate under different ITA authorities,
+ACP-ITA-1.1 defines the mutual recognition protocol.
+The process requires both authorities to sign a Mutual Recognition Agreement (MRA) establishing:
+the scope of recognition, the agreement's validity period,
+and the proxy resolution mechanism.
+
+Recognition is explicitly non-transitive.
+If A recognizes B and B recognizes C, A does not automatically recognize C.
+Each bilateral relationship requires its own signed MRA.
+This prevents uncontrolled expansion of the trust graph.
+
+\subsection{Institutional Key Rotation and Revocation}
+
+\textbf{Normal rotation} includes a transition period of up to 7 days during which both keys are valid,
+allowing artifacts signed with the old key to be verified during the transition.
+
+\textbf{Emergency rotation} is activated when a key is compromised.
+The result is immediate: the key is marked \texttt{revoked},
+all artifacts signed with it are invalid from that moment,
+and there is no transition period.
+
+% ============================================================
+\section{Security Model}
+% ============================================================
+
+ACP explicitly defines which threats it mitigates, which properties it guarantees,
+and which risks fall outside its scope.
+
+\subsection{Threat Model (STRIDE)}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}llp{6.5cm}@{}}
+\toprule
+\textbf{Category} & \textbf{Threat} & \textbf{Mitigation in ACP} \\
+\midrule
+Spoofing & AgentID impersonation & $\text{AgentID} = \text{SHA-256}(\text{pk})$. Without valid signature $\rightarrow$ immediate DENIED. \\
+Tampering & Token or event alteration & Ed25519 covers all fields. Chained ledger: altering one event invalidates all subsequent. \\
+Repudiation & Agent denies executed action & ActionRequest digitally signed. Non-repudiation by design. \\
+Info Disclosure & Capability exposure & Tokens reveal only the necessary subset. Channel confidentiality via TLS. \\
+DoS & Request flooding & Rate limits per \texttt{agent\_id}. Anomalous frequency control. \\
+Elevation & Delegation that expands privileges & $C_{\text{delegated}} \subseteq C_{\text{original}}$. Cryptographically verified at each hop. \\
+\bottomrule
+\end{tabular}
+\caption{STRIDE threat model and ACP mitigations.}
+\end{table}
+
+\subsection{Guaranteed Security Properties}
+
+ACP guarantees the following properties when the implementation is compliant:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{Artifact integrity.}
+        EUF-CMA security of Ed25519. Impossible to modify a token or event without invalidating the signature.
+  \item \textbf{Identity authenticity.}
+        Only whoever possesses \texttt{sk} can generate a valid signature under the corresponding \texttt{pk}.
+  \item \textbf{No privilege escalation via delegation.}
+        Demonstrable by induction over the delegation chain.
+  \item \textbf{Anti-replay.}
+        The single-use challenge makes reusing a proof of possession ineffective.
+  \item \textbf{Effective revocation.}
+        $\textit{Valid}(t) = \textit{valid\_sig} \wedge \neg\textit{expired} \wedge \neg\textit{revoked} \wedge \textit{valid\_delegation}$.
+        All four conditions must be true simultaneously.
+\end{itemize}
+
+\subsection{Declared Residual Risks}
+
+ACP explicitly declares what it cannot resolve:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{Total compromise of the RIK held in HSM.}
+        ACP defines the emergency rotation process but cannot prevent a physical compromise of the custody infrastructure.
+  \item \textbf{Coordinated institutional collusion.}
+        If multiple institutions act maliciously in a coordinated manner, they can generate valid artifacts.
+        ACP guarantees traceability, not prevention of malicious agreements between parties.
+  \item \textbf{Implementation failures.}
+        ACP is a specification. An implementation that violates prohibited behaviors can compromise all protocol guarantees.
+        Conformance requires formal testing.
+  \item \textbf{ITA bootstrap.}
+        The only point that depends on an out-of-band channel.
+        Once the ITA root key is resolved, everything subsequent is autonomous.
+\end{itemize}
+
+% ============================================================
+\section{Conformance and Interoperability}
+% ============================================================
+
+\subsection{Conformance Levels}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Level} & \textbf{Required documents} & \textbf{Enabled capability} \\
+\midrule
+L1 --- CORE & ACP-SIGN-1.0, ACP-CT-1.0, ACP-HP-1.0 & Token issuance with cryptographic PoP \\
+L2 --- SECURITY & L1 + ACP-RISK-1.0, ACP-REV-1.0, ACP-ITA-1.0 & Risk eval, transitive revocation, ITA \\
+L3 --- FULL & L2 + ACP-API-1.0, ACP-EXEC-1.0, ACP-LEDGER-1.3 & Complete verifiable auditing \\
+L4 --- EXTENDED & L3 + ACP-PAY-1.0, ACP-NOTIFY-1.0, ACP-DISC-1.0, \ldots & Full governance suite \\
+L5 --- DECENTRAL. & L4 + ACP-D suite & Federation without central ITA \\
+\bottomrule
+\end{tabular}
+\caption{ACP-CONF-1.2 conformance levels.}
+\end{table}
+
+\subsection{Conformance Declaration}
+
+Every compliant implementation MUST expose a public endpoint without authentication:
+\begin{lstlisting}
+GET https://<endpoint>/acp/v1/conformance
+\end{lstlisting}
+This endpoint returns the achieved level, implemented documents, declared extensions, and declaration date.
+It allows any external partner to verify the conformance level of a counterparty before establishing an ACP relationship.
+
+\subsection{Prohibited Behaviors}
+
+ACP defines 12 behaviors that no compliant implementation can exhibit.
+If any is exhibited, the implementation cannot declare conformance at any level:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Code} & \textbf{Prohibited behavior} \\
+\midrule
+PROHIB-001 & Approving a request when any evaluation component fails \\
+PROHIB-002 & Reusing an already-consumed Execution Token \\
+PROHIB-003 & Omitting signature verification on any incoming artifact \\
+PROHIB-004 & Treating a not-found \texttt{token\_id} as active in a revocation context \\
+PROHIB-005 & Allowing state transition from \texttt{revoked} \\
+PROHIB-006 & Issuing an ET without a prior APPROVED AuthorizationDecision \\
+PROHIB-007 & Modifying or deleting Audit Ledger events \\
+PROHIB-008 & Silencing ledger corruption detection \\
+PROHIB-009 & Ignoring \texttt{max\_depth} in delegation chains \\
+PROHIB-010 & Implementing an offline policy more permissive than ACP-REV-1.0 \\
+PROHIB-011 & Approving requests from agents with \texttt{autonomy\_level}~0 \\
+PROHIB-012 & Continuing to process an artifact with an invalid signature \\
+\bottomrule
+\end{tabular}
+\caption{ACP prohibited behaviors. Exhibiting any disqualifies conformance at all levels.}
+\end{table}
+
+\subsection{B2B Interoperability Conditions}
+
+\begin{itemize}[noitemsep]
+  \item \textbf{L1 Interoperability:} Institution A can verify tokens from B if both implement ACP-CONF-L1,
+        A has access to B's public key (via ITA or out-of-band), and B's tokens use ACP-SIGN-1.0 algorithms.
+  \item \textbf{L2 Interoperability:} A can delegate to B's agents if both implement ACP-CONF-L2,
+        are registered in a common ITA or with mutual recognition, and B's revocation endpoint is accessible to A.
+  \item \textbf{L3 Interoperability:} A can audit B's ledger if B implements ACP-CONF-L3,
+        A can resolve B's public key via ITA, and B exposes \texttt{GET /acp/v1/audit/query}.
+\end{itemize}
+
+% ============================================================
+\section{Use Cases}
+% ============================================================
+
+ACP is sector-agnostic. The mechanisms are identical regardless of industry.
+What varies is the configuration of capabilities, resources, and autonomy levels.
+
+\subsection{Financial Sector --- Inter-Institutional Payment Agents}
+
+ACP-PAY-1.0 extends the capability registry with formal specifications for
+\texttt{acp:cap:financial.payment} and \texttt{acp:cap:financial.transfer}.
+Mandatory constraints in the token include \texttt{max\_amount} and \texttt{currency}.
+12 specific validation steps cover limit verification, beneficiary validation, and time window control.
+In a financial B2B scenario, Bank~A can authorize an agent to execute payments up to a defined amount
+to pre-approved beneficiaries, with a complete record verifiable by Bank~B
+without needing shared proprietary systems.
+
+\subsection{Digital Government --- Document Processing}
+
+Government agents that process documents can operate under ACP with \texttt{autonomy\_level}~1 or~2,
+requiring human review for any action with a Risk Score above the configured threshold.
+Ledger traceability provides forensic evidence for regulatory audits and transparency processes.
+
+\subsection{Enterprise AI --- Multi-Company Orchestration}
+
+In agent pipelines that cross organizational boundaries,
+ACP allows each organization to maintain formal control over what other organizations' agents can do in their systems.
+Chained delegation allows an agent in company~A to operate in company~B's systems with explicitly delegated capabilities,
+without B needing to trust A's internal controls---only the chain of signed tokens.
+
+\subsection{Critical Infrastructure --- Monitoring and Actuation Agents}
+
+For systems where an incorrect action has irreversible consequences,
+\texttt{autonomy\_level}~0 ensures any actuation request is DENIED without evaluating the Risk Score.
+The ledger provides the forensic record needed for post-incident analysis.
+
+% ============================================================
+\section{Specification and Implementation Status}
+% ============================================================
+
+ACP v1.11 is a complete Draft Standard specification with a full Go reference implementation.
+
+\subsection{Active Specifications --- v1.11 (36 documents)}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Level} & \textbf{Document} & \textbf{Title} \\
+\midrule
+L1 & ACP-SIGN-1.0 & Serialization and Signature \\
+L1 & ACP-AGENT-1.0 & Agent Identity \\
+L1 & ACP-CT-1.0 & Capability Tokens \\
+L1 & ACP-CAP-REG-1.0 & Capability Registry \\
+L1 & ACP-HP-1.0 & Handshake / Proof-of-Possession \\
+L1 & ACP-DCMA-1.0 & Delegated Chain Multi-Agent \\
+L1 & ACP-MESSAGES-1.0 & Wire Message Format \\
+L1 & ACP-PROVENANCE-1.0 & Authority Provenance \\
+\midrule
+L2 & ACP-RISK-1.0 & Deterministic Risk Engine \\
+L2 & ACP-REV-1.0 & Revocation Protocol \\
+L2 & ACP-ITA-1.0 & Institutional Trust Anchor \\
+L2 & ACP-ITA-1.1 & ITA Mutual Recognition \\
+L2 & ACP-REP-1.2 & Reputation Module \\
+L2 & ACP-REP-PORTABILITY-1.0 & Reputation Portability \\
+\midrule
+L3 & ACP-API-1.0 & HTTP API \\
+L3 & ACP-EXEC-1.0 & Execution Tokens \\
+L3 & ACP-LEDGER-1.3 & Audit Ledger (mandatory institutional sig) \\
+L3 & ACP-PSN-1.0 & Policy Snapshot \\
+L3 & ACP-POLICY-CTX-1.0 & Policy Context Snapshot \\
+L3 & ACP-LIA-1.0 & Liability Attribution \\
+L3 & ACP-HIST-1.0 & History Query API \\
+\midrule
+L4 & ACP-PAY-1.0 & Financial Capability \\
+L4 & ACP-NOTIFY-1.0 & Event Notifications \\
+L4 & ACP-DISC-1.0 & Service Discovery \\
+L4 & ACP-BULK-1.0 & Batch Operations \\
+L4 & ACP-CROSS-ORG-1.0 & Cross-Organization Bundles \\
+L4 & ACP-GOV-EVENTS-1.0 & Governance Event Stream \\
+\midrule
+Gov. & ACP-CONF-1.2 & Conformance --- sole normative source \\
+Gov. & ACP-TS-1.1 & Test Vector Format \\
+Gov. & RFC-PROCESS & Specification Process \\
+Gov. & RFC-REGISTRY & Specification Registry \\
+Gov. & ACR-1.0 & Change Request Process \\
+\bottomrule
+\end{tabular}
+\caption{ACP v1.11 active specification documents by conformance level.
+Superseded versions (CONF-1.0, CONF-1.1, LEDGER-1.2, REP-1.1, AGENT-SPEC-0.3) archived in \texttt{archive/specs/}.}
+\end{table}
+
+\subsection{Reference Implementation --- 22 Go Packages}
+
+The Go reference implementation in \texttt{impl/go/} covers all L1--L4 conformance levels.
+All 22 packages pass \texttt{go test ./...}.
+A Python SDK (\texttt{impl/python/}) covers the ACP-HP-1.0 handshake and all ACP-API-1.0 endpoints.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Package} & \textbf{Spec} & \textbf{Level} \\
+\midrule
+\texttt{pkg/agent} & ACP-AGENT-1.0 & L1 \\
+\texttt{pkg/ct} & ACP-CT-1.0 & L1 \\
+\texttt{pkg/hp} & ACP-HP-1.0 & L1 \\
+\texttt{pkg/dcma} & ACP-DCMA-1.0 & L1 \\
+\texttt{pkg/risk} & ACP-RISK-1.0 & L2 \\
+\texttt{pkg/rev} & ACP-REV-1.0 & L2 \\
+\texttt{pkg/rep} & ACP-REP-1.2 & L2 \\
+\texttt{pkg/exec} & ACP-EXEC-1.0 & L3 \\
+\texttt{pkg/ledger} & ACP-LEDGER-1.3 & L3 \\
+\texttt{pkg/psn} & ACP-PSN-1.0 & L3 \\
+\texttt{pkg/policyctx} & ACP-POLICY-CTX-1.0 & L3 \\
+\texttt{pkg/provenance} & ACP-PROVENANCE-1.0 & L3 \\
+\texttt{pkg/lia} & ACP-LIA-1.0 & L3 \\
+\texttt{pkg/hist} & ACP-HIST-1.0 & L4 \\
+\texttt{pkg/govevents} & ACP-GOV-EVENTS-1.0 & L4 \\
+\texttt{pkg/notify} & ACP-NOTIFY-1.0 & L4 \\
+\texttt{pkg/disc} & ACP-DISC-1.0 & L4 \\
+\texttt{pkg/bulk} & ACP-BULK-1.0 & L4 \\
+\texttt{pkg/crossorg} & ACP-CROSS-ORG-1.0 & L4 \\
+\texttt{pkg/pay} & ACP-PAY-1.0 & L4 \\
+\texttt{pkg/psn} & ACP-PSN-1.0 & L3 \\
+\texttt{cmd/acp-server} & ACP-API-1.0 & L3 \\
+\bottomrule
+\end{tabular}
+\caption{Go reference implementation packages. All pass \texttt{go test ./...}.}
+\end{table}
+
+\subsection{Conformance Test Vectors --- 42 Signed Vectors}
+
+The \texttt{compliance/test-vectors/} directory contains 42 signed test vectors per ACP-TS-1.1:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Suite} & \textbf{Positive} & \textbf{Negative} & \textbf{Spec} \\
+\midrule
+CORE (SIGN, CT, HP) & 4 & 4 & L1 \\
+DCMA & 2 & 2 & L1 \\
+HP & 2 & 8 & L1 \\
+LEDGER & 3 & 8 & L3 \\
+EXEC & 2 & 7 & L3 \\
+\midrule
+\textbf{Total} & \textbf{13} & \textbf{29} & \\
+\bottomrule
+\end{tabular}
+\caption{Conformance test vector suites. All positive vectors carry real Ed25519 signatures (RFC~8037 Test Key A) and real SHA-256 hash chains.}
+\end{table}
+
+\subsection{Roadmap}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Item} & \textbf{Status} \\
+\midrule
+Core specs (L1--L4), 36 documents & Complete \\
+Go reference implementation (22 packages) & Complete \\
+Conformance test vectors (42 signed) & Complete \\
+OpenAPI 3.1.0 (\texttt{openapi/acp-api-1.0.yaml}) & Complete \\
+Python SDK (\texttt{impl/python/}) & Complete (L1 + full API client) \\
+Docker image (\texttt{ghcr.io/chelof100/acp-server:latest}) & Complete \\
+L5 Decentralized (ACP-D) & Specification in design (v2.0) \\
+Post-quantum algorithm migration & Research phase \\
+IETF RFC submission & After L5 stabilization \\
+\bottomrule
+\end{tabular}
+\caption{ACP v1.11 development roadmap.}
+\end{table}
+
+% ============================================================
+\section{How to Implement ACP}
+% ============================================================
+
+ACP is a specification---it does not require adopting any specific platform.
+It can be implemented on top of existing infrastructure.
+
+\subsection{Minimum Requirements for L1 Conformance}
+
+\begin{itemize}[noitemsep]
+  \item \textbf{Ed25519 public key infrastructure.} Key pair for each agent.
+  \item \textbf{JCS implementation (RFC~8785).} Deterministic canonicalization for all signed artifacts.
+  \item \textbf{Capability Token issuance and verification} with all mandatory fields per ACP-CT-1.0~\S5.
+  \item \textbf{Handshake endpoint} to issue and verify challenges (ACP-HP-1.0~\S6).
+  \item \textbf{Capability registry} with the core domains of ACP-CAP-REG-1.0.
+\end{itemize}
+
+\subsection{Additional Requirements for L3 Conformance}
+
+\begin{itemize}[noitemsep]
+  \item Root Institutional Key held in HSM with documented rotation process.
+  \item Registration with an ITA authority (centralized or federated model).
+  \item Deterministic risk engine with the four factors of ACP-RISK-1.0.
+  \item Revocation endpoint (Mechanism~A: online endpoint, or Mechanism~B: CRL).
+  \item Append-only storage for the Audit Ledger with per-event signing.
+  \item Complete HTTP API per ACP-API-1.0, including health and conformance endpoints.
+  \item Public conformance declaration at \texttt{GET /acp/v1/conformance}.
+\end{itemize}
+
+\subsection{What ACP Does Not Prescribe}
+
+ACP defines the \emph{what}---mechanisms, flows, data structures, requirements.
+It does not prescribe the \emph{how} of internal implementation:
+programming language, database, HSM provider, ITA provider,
+or specific integration with existing RBAC or Zero Trust systems.
+
+% ============================================================
+\section{Conclusion}
+% ============================================================
+
+Autonomous agents are already operating in institutional environments.
+The question is not whether they will operate---it is whether they will do so with or without formal governance.
+ACP proposes that they operate with formal governance, with verifiable mechanisms,
+and with traceability that can withstand an external audit.
+
+ACP is not the first attempt to control autonomous agents.
+It is the first attempt to do so through a formal technical specification with precise state models,
+demonstrable security properties, and verifiable conformance requirements.
+The difference between a best-practices policy and a formal protocol is exactly that:
+behaviors are defined, failures have specific error codes, and conformance can be verified.
+
+The goal of ACP is not to make agents more capable. It is to make them governable.
+That is a necessary condition for their institutional deployment to be sustainable at scale.
+
+The v1.11 specification is complete.
+A full Go reference implementation (22 packages, L1--L4) and 42 signed conformance test vectors
+are publicly available at \url{https://github.com/chelof100/acp-framework-en}.
+The specification and implementation are open for technical review, pilot implementation, and formal standardization.
+
+TraslaIA invites organizations interested in adopting ACP, contributing to its evolution,
+or participating in the standardization process to reach out directly.
+
+\bigskip
+\noindent\textbf{Marcelo Fernandez | TraslaIA}\\
+\texttt{info@traslaia.com} | \url{https://agentcontrolprotocol.xyz}
+
+% ============================================================
+\appendix
+\section{Glossary}
+% ============================================================
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}lp{10cm}@{}}
+\toprule
+\textbf{Term} & \textbf{Definition} \\
+\midrule
+AgentID & Cryptographic identifier: \texttt{base58(SHA-256(Ed25519\_public\_key))}. Immutable and unforgeable. \\
+Capability Token (CT) & Signed JSON artifact authorizing an agent to perform specific actions on a defined resource during a limited period. \\
+Execution Token (ET) & Single-use artifact issued after an APPROVED decision. Authorizes exactly that action at that moment. \\
+ITA & Institutional Trust Anchor. Authoritative registry linking \texttt{institution\_id} to institutional Ed25519 public key. \\
+RIK & Root Institutional Key. Institution's Ed25519 key pair held in HSM. \\
+Risk Score (RS) & Integer in $[0, 100]$ produced by the deterministic risk function. Determines the authorization decision. \\
+Autonomy Level & Integer 0--4 assigned to an agent determining applicable risk evaluation thresholds. \\
+PoP & Proof-of-Possession. Cryptographic proof that the bearer of a CT possesses the corresponding private key. \\
+Audit Ledger & Chain of signed events where $h_n = \text{SHA-256}(e_n \| h_{n-1})$. Append-only and immutable. \\
+MRA & Mutual Recognition Agreement. Bilateral document signed by two ITA authorities for cross-authority interoperability. \\
+ESCALATED & ACP decision when RS is in the intermediate range. Action not executed until explicit resolution. \\
+Fail Closed & Design principle: on any internal failure, the action is denied. Never approved by default. \\
+\bottomrule
+\end{tabular}
+\caption{ACP Glossary.}
+\end{table}
+
+% ============================================================
+\section*{Acknowledgements}
+% ============================================================
+
+The ACP specification emerged from analysis of operational challenges in deploying autonomous agents in regulated B2B environments.
+The protocol design was informed by the IETF RFC process, the Kubernetes admission control architecture,
+and the SPIFFE/SPIRE workload identity model.
+
+% ============================================================
+% Bibliography
+% ============================================================
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
