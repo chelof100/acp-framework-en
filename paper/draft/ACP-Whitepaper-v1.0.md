@@ -1,23 +1,25 @@
 # Agent Control Protocol
-## ACP v1.0
-### Formal Governance of Autonomous Institutional Agents
+## ACP v1.11
+### Admission Control for Agent Actions
 
 **Author:**
 Marcelo Fernandez
 TraslaIA
 info@traslaia.com | www.traslaia.com
-February 23, 2026
-Draft Standard · Version 1.0 · B2B Use
+March 2026
+Draft Standard · Version 1.11 · B2B Use
 
 ---
 
 ## Abstract
 
-Agent Control Protocol (ACP) is a formal technical specification for the governance of autonomous agents in B2B institutional environments. It defines the mechanisms of cryptographic identity, capability-based authorization, deterministic risk evaluation, verifiable chained delegation, transitive revocation, and immutable auditing that a system must implement for autonomous agents to operate under explicit institutional control.
+Agent Control Protocol (ACP) is a formal technical specification for governance of autonomous agents in B2B institutional environments. ACP is the **admission control layer between agent intent and system state mutation**: before any agent action reaches execution, it must pass a cryptographic admission check that validates identity, capability scope, delegation chain, and policy compliance simultaneously.
 
-ACP operates as an additional layer on top of RBAC and Zero Trust, without replacing them. It is designed specifically for the problem that neither of those models solves: governing what an autonomous agent can do, under what conditions, with what limits, and with complete traceability for external auditing.
+ACP defines the mechanisms of cryptographic identity, capability-based authorization, deterministic risk evaluation, verifiable chained delegation, transitive revocation, and immutable auditing that a system must implement for autonomous agents to operate under explicit institutional control.
 
-The v1.0 specification is composed of 15 technical documents organized into four layers: Core, Security, Operations, and Governance. It defines 3 conformance levels, more than 62 verifiable requirements, 12 prohibited behaviors, and the mechanisms for interoperability between institutions.
+ACP operates as an additional layer on top of RBAC and Zero Trust, without replacing them. It is designed specifically for the problem that neither model solves: governing what an autonomous agent can do, under what conditions, with what limits, and with complete traceability for external auditing — including across organizational boundaries.
+
+The v1.11 specification is composed of 36 technical documents organized into five conformance levels (L1–L5). It includes a Go reference implementation of 22 packages covering all L1–L4 capabilities, 42 signed conformance test vectors (Ed25519 + SHA-256), and an OpenAPI 3.1.0 specification for all HTTP endpoints. It defines more than 62 verifiable requirements, 12 prohibited behaviors, and the mechanisms for interoperability between institutions.
 
 ---
 
@@ -84,7 +86,41 @@ This is acceptable when a human executes that action, because the human bears re
 
 > The problem is not whether agents are trustworthy. The problem is that currently no formal technical mechanism exists that allows an institution to demonstrate that its agents operated within authorized limits.
 
-### 1.2 Why RBAC and Zero Trust are insufficient
+### 1.2 ACP as Admission Control
+
+The clearest frame for understanding what ACP does is the Kubernetes Admission Controller analogy.
+
+Kubernetes intercepts every API request before it reaches the cluster and runs it through a sequence of admission checks — ValidatingWebhookConfiguration, ResourceQuota enforcement, OPA Gatekeeper policies. If any check fails, the request is rejected before touching cluster state.
+
+ACP applies this pattern to agent actions:
+
+```
+agent intent
+    ↓
+[1] Identity check     (ACP-AGENT-1.0, ACP-HP-1.0)     — is this agent who they claim to be?
+    ↓
+[2] Capability check   (ACP-CT-1.0, ACP-DCMA-1.0)      — does the agent hold a token for this?
+    ↓
+[3] Policy check       (ACP-RISK-1.0, ACP-PSN-1.0)     — is this action within current policy?
+    ↓
+[4] ADMIT / DENY / ESCALATE
+    ↓  (if ADMIT)
+[5] Execution token    (ACP-EXEC-1.0)                   — single-use cryptographic proof of admit
+    ↓
+[6] Ledger record      (ACP-LEDGER-1.3)                 — immutable signed audit entry
+    ↓
+system state mutation
+```
+
+The critical difference from Kubernetes: ACP's admission check operates across institutional boundaries. An agent from Bank A can be admitted by Bank B without Bank B trusting Bank A's internal infrastructure — the cryptographic proof is self-contained and verifiable with Bank A's published public key alone.
+
+This "admission control" framing also clarifies the relationship with related tools:
+- **OPA (Open Policy Agent)** can serve as the policy evaluation engine inside Step 3 — ACP does not replace OPA, it adds the identity and delegation chain layers above it
+- **AWS IAM / Azure RBAC** model static role permissions for humans — ACP adds dynamic agent delegation with execution proof
+- **OAuth 2.0** handles API access tokens — ACP extends delegation to multi-agent chains with non-escalation and verifiable provenance
+- **SPIFFE / SPIRE** provides cryptographic workload identity — ACP builds on that identity to add capability scoping and governance
+
+### 1.3 Why RBAC and Zero Trust are insufficient
 
 RBAC (Role-Based Access Control) and Zero Trust are the predominant control layers in enterprise environments. Both are necessary. Neither solves the problem of governing autonomous agents:
 
@@ -101,7 +137,7 @@ RBAC (Role-Based Access Control) and Zero Trust are the predominant control laye
 
 ACP does not replace RBAC or Zero Trust. It adds a governance layer oriented specifically to autonomous agents that operates above existing controls.
 
-### 1.3 The concrete scenario ACP prevents
+### 1.4 The concrete scenario ACP prevents
 
 Consider the following scenario, which occurs today in multiple organizations with advanced automation systems:
 
@@ -417,42 +453,127 @@ For systems where an incorrect action has irreversible consequences, ACP allows 
 
 ---
 
-## 8. Specification Status
+## 8. Specification and Implementation Status
 
-ACP v1.0/v1.1 is a complete Draft Standard specification. All documents defined in the v1.x roadmap are finalized.
+ACP v1.11 is a complete Draft Standard specification with a full Go reference implementation.
 
-### 8.1 v1.0 Documents — Complete
+### 8.1 Active Specifications — v1.11 (36 documents)
 
-| Document | Title | Layer |
-|----------|-------|-------|
-| ACP-SIGN-1.0 | Serialization and Signature | Core |
-| ACP-CT-1.0 | Capability Tokens | Core |
-| ACP-CAP-REG-1.0 | Capability Registry | Core |
-| ACP-HP-1.0 | Handshake / Proof-of-Possession | Core |
-| ACP-RISK-1.0 | Deterministic Risk Engine | Security |
-| ACP-REV-1.0 | Revocation Protocol | Security |
-| ACP-ITA-1.0 | Institutional Trust Anchor | Security |
-| ACP-API-1.0 | Formal HTTP API | Operations |
-| ACP-EXEC-1.0 | Execution Tokens | Operations |
-| ACP-LEDGER-1.0 | Audit Ledger | Operations |
-| ACP-CONF-1.0 | Conformance — 3 levels, 62+ requirements | Governance |
+**L1 — Core Execution**
 
-### 8.2 v1.1 Documents — Complete
+| Document | Title |
+|----------|-------|
+| ACP-SIGN-1.0 | Serialization and Signature |
+| ACP-AGENT-1.0 | Agent Identity |
+| ACP-CT-1.0 | Capability Tokens |
+| ACP-CAP-REG-1.0 | Capability Registry |
+| ACP-HP-1.0 | Handshake / Proof-of-Possession |
+| ACP-DCMA-1.0 | Delegated Chain Multi-Agent |
+| ACP-MESSAGES-1.0 | Wire Message Format |
+| ACP-PROVENANCE-1.0 | Authority Provenance |
 
-| Document | Title | What it adds |
-|----------|-------|-------------|
-| ACP-PAY-1.0 | Financial Capability Spec | Formal specification for financial capabilities. 12 validation steps, 11 error codes. |
-| ACP-REP-1.1 | Reputation Module | Deterministic `trust_score` over 90-day history. External signals with ±0.20 impact limit. |
-| ACP-ITA-1.1 | ITA Mutual Recognition | Bilateral recognition between ITA authorities. Signed MRA. Proxy resolution. Non-transitive. |
+**L2 — Security**
 
-### 8.3 v2.0 Roadmap — Planned
+| Document | Title |
+|----------|-------|
+| ACP-RISK-1.0 | Deterministic Risk Engine |
+| ACP-REV-1.0 | Revocation Protocol |
+| ACP-ITA-1.0 | Institutional Trust Anchor |
+| ACP-ITA-1.1 | ITA Mutual Recognition |
+| ACP-REP-1.2 | Reputation Module |
+| ACP-REP-PORTABILITY-1.0 | Reputation Portability |
 
-The following extensions are identified but have no date. Each requires impact analysis on the existing specification before starting:
+**L3 — Verifiable Execution**
 
-- **Post-quantum algorithms.** Evaluation of migration from Ed25519. Compatibility analysis with all existing artifacts signed under ACP-SIGN-1.0.
-- **ITA federation protocol.** Formal extension of ACP-ITA-1.1 for multi-level trust graphs with controlled transitivity conditions.
-- **Reference prototype.** Minimal executable implementation in Python with all v1.0 documents. Automated conformance test suite.
-- **Standardization process.** Preparation for submission to a formal standards body. IETF RFC-style numbering. External peer review.
+| Document | Title |
+|----------|-------|
+| ACP-API-1.0 | HTTP API |
+| ACP-EXEC-1.0 | Execution Tokens |
+| ACP-LEDGER-1.3 | Audit Ledger (mandatory institutional sig) |
+| ACP-PSN-1.0 | Policy Snapshot |
+| ACP-POLICY-CTX-1.0 | Policy Context Snapshot |
+| ACP-LIA-1.0 | Liability Attribution |
+| ACP-HIST-1.0 | History Query API |
+
+**L4 — Extended Governance**
+
+| Document | Title |
+|----------|-------|
+| ACP-PAY-1.0 | Financial Capability |
+| ACP-NOTIFY-1.0 | Event Notifications |
+| ACP-DISC-1.0 | Service Discovery |
+| ACP-BULK-1.0 | Batch Operations |
+| ACP-CROSS-ORG-1.0 | Cross-Organization Bundles |
+| ACP-GOV-EVENTS-1.0 | Governance Event Stream |
+
+**Governance**
+
+| Document | Title |
+|----------|-------|
+| ACP-CONF-1.2 | Conformance — sole normative source |
+| ACP-TS-1.1 | Test Vector Format |
+| RFC-PROCESS | Specification Process |
+| RFC-REGISTRY | Specification Registry |
+| ACR-1.0 | Change Request Process |
+| ACP-GOV-EVENTS-1.0 | Governance Events |
+
+Superseded versions archived in `archive/specs/` (CONF-1.0, CONF-1.1, LEDGER-1.2, REP-1.1, AGENT-SPEC-0.3).
+
+### 8.2 Reference Implementation — Complete (22 Go packages)
+
+The Go reference implementation in `impl/go/` covers all L1–L4 conformance levels:
+
+| Package | Spec | Level |
+|---------|------|-------|
+| `pkg/handshake` | ACP-HP-1.0 | L1 |
+| `pkg/tokens` | ACP-CT-1.0 | L1 |
+| `pkg/delegation` | ACP-DCMA-1.0 | L1 |
+| `pkg/registry` | ACP-CAP-REG-1.0 | L1 |
+| `pkg/risk` | ACP-RISK-1.0 | L2 |
+| `pkg/revocation` | ACP-REV-1.0 | L2 |
+| `pkg/reputation` | ACP-REP-1.2 | L2/L4 |
+| `pkg/execution` | ACP-EXEC-1.0 | L3 |
+| `pkg/ledger` | ACP-LEDGER-1.3 | L3 |
+| `pkg/psn` | ACP-PSN-1.0 | L3 |
+| `pkg/policyctx` | ACP-POLICY-CTX-1.0 | L3 |
+| `pkg/provenance` | ACP-PROVENANCE-1.0 | L3 |
+| `pkg/lia` | ACP-LIA-1.0 | L3/L4 |
+| `pkg/hist` | ACP-HIST-1.0 | L4 |
+| `pkg/govevents` | ACP-GOV-EVENTS-1.0 | L4 |
+| `pkg/notify` | ACP-NOTIFY-1.0 | L4 |
+| `pkg/disc` | ACP-DISC-1.0 | L4 |
+| `pkg/bulk` | ACP-BULK-1.0 | L4 |
+| `pkg/crossorg` | ACP-CROSS-ORG-1.0 | L4 |
+| `pkg/pay` | ACP-PAY-1.0 | L4 |
+
+All 22 packages pass `go test ./...`. A Python SDK (`impl/python/`) covers the ACP-HP-1.0 handshake and all ACP-API-1.0 endpoints.
+
+### 8.3 Conformance Test Vectors — 42 signed vectors
+
+The `compliance/test-vectors/` directory contains 42 signed test vectors per `ACP-TS-1.1`:
+
+| Suite | Positive | Negative | Spec |
+|-------|----------|----------|------|
+| CORE (SIGN, CT, HP) | 4 | 4 | L1 |
+| DCMA | 2 | 2 | L1 |
+| HP | 2 | 8 | L1 |
+| LEDGER | 3 | 8 | L3 |
+| EXEC | 2 | 7 | L3 |
+
+All positive vectors carry real Ed25519 signatures (RFC 8037 Test Key A) and real SHA-256 hash chains.
+
+### 8.4 Roadmap
+
+| Item | Status |
+|------|--------|
+| Core specs (L1-L4) | ✅ Complete |
+| Go reference implementation (22 packages) | ✅ Complete |
+| Conformance test vectors (42 signed) | ✅ Complete |
+| OpenAPI 3.1.0 (`openapi/acp-api-1.0.yaml`) | ✅ Complete |
+| Python SDK (`impl/python/`) | ✅ Complete (L1 + full API client) |
+| L5 Decentralized (ACP-D) | 🔜 Specification in design |
+| Post-quantum algorithm migration | 🔜 Research phase |
+| IETF RFC submission | 🔜 After L5 stabilization |
 
 ---
 
@@ -502,7 +623,9 @@ ACP is not the first attempt to control autonomous agents. It is the first attem
 
 The goal of ACP is not to make agents more capable. It is to make them governable. That is a necessary condition for their institutional deployment to be sustainable at scale.
 
-The v1.0/v1.1 specification is complete. It is available for technical review, pilot implementation, and formal standardization process. TraslaIA invites organizations interested in adopting ACP, contributing to its evolution, or participating in the standardization process to reach out directly.
+The v1.11 specification is complete. A full Go reference implementation (22 packages, L1–L4) and 42 signed conformance test vectors are publicly available at github.com/chelof100/acp-framework-en. The specification and implementation are available for technical review, pilot implementation, and formal standardization process.
+
+TraslaIA invites organizations interested in adopting ACP, contributing to its evolution, or participating in the standardization process to reach out directly.
 
 **Marcelo Fernandez | TraslaIA**
 info@traslaia.com | www.traslaia.com
@@ -544,9 +667,23 @@ info@traslaia.com | www.traslaia.com
 | ACP-ITA-1.1 | ITA Mutual Recognition Protocol. TraslaIA, 2026. |
 | ACP-API-1.0 | HTTP API Specification. TraslaIA, 2026. |
 | ACP-EXEC-1.0 | Execution Token Specification. TraslaIA, 2026. |
-| ACP-LEDGER-1.0 | Audit Ledger Specification. TraslaIA, 2026. |
+| ACP-LEDGER-1.3 | Audit Ledger Specification (mandatory institutional sig). TraslaIA, 2026. |
 | ACP-PAY-1.0 | Financial Capability Specification. TraslaIA, 2026. |
-| ACP-REP-1.1 | Reputation Module Specification. TraslaIA, 2026. |
-| ACP-CONF-1.0 | Conformance Specification. TraslaIA, 2026. |
+| ACP-REP-1.2 | Reputation Module Specification. TraslaIA, 2026. |
+| ACP-CONF-1.2 | Conformance Specification (sole normative source). TraslaIA, 2026. |
+| ACP-PSN-1.0 | Policy Snapshot Specification. TraslaIA, 2026. |
+| ACP-PROVENANCE-1.0 | Authority Provenance Specification. TraslaIA, 2026. |
+| ACP-POLICY-CTX-1.0 | Policy Context Snapshot. TraslaIA, 2026. |
+| ACP-GOV-EVENTS-1.0 | Governance Event Stream. TraslaIA, 2026. |
+| ACP-LIA-1.0 | Liability Attribution Specification. TraslaIA, 2026. |
+| ACP-HIST-1.0 | History Query API Specification. TraslaIA, 2026. |
+| ACP-CROSS-ORG-1.0 | Cross-Organization Bundles. TraslaIA, 2026. |
+| Open Policy Agent | https://www.openpolicyagent.org — policy evaluation engine |
+| SPIFFE/SPIRE | https://spiffe.io — cryptographic workload identity |
+| RFC 7519 | JSON Web Token (JWT). IETF, 2015. |
+| RFC 6749 | OAuth 2.0 Authorization Framework. IETF, 2012. |
+| Saltzer & Schroeder (1975) | The Protection of Information in Computer Systems. IEEE. |
 
-The complete specification is available through TraslaIA. Contact: info@traslaia.com
+The complete specification is publicly available at: https://github.com/chelof100/acp-framework-en
+Official website: https://agentcontrolprotocol.xyz
+Contact: info@traslaia.com
