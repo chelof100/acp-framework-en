@@ -2,8 +2,9 @@
 ## Execution Token Specification
 **Status:** Draft
 **Version:** 1.0
-**Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0, ACP-API-1.0
-**Required-by:** ACP-LEDGER-1.2, ACP-CONF-1.1
+**Depends-on:** ACP-SIGN-1.0, ACP-CT-1.0
+**Required-by:** ACP-LEDGER-1.3, ACP-CONF-1.2
+**Integration note:** Execution Tokens are issued via the ACP HTTP API (ACP-API-1.0 §6). ACP-API-1.0 is an operational transport layer; it is not required for ET issuance and validation logic to be correct.
 
 ---
 

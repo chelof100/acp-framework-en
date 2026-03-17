@@ -4,8 +4,9 @@
 **Status:** Normative
 **Version:** 1.0
 **Type:** Core Protocol Specification
-**Depends-on:** ACP-CT-1.0, ACP-SIGN-1.0, ACP-LEDGER-1.2
-**Required-by:** ACP-CONF-1.1 (L1 — Core Conformance)
+**Depends-on:** ACP-CT-1.0, ACP-SIGN-1.0
+**Required-by:** ACP-CONF-1.2 (L1 — Core Conformance)
+**Integration note:** DCMA payloads are included in `AUTHORIZATION` and `LIABILITY_RECORD` ledger events (ACP-LEDGER-1.3 §5.2, §5.12). This is a write-only operational integration; ACP-LEDGER-1.3 is not required for DCMA's formal delegation model to be correct.
 
 > This specification is **normative**. It defines the formal chained delegation model, no-escalation constraints, and transitive revocation. All ACP v1.x implementations that support delegation MUST comply with the formal properties defined here.
 
