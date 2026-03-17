@@ -1,6 +1,6 @@
 ﻿% ============================================================
 % Agent Control Protocol — arXiv Submission
-% ACP v1.11 — Admission Control for Agent Actions
+% ACP v1.12 — Admission Control for Agent Actions
 % Marcelo Fernandez, TraslaIA, March 2026
 % Categories: cs.CR (primary), cs.AI (secondary)
 % ============================================================
@@ -93,7 +93,7 @@
 
 \title{%
   \textbf{Agent Control Protocol}\\[0.4em]
-  \large ACP v1.11: Admission Control for Agent Actions\\[0.3em]
+  \large ACP v1.12: Admission Control for Agent Actions\\[0.3em]
   \normalsize Technical Specification and Reference Implementation%
 }
 
@@ -119,7 +119,7 @@ ACP defines the mechanisms of cryptographic identity, capability-based authoriza
 ACP operates as an additional layer on top of RBAC and Zero Trust, without replacing them.
 It is designed specifically for the problem that neither model solves: governing what an autonomous agent can do, under what conditions, with what limits, and with complete traceability for external auditing---including across organizational boundaries.
 
-The v1.11 specification comprises 36 technical documents organized into five conformance levels (L1--L5).
+The v1.12 specification comprises 36 technical documents organized into five conformance levels (L1--L5).
 It includes a Go reference implementation of 22 packages covering all L1--L4 capabilities,
 51 signed conformance test vectors (Ed25519 + SHA-256), and an OpenAPI 3.1.0 specification for all HTTP endpoints.
 It defines more than 62 verifiable requirements, 12 prohibited behaviors,
@@ -678,9 +678,9 @@ The ledger provides the forensic record needed for post-incident analysis.
 \section{Specification and Implementation Status}
 % ============================================================
 
-ACP v1.11 is a complete Draft Standard specification with a full Go reference implementation.
+ACP v1.12 is a complete Draft Standard specification with a full Go reference implementation.
 
-\subsection{Active Specifications --- v1.11 (36 documents)}
+\subsection{Active Specifications --- v1.12 (36 documents)}
 
 \begin{table}[h!]
 \centering
@@ -727,7 +727,7 @@ Gov. & RFC-REGISTRY & Specification Registry \\
 Gov. & ACR-1.0 & Change Request Process \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.11 active specification documents by conformance level.
+\caption{ACP v1.12 active specification documents by conformance level.
 Superseded versions (CONF-1.0, CONF-1.1, LEDGER-1.2, REP-1.1, AGENT-SPEC-0.3) archived in \texttt{archive/specs/}.}
 \end{table}
 
@@ -755,7 +755,7 @@ A Python SDK (\texttt{impl/python/}) covers the ACP-HP-1.0 handshake and all ACP
 \texttt{pkg/ledger} & ACP-LEDGER-1.3 & L3 \\
 \texttt{pkg/psn} & ACP-PSN-1.0 & L3 \\
 \texttt{pkg/policyctx} & ACP-POLICY-CTX-1.0 & L3 \\
-\texttt{pkg/provenance} & ACP-PROVENANCE-1.0 & L3 \\
+\texttt{pkg/provenance} & ACP-PROVENANCE-1.0 & L1 \\
 \texttt{pkg/lia} & ACP-LIA-1.0 & L3 \\
 \texttt{pkg/hist} & ACP-HIST-1.0 & L4 \\
 \texttt{pkg/govevents} & ACP-GOV-EVENTS-1.0 & L4 \\
@@ -764,14 +764,13 @@ A Python SDK (\texttt{impl/python/}) covers the ACP-HP-1.0 handshake and all ACP
 \texttt{pkg/bulk} & ACP-BULK-1.0 & L4 \\
 \texttt{pkg/crossorg} & ACP-CROSS-ORG-1.0 & L4 \\
 \texttt{pkg/pay} & ACP-PAY-1.0 & L4 \\
-\texttt{pkg/psn} & ACP-PSN-1.0 & L3 \\
 \texttt{cmd/acp-server} & ACP-API-1.0 & L3 \\
 \bottomrule
 \end{tabular}
 \caption{Go reference implementation packages. All pass \texttt{go test ./...}.}
 \end{table}
 
-\subsection{Conformance Test Vectors --- 42 Signed Vectors}
+\subsection{Conformance Test Vectors --- 51 Signed Vectors}
 
 The \texttt{compliance/test-vectors/} directory contains 51 signed test vectors per ACP-TS-1.1:
 
@@ -787,8 +786,9 @@ DCMA & 2 & 2 & L1 \\
 HP & 2 & 8 & L1 \\
 LEDGER & 3 & 8 & L3 \\
 EXEC & 2 & 7 & L3 \\
+PROV & 2 & 7 & L1 \\
 \midrule
-\textbf{Total} & \textbf{13} & \textbf{29} & \\
+\textbf{Total} & \textbf{15} & \textbf{36} & \\
 \bottomrule
 \end{tabular}
 \caption{Conformance test vector suites. All positive vectors carry real Ed25519 signatures (RFC~8037 Test Key A) and real SHA-256 hash chains.}
@@ -814,7 +814,7 @@ Post-quantum algorithm migration & Research phase \\
 IETF RFC submission & After L5 stabilization \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.11 development roadmap.}
+\caption{ACP v1.12 development roadmap.}
 \end{table}
 
 % ============================================================
@@ -871,7 +871,7 @@ behaviors are defined, failures have specific error codes, and conformance can b
 The goal of ACP is not to make agents more capable. It is to make them governable.
 That is a necessary condition for their institutional deployment to be sustainable at scale.
 
-The v1.11 specification is complete.
+The v1.12 specification is complete.
 A full Go reference implementation (22 packages, L1--L4) and 51 signed conformance test vectors
 are publicly available at \url{https://github.com/chelof100/acp-framework-en}.
 The specification and implementation are open for technical review, pilot implementation, and formal standardization.
