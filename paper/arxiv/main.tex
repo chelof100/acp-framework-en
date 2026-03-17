@@ -1,4 +1,4 @@
-% ============================================================
+﻿% ============================================================
 % Agent Control Protocol — arXiv Submission
 % ACP v1.11 — Admission Control for Agent Actions
 % Marcelo Fernandez, TraslaIA, March 2026
@@ -121,7 +121,7 @@ It is designed specifically for the problem that neither model solves: governing
 
 The v1.11 specification comprises 36 technical documents organized into five conformance levels (L1--L5).
 It includes a Go reference implementation of 22 packages covering all L1--L4 capabilities,
-42 signed conformance test vectors (Ed25519 + SHA-256), and an OpenAPI 3.1.0 specification for all HTTP endpoints.
+51 signed conformance test vectors (Ed25519 + SHA-256), and an OpenAPI 3.1.0 specification for all HTTP endpoints.
 It defines more than 62 verifiable requirements, 12 prohibited behaviors,
 and the mechanisms for interoperability between institutions.
 
@@ -773,7 +773,7 @@ A Python SDK (\texttt{impl/python/}) covers the ACP-HP-1.0 handshake and all ACP
 
 \subsection{Conformance Test Vectors --- 42 Signed Vectors}
 
-The \texttt{compliance/test-vectors/} directory contains 42 signed test vectors per ACP-TS-1.1:
+The \texttt{compliance/test-vectors/} directory contains 51 signed test vectors per ACP-TS-1.1:
 
 \begin{table}[h!]
 \centering
@@ -805,7 +805,7 @@ EXEC & 2 & 7 & L3 \\
 \midrule
 Core specs (L1--L4), 36 documents & Complete \\
 Go reference implementation (22 packages) & Complete \\
-Conformance test vectors (42 signed) & Complete \\
+Conformance test vectors (51 signed) & Complete \\
 OpenAPI 3.1.0 (\texttt{openapi/acp-api-1.0.yaml}) & Complete \\
 Python SDK (\texttt{impl/python/}) & Complete (L1 + full API client) \\
 Docker image (\texttt{ghcr.io/chelof100/acp-server:latest}) & Complete \\
@@ -872,7 +872,7 @@ The goal of ACP is not to make agents more capable. It is to make them governabl
 That is a necessary condition for their institutional deployment to be sustainable at scale.
 
 The v1.11 specification is complete.
-A full Go reference implementation (22 packages, L1--L4) and 42 signed conformance test vectors
+A full Go reference implementation (22 packages, L1--L4) and 51 signed conformance test vectors
 are publicly available at \url{https://github.com/chelof100/acp-framework-en}.
 The specification and implementation are open for technical review, pilot implementation, and formal standardization.
 

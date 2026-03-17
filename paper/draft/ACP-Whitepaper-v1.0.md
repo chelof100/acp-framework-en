@@ -1,4 +1,4 @@
-# Agent Control Protocol
+﻿# Agent Control Protocol
 ## ACP v1.11
 ### Admission Control for Agent Actions
 
@@ -19,7 +19,7 @@ ACP defines the mechanisms of cryptographic identity, capability-based authoriza
 
 ACP operates as an additional layer on top of RBAC and Zero Trust, without replacing them. It is designed specifically for the problem that neither model solves: governing what an autonomous agent can do, under what conditions, with what limits, and with complete traceability for external auditing — including across organizational boundaries.
 
-The v1.11 specification is composed of 36 technical documents organized into five conformance levels (L1–L5). It includes a Go reference implementation of 22 packages covering all L1–L4 capabilities, 42 signed conformance test vectors (Ed25519 + SHA-256), and an OpenAPI 3.1.0 specification for all HTTP endpoints. It defines more than 62 verifiable requirements, 12 prohibited behaviors, and the mechanisms for interoperability between institutions.
+The v1.11 specification is composed of 36 technical documents organized into five conformance levels (L1–L5). It includes a Go reference implementation of 22 packages covering all L1–L4 capabilities, 51 signed conformance test vectors (Ed25519 + SHA-256), and an OpenAPI 3.1.0 specification for all HTTP endpoints. It defines more than 62 verifiable requirements, 12 prohibited behaviors, and the mechanisms for interoperability between institutions.
 
 ---
 
@@ -548,9 +548,9 @@ The Go reference implementation in `impl/go/` covers all L1–L4 conformance lev
 
 All 22 packages pass `go test ./...`. A Python SDK (`impl/python/`) covers the ACP-HP-1.0 handshake and all ACP-API-1.0 endpoints.
 
-### 8.3 Conformance Test Vectors — 42 signed vectors
+### 8.3 Conformance Test Vectors — 51 signed vectors
 
-The `compliance/test-vectors/` directory contains 42 signed test vectors per `ACP-TS-1.1`:
+The `compliance/test-vectors/` directory contains 51 signed test vectors per `ACP-TS-1.1`:
 
 | Suite | Positive | Negative | Spec |
 |-------|----------|----------|------|
@@ -568,7 +568,7 @@ All positive vectors carry real Ed25519 signatures (RFC 8037 Test Key A) and rea
 |------|--------|
 | Core specs (L1-L4) | ✅ Complete |
 | Go reference implementation (22 packages) | ✅ Complete |
-| Conformance test vectors (42 signed) | ✅ Complete |
+| Conformance test vectors (51 signed) | ✅ Complete |
 | OpenAPI 3.1.0 (`openapi/acp-api-1.0.yaml`) | ✅ Complete |
 | Python SDK (`impl/python/`) | ✅ Complete (L1 + full API client) |
 | L5 Decentralized (ACP-D) | 🔜 Specification in design |
@@ -623,7 +623,7 @@ ACP is not the first attempt to control autonomous agents. It is the first attem
 
 The goal of ACP is not to make agents more capable. It is to make them governable. That is a necessary condition for their institutional deployment to be sustainable at scale.
 
-The v1.11 specification is complete. A full Go reference implementation (22 packages, L1–L4) and 42 signed conformance test vectors are publicly available at github.com/chelof100/acp-framework-en. The specification and implementation are available for technical review, pilot implementation, and formal standardization process.
+The v1.11 specification is complete. A full Go reference implementation (22 packages, L1–L4) and 51 signed conformance test vectors are publicly available at github.com/chelof100/acp-framework-en. The specification and implementation are available for technical review, pilot implementation, and formal standardization process.
 
 TraslaIA invites organizations interested in adopting ACP, contributing to its evolution, or participating in the standardization process to reach out directly.
 
