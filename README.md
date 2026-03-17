@@ -10,6 +10,13 @@ Before any agent mutates system state, ACP answers four questions: *Who is this 
 
 https://agentcontrolprotocol.xyz
 
+## Paper
+
+**Agent Control Protocol: Admission Control for Agent Actions**
+Marcelo Fernandez (TraslaIA), 2026
+
+DOI: [10.5281/zenodo.19072332](https://doi.org/10.5281/zenodo.19072332) — Zenodo
+
 ---
 
 ## Why ACP Exists
