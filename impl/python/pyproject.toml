@@ -32,9 +32,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/chelof100/acp-framework"
-Repository = "https://github.com/chelof100/acp-framework"
-Documentation = "https://github.com/chelof100/acp-framework/tree/main/sdk/python"
+Homepage = "https://agentcontrolprotocol.xyz"
+Repository = "https://github.com/chelof100/acp-framework-en"
+Documentation = "https://github.com/chelof100/acp-framework-en/tree/master/impl/python"
 
 [tool.hatch.build.targets.wheel]
 packages = ["acp"]
