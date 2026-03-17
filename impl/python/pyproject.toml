@@ -34,7 +34,7 @@ dev = [
 [project.urls]
 Homepage = "https://agentcontrolprotocol.xyz"
 Repository = "https://github.com/chelof100/acp-framework-en"
-Documentation = "https://github.com/chelof100/acp-framework-en/tree/master/impl/python"
+Documentation = "https://agentcontrolprotocol.xyz"
 
 [tool.hatch.build.targets.wheel]
 packages = ["acp"]
