@@ -242,6 +242,8 @@ Each layer builds on the previous and adds a distinct governance capability.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+→ **New to ACP? Start here:** [docs/admission-flow.md](docs/admission-flow.md) — the complete step-by-step guide to the admission check
+
 → Formal domain model and dependency graph: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
@@ -515,8 +517,14 @@ acp-framework/
 ## Quick Start
 
 ```bash
+# Option 1: Go reference server
 cd impl/go
 docker compose up
+
+# Option 2: Python SDK demo (no server required)
+cd impl/python
+pip install -e .
+python examples/admission_control_demo.py
 ```
 
 Health check:
