@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "id": "TS-PROV-POS-002",
+    "layer": "PROV",
+    "severity": "mandatory",
+    "acp_version": "1.0",
+    "conformance_level": "L2",
+    "description": "Valid minimal provenance (chain: []) — direct institutional authorization with no intermediate delegation"
+  },
+  "input": {
+    "institution_public_key": "AP8eMF8a-KYPW-2LFlCjKNjJaKUxVX2oQBG2XPIaFOI",
+    "provenance": {
+      "authority_scope": "acp:cap:data.read",
+      "captured_at": 1774036800,
+      "chain": [],
+      "execution_id": "et-prov-test-0000-0000-0002",
+      "executor": "agent.bank.controller",
+      "policy_hash": "373f4248f70c22b101858873f511dd4e6cd1584310e994f233ef6a3bbe546005",
+      "policy_ref": "payment_policy:v3",
+      "principal": "org.bank.institution",
+      "provenance_id": "prov-minimal-0000-0001",
+      "sig": "bRxBbcucrLUfoZtV5sGRyS1_iGxMLi2cO7B15MrPgmAIfnXK6DtPKE1G3vzAyBx47gr2VTcnsIi8Ut2PhedQBQ",
+      "ver": "1.0"
+    },
+    "verify_at": 1774036800,
+    "et_expires_at": 1774036860
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

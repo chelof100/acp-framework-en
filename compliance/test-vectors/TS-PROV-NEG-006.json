@@ -1,0 +1,53 @@
+{
+  "meta": {
+    "id": "TS-PROV-NEG-006",
+    "layer": "PROV",
+    "severity": "mandatory",
+    "acp_version": "1.0",
+    "conformance_level": "L3",
+    "description": "PROV-007: provenance.execution_id does not match the bound ET id"
+  },
+  "input": {
+    "institution_public_key": "AP8eMF8a-KYPW-2LFlCjKNjJaKUxVX2oQBG2XPIaFOI",
+    "provenance": {
+      "authority_scope": "acp:cap:financial.payment",
+      "captured_at": 1774036800,
+      "chain": [
+        {
+          "capability_subset": "acp:cap:financial.payment",
+          "delegated_at": 1774033200,
+          "delegation_id": "DEL-PROV-001",
+          "delegation_sig": "hqa1_jaL6nKibyVomsCsAxCwnjXIcU1DNRZq8BwYeOT_YuXE9_tpMJ4Ko3rwUZvsQS-_0Dix0YQ1yFh9qcccAw",
+          "delegator": "org.bank.institution",
+          "executor": "agent.bank.controller",
+          "step": 1,
+          "valid_until": 1774119600
+        },
+        {
+          "capability_subset": "acp:cap:financial.payment",
+          "delegated_at": 1774033200,
+          "delegation_id": "DEL-PROV-002",
+          "delegation_sig": "pPaYtMiFdBgt1pAO0QHhDzOP83SNwbyyEvJ3QESuKYXK5KAWKSGb2UI3Dillt3fwwf5GHi5rZ3dPzJ9DUKYOCg",
+          "delegator": "agent.bank.controller",
+          "executor": "agent.bank.executor",
+          "step": 2,
+          "valid_until": 1774119600
+        }
+      ],
+      "execution_id": "et-different-0000-0000-9999",
+      "executor": "agent.bank.executor",
+      "policy_hash": "373f4248f70c22b101858873f511dd4e6cd1584310e994f233ef6a3bbe546005",
+      "policy_ref": "payment_policy:v3",
+      "principal": "org.bank.institution",
+      "provenance_id": "prov-0000-0000-0000-0001",
+      "sig": "HQ_R2tdrjAEpSeJVWrtGOdz3svwE8Ub5vS7CZtkgxCPlGSb182K7PbC3rjTgmeTGpdq4z_hEQSZJslDRBV-QAg",
+      "ver": "1.0"
+    },
+    "verify_at": 1774036800,
+    "et_expires_at": 1774036860
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "PROV-007"
+  }
+}
