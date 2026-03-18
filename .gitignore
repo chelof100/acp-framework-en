@@ -10,8 +10,8 @@ ACP-CERT-*.json
 # Agent workflow rules (local only)
 AGENTS.md
 
-# Paper archives (local only — never push to repo)
-paper/arxiv/*.zip
+# Paper folder (local only — published on Zenodo DOI 10.5281/zenodo.19077019)
+paper/
 
 # Python cache
 **/.pytest_cache/
