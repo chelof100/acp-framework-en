@@ -7,17 +7,96 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [1.12.0] — 2026-03-17
 
 ### Added
-- `openapi/acp-api-1.0.yaml` — OpenAPI 3.1.0 specification for all ACP-API-1.0 endpoints (agents, authorization, tokens, audit, execution tokens, health, handshake)
-- `compliance/test-vectors/` — 22 normative ACP-TS-1.1 conformance test vectors: 8 CORE (L1), 4 DCMA (L2), 10 HP (L1)
-- HP test vector coverage: TS-HP-POS-001/002 (valid PoP), TS-HP-NEG-001 through 008 (HP-004, HP-006, HP-007, HP-008, HP-009, HP-010, HP-011, HP-014)
-- `impl/go/cmd/acp-sign-vectors` — tool to generate real Ed25519 signatures for positive test vectors
+- `compliance/test-vectors/TS-PROV-*` — 9 new conformance vectors for ACP-PROVENANCE-1.0: TS-PROV-POS-001 (valid 2-hop chain), TS-PROV-POS-002 (direct institutional authorization), TS-PROV-NEG-001..007 (PROV-001/002/003/004/005/007/009 error codes). Real Ed25519 signatures over SHA-256(JCS). **Total: 51 vectors** (8 CORE + 4 DCMA + 10 HP + 11 LEDGER + 9 EXEC + 9 PROV)
+- `impl/go/cmd/gen-prov-vectors/main.go` — generator for TS-PROV-* vectors using RFC 8037 test key A
+- `paper/arxiv/` — LaTeX source (`main.tex`), bibliography (`references.bib`), submission guide (`SUBMIT.md`) for arXiv cs.CR + cs.AI submission
+- `paper/arxiv/SUBMIT.md` — full submission guide: steps, metadata, abstract, endorsement, post-acceptance
+
+### Fixed
+- Dependency graph circularity (S-3): `ACP-DCMA-1.0` — removed `ACP-LEDGER-1.2` from Depends-on; `ACP-LEDGER-1.3` — removed `ACP-LIA-1.0` and `ACP-PSN-1.0` from Depends-on; `ACP-EXEC-1.0` — removed `ACP-API-1.0` from Depends-on. Dependency graph is now acyclic and resolvable.
 
 ### Changed
-- `QUICKSTART.md` — rewritten to reflect current repository structure (spec/, openapi/, compliance/, impl/go/)
-- `README.md` — repository structure updated to include openapi/ and compliance/ directories; health response format corrected; roadmap updated
+- `README.md` — vector coverage row updated: CORE · DCMA · HP · LEDGER · EXEC · PROV; 42→51 vectors; DOI badge updated to `10.5281/zenodo.19077019`
+- `paper/draft/ACP-Whitepaper-v1.0.md` — updated to v1.12: 42→51 vectors, PROV coverage added
+- `paper/arxiv/main.tex` — 42→51 vectors in all tables
+
+---
+
+## [1.11.0] — 2026-03-16
+
+### Added
+
+#### Specification
+- `spec/governance/ACP-CONF-1.2.md` — normative conformance specification superseding CONF-1.1. Corrects L1 (adds AGENT-1.0, DCMA-1.0, MESSAGES-1.0), L3 (adds PROVENANCE-1.0, POLICY-CTX-1.0, PSN-1.0), L4 (adds GOV-EVENTS-1.0, LIA-1.0, HIST-1.0, NOTIFY-1.0, DISC-1.0, BULK-1.0, CROSS-ORG-1.0, REP-PORTABILITY-1.0; updates REP-1.1→1.2, LEDGER-1.2→1.3). Appendix A: mapping from CONF-1.1. Appendix B: deprecated profiles.
+- `spec/operations/ACP-LEDGER-1.3.md` — supersedes LEDGER-1.2. `sig` is normative MUST on all production events. LEDGER-012 error code for absent signature. Removes dev-mode ambiguity from §4.4.
+- `archive/specs/` — superseded specs moved here with Superseded headers: ACP-CONF-1.0, ACP-CONF-1.1, ACP-LEDGER-1.2, ACP-REP-1.1, ACP-AGENT-SPEC-0.3. `archive/specs/README.md` created.
+- `openapi/acp-api-1.0.yaml` — OpenAPI 3.1.0 for all ACP-API-1.0 endpoints (12 endpoints). Security: ACPAgent (Authorization header) + ACPPoP (X-ACP-PoP header). Complete schemas and reusable error responses.
+- `ARCHITECTURE.md` — formal domain model: 8 domain concepts, 8-layer governance stack, directed dependency graph (ASCII), 10-step execution lifecycle, 7 formal properties (P-INVARIANT, P-NON-ESCALATION, P-TEMPORAL, P-CHAIN-COMPLETENESS, P-IMMUTABILITY, P-PORTABILITY, P-REVOCABILITY).
+
+#### Compliance — Test Vectors (42 total)
+- `TS-HP-POS-001/002`, `TS-HP-NEG-001..008` — 10 vectors for ACP-HP-1.0 (HP-004/006/007/008/009/010/011/014 error codes). Real Ed25519 signatures.
+- `TS-LEDGER-POS-001..003`, `TS-LEDGER-NEG-001..008` — 11 vectors for ACP-LEDGER-1.3 (LEDGER-002/003/004/005/006/008/010/012 error codes). Hash chains with SHA-256, real Ed25519 signatures.
+- `TS-EXEC-POS-001/002`, `TS-EXEC-NEG-001..007` — 9 vectors for ACP-EXEC-1.0 (EXEC-001..007 error codes). Real Ed25519 execution tokens.
+- `impl/go/cmd/gen-ledger-vectors/main.go` — LEDGER vector generator
+- `impl/go/cmd/gen-exec-vectors/main.go` — EXEC vector generator
+- `impl/go/cmd/acp-sign-vectors/main.go` — rewritten: correct path, HP support
+
+#### Reference Implementation — Go (23 packages)
+- `impl/go/pkg/provenance/` — ACP-PROVENANCE-1.0: `Issue()`, `VerifySig()`, `ValidateChain()`, `InMemoryProvenanceStore`. Sentinels PROV-001..009.
+- `impl/go/pkg/policyctx/` — ACP-POLICY-CTX-1.0: `Capture()`, `VerifySig()`, `VerifyPolicyHash()`, `ComputePolicyHash()`, `InMemorySnapshotStore`. Sentinels PCTX-001..008.
+- `impl/go/pkg/govevents/` — ACP-GOV-EVENTS-1.0: `Emit()`, `VerifySig()`, `IsValidEventType()`, `InMemoryEventStream` with `List(QueryFilter)`. 10 normative payload types. Sentinels GEVE-001..007.
+- `impl/go/pkg/lia/` — ACP-LIA-1.0: `Emit()` with §6 assignee resolution (3 rules), `InMemoryLiabilityStore`. Sentinels LIA-001..008.
+- `impl/go/pkg/hist/` — ACP-HIST-1.0: `Query()` with full filtering + cursor pagination, `AgentHistory()`, `Export()` (signed ExportBundle). Sentinels HIST-001..007.
+- `impl/go/pkg/notify/` — ACP-NOTIFY-1.0: `Subscribe()`, `BuildPayload()`, `VerifyPayloadSig()`, `InMemorySubscriptionStore` with secret rotation. Sentinels NOTI-001..005.
+- `impl/go/pkg/disc/` — ACP-DISC-1.0: `Register()` with TTL, expiry-aware `Query(QueryFilter)`, `InMemoryDiscoveryRegistry`. Sentinels DISC-001..004.
+- `impl/go/pkg/bulk/` — ACP-BULK-1.0: `ValidateBatchRequest()` (max 100), `ValidateLiabilityQuery()` (max 1000). Sentinels BULK-001..005.
+- `impl/go/pkg/crossorg/` — ACP-CROSS-ORG-1.0: `VerifyBundle()`, `SignBundle()`, `BuildAck()`, `VerifyAck()`, `InMemoryCrossOrgStore`. Sentinels CROSS-001..010.
+- `impl/go/pkg/pay/` — ACP-PAY-1.0: `VerifyToken()` with double-spend detection by ProofID, `InMemoryPayStore`. Sentinels PAY-001..006+010.
+- `impl/go/pkg/psn/` — ACP-PSN-1.0: `Create()`, `Transition()` (atomic under write lock), `VerifySig()`, `InMemorySnapshotStore`. Sentinels PSN-001..007.
+- `impl/go/pkg/ledger/` — Updated: 6 new event type constants (`LIABILITY_RECORD`, `POLICY_SNAPSHOT_CREATED`, `REPUTATION_UPDATED`, `PROVENANCE`, `POLICY_SNAPSHOT`, `GOVERNANCE`); verifier enforces LEDGER-008/010/011/012; Version→"1.3".
+- `impl/go/pkg/iut/evaluator.go` — Added `SignPoP()` per ACP-HP-1.0 §9.
+
+#### Python SDK & Integrations
+- `impl/python/examples/admission_control_demo.py` — `ACPAdmissionGuard` pattern, offline + online modes, 4 scenarios (APPROVED/ESCALATED/DENIED).
+- `impl/python/examples/langchain_agent_demo.py` — `@acp_tool()` decorator factory for LangChain. 5 scenarios. `--with-llm` flag for ReAct agent.
+- `impl/python/examples/pydantic_ai_demo.py` — `ACPAdmissionGuard` as Pydantic AI `deps`. DENIED/ESCALATED → `ModelRetry`.
+- `impl/python/examples/mcp_server_demo.py` — `ACPToolDispatcher`: ACP admission check in MCP dispatch layer. FastMCP-compatible via `dispatcher.mount()`.
+- `impl/python/examples/README.md` — index with decision table (APPROVED/ESCALATED/DENIED) for all 4 demos.
+- `impl/python/README.md` — SDK README (was missing; caused `pip install -e .` failure).
+
+#### Documentation
+- `docs/admission-flow.md` — complete admission check flow guide: 6 steps, error codes, DCMA, cross-org, L1–L4 table, Go + Python examples.
+- `paper/draft/ACP-Whitepaper-v1.0.md` — updated to v1.11: §1.2 admission control framing, §8 rewritten (36 specs, 23 Go packages, 51 vectors).
+- `Makefile` — `make run`, `make test`, `make docker-build` targets.
+- `.env.example` — reference environment configuration.
+
+### Changed
+- `README.md` — rewritten: "Admission control for agent actions" tagline; "ACP as Admission Control" section with 6-step flow; ACP vs OPA/IAM/OAuth2/SPIFFE comparison table; admission-framing throughout; roadmap updated.
+- `QUICKSTART.md` — rewritten: repo structure aligned (spec/, openapi/, compliance/, impl/go/); Docker zero-setup; Python demo card; corrected impl/go clone path.
+
+---
+
+## [1.10.0] — 2026-03-11
+
+### Added
+
+#### Repository Restructure
+- New directory layout: `spec/core/`, `spec/security/`, `spec/operations/`, `spec/governance/`, `spec/decentralized/`; `impl/go/`, `impl/python/`, `impl/rust/`, `impl/typescript/`; `compliance/test-vectors/`; `paper/draft/`, `paper/figures/`; `openapi/`; `docs/`
+- `archive/specs/` — placeholder for superseded specifications
+
+#### Evidence Layer Specifications
+- `spec/core/ACP-PROVENANCE-1.0.md` — Authority Provenance: structured artifact proving retrospectively from where authority originated at execution time. Distinguishes from DCMA (how to delegate) — this proves the authority chain for audit.
+- `spec/operations/ACP-POLICY-CTX-1.0.md` — Policy Context Snapshot: signed point-in-time capture of active policies at action time. Critical for compliance and legal disputes.
+- `spec/governance/ACP-GOV-EVENTS-1.0.md` — Governance Event Stream: formal taxonomy of 10 institutional event types (delegation_revoked, agent_suspended, policy_updated, authority_transferred, sanction_applied, capability_suspended, agent_reactivated, delegation_extended, policy_rolled_back, institution_federated).
+
+#### Documentation
+- `ARCHITECTURE.md` — formal domain model: 8 concepts (Actor, Agent `A=(ID,C,P,D,L,S)`, Institution, Authority, Interaction, Attestation, History, Reputation), 8-layer governance stack, directed dependency graph, 10-step execution lifecycle, 7 formal properties.
+- `docs/architecture-overview.md` — Agent Governance Stack, ACP positioning, layer descriptions.
+- `docs/quickstart.md` — conformance levels, spec pointers, implementation paths.
+- `docs/faq.md` — what is ACP, relationship to MIR/ARAF, provenance vs delegation, decentralized variant.
 
 ---
 
@@ -239,7 +318,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/chelof100/acp-framework-en/compare/v1.4.0...HEAD
+[1.12.0]: https://github.com/chelof100/acp-framework-en/compare/v1.11.0...v1.12.0
+[1.11.0]: https://github.com/chelof100/acp-framework-en/compare/v1.10.0...v1.11.0
+[1.10.0]: https://github.com/chelof100/acp-framework-en/compare/v1.9.0...v1.10.0
+[1.9.0]: https://github.com/chelof100/acp-framework-en/compare/v1.8.0...v1.9.0
+[1.8.0]: https://github.com/chelof100/acp-framework-en/compare/v1.6.0...v1.8.0
+[1.6.0]: https://github.com/chelof100/acp-framework-en/compare/v1.4.0...v1.6.0
 [1.4.0]: https://github.com/chelof100/acp-framework-en/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/chelof100/acp-framework-en/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/chelof100/acp-framework-en/compare/v1.1.0...v1.2.0
