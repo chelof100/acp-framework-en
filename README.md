@@ -574,7 +574,7 @@ curl http://localhost:8080/acp/v1/health
 | ACP-LEDGER-1.3 | ✅ Complete — sig normatively mandatory |
 | OpenAPI spec (`openapi/acp-api-1.0.yaml`) | ✅ Complete — OpenAPI 3.1.0, all ACP-API-1.0 endpoints |
 | Conformance test vectors (CORE · DCMA · HP · LEDGER · EXEC · PROV) | ✅ Complete — 51 signed test vectors, real Ed25519 + SHA-256 |
-| Reference implementation — 22 Go packages (L1–L4) | ✅ Complete — `impl/go/pkg/` covers all conformance levels |
+| Reference implementation — 23 Go packages (L1–L4) | ✅ Complete — `impl/go/pkg/` covers all conformance levels |
 | `pkg/psn` policy snapshot | ✅ Complete — atomic transitions, single ACTIVE snapshot |
 | Python SDK — `ACPAdmissionGuard` + `@acp_tool` (LangChain) | ✅ Complete — `impl/python/` |
 | TypeScript / Rust SDKs | 🔜 On roadmap |

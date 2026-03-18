@@ -24,7 +24,7 @@ curl http://localhost:8080/acp/v1/health
 ```bash
 make demo          # start server in dev mode + health check
 make test          # run all Go tests
-make vectors       # run 42 conformance test vectors
+make vectors       # run 51 conformance test vectors
 make python-demo   # run Python admission control demo (no server needed)
 make build         # build the Go server binary
 ```
@@ -51,7 +51,7 @@ Start here if you want to build a conformant ACP implementation.
 1. [`spec/governance/ACP-CONF-1.2.md`](spec/governance/ACP-CONF-1.2.md) — Normative conformance definition (L1–L5)
 2. [`openapi/acp-api-1.0.yaml`](openapi/acp-api-1.0.yaml) — OpenAPI 3.1.0 spec for all HTTP endpoints
 3. [`compliance/ACP-TS-1.1.md`](compliance/ACP-TS-1.1.md) — Test vector format
-4. [`compliance/test-vectors/`](compliance/test-vectors/) — 22 normative test vectors (CORE · DCMA · HP)
+4. [`compliance/test-vectors/`](compliance/test-vectors/) — 51 normative test vectors (CORE · DCMA · HP · LEDGER · EXEC · PROV)
 5. [`compliance/ACR-1.0.md`](compliance/ACR-1.0.md) — Compliance runner protocol
 
 ### Path C — Run the reference implementation
@@ -105,7 +105,7 @@ go run ./cmd/acp-runner \
   --impl ./acp-evaluate \
   --suite ../../compliance/test-vectors
 
-# Expected: 42/42 PASS → CONFORMANT L1 (CORE + DCMA + HP + LEDGER + EXEC)
+# Expected: 51/51 PASS → CONFORMANT L1–L3 (CORE + DCMA + HP + LEDGER + EXEC + PROV)
 ```
 
 ### Path D — Contribute to the framework
