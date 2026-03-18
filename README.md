@@ -15,7 +15,7 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19072332](https://doi.org/10.5281/zenodo.19072332) — Zenodo
+DOI: [10.5281/zenodo.19077019](https://doi.org/10.5281/zenodo.19077019) — Zenodo
 
 ---
 
