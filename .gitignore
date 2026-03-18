@@ -10,6 +10,9 @@ ACP-CERT-*.json
 # Agent workflow rules (local only)
 AGENTS.md
 
+# Paper archives (local only — never push to repo)
+paper/arxiv/*.zip
+
 # Python cache
 **/.pytest_cache/
 **/__pycache__/
