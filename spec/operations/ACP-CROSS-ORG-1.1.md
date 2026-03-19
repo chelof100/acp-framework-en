@@ -11,7 +11,7 @@
 
 ## Changelog
 
-- **v1.1** — Adds fault-tolerant bilateral protocol. Introduces `interaction_id` (UUIDv7) as mandatory correlation identifier for deduplication across retries. Defines derived interaction status model (§9). Adds formal retry protocol: 3 attempts, backoff +30s/+60s/+120s (§8). Formalises `pending_review` SLA (24h) and state transitions (§8.4). Registers `CROSS_ORG_ACK` as a first-class event type in ACP-LEDGER-1.3 §5. Adds error codes CROSS-012 through CROSS-015. Updates dependency from ACP-LEDGER-1.2 to ACP-LEDGER-1.3.
+- **v1.1** — Adds fault-tolerant bilateral protocol. Introduces `interaction_id` (UUIDv7) as mandatory correlation identifier for deduplication across retries. Defines derived interaction status model (§9). Adds formal retry protocol: 3 attempts, backoff +30s/+60s/+120s (§8). Formalises `pending_review` SLA (24h) and state transitions (§8.4). Registers `CROSS_ORG_ACK` as a first-class event type in ACP-LEDGER-1.3 §5. Adds error codes CROSS-012 through CROSS-015. Updates dependency from ACP-LEDGER-1.2 to ACP-LEDGER-1.3. **v1.1 rev.1:** Adds §9.1 Interaction State Invariants (INV-1..5) and §13.1 Security Considerations (threat table + scope limitation).
 - **v1.0** — Initial specification: `CROSS_ORG_INTERACTION` event type, CrossOrgBundle bilateral transmission protocol, CrossOrgAck, HIST-1.0 query extensions.
 
 ---
@@ -436,6 +436,20 @@ Given an `interaction_id`, the derived status is computed as follows:
 
 **Verification rule:** An implementation computing derived status MUST read the ledger at query time. Derived status MUST NOT be cached beyond the request scope without invalidation.
 
+### 9.1 Interaction State Invariants
+
+For any `interaction_id`, the following invariants MUST hold:
+
+| # | Invariant | Enforcement |
+|---|-----------|-------------|
+| INV-1 | At most one terminal state (`acked` or `rejected`) may exist per `interaction_id`. | CROSS-014 on duplicate with different payload. |
+| INV-2 | A valid `CROSS_ORG_ACK` (accepted or rejected) MUST cancel all pending retry timers immediately. | CROSS-RULE-10. |
+| INV-3 | Retry operations MUST NOT create new `interaction_id` values; only `event_id` changes across attempts. | CROSS-RULE-7. |
+| INV-4 | Once `acked` or `rejected`, the derived status MUST NOT regress to a non-terminal state. | Precedence rules §9. |
+| INV-5 | The transition `pending_review → pending_review` is prohibited. | CROSS-015. |
+
+These invariants are verifiable from the ledger alone without access to any mutable runtime state.
+
 ---
 
 ## 10. Query Extensions (HIST-1.0)
@@ -545,6 +559,21 @@ flowchart TD
 | CROSS-013 | 408 | `pending_review` SLA expired: no resolution within 24 hours of review_deadline. |
 | CROSS-014 | 409 | Duplicate `interaction_id` with different `payload_hash` or `action_type` (payload tampering attempt). |
 | CROSS-015 | 422 | Invalid ACK transition: `pending_review → pending_review` is prohibited. |
+
+### 13.1 Security Considerations
+
+ACP-CROSS-ORG-1.1 assumes authenticated communication between institutions. All `CROSS_ORG_INTERACTION` and `CROSS_ORG_ACK` events MUST be signed with the originating institution's Ed25519 ITA key and serialized via JCS (RFC 8785), providing authenticity, integrity, and non-repudiation.
+
+**Threat mitigations:**
+
+| Threat | Mitigation |
+|--------|------------|
+| Replay attack | `interaction_id` (UUIDv7) + `event_id` (UUIDv4) allow target to detect and reject duplicates (CROSS-014). |
+| Event forgery | Ed25519 signatures over JCS-canonical payloads prevent injection of valid-looking ACK or INTERACTION events. |
+| Audit divergence | `CROSS_ORG_ACK` as first-class ledger event on both sides enables independent verification without trusting either institution's mutable state. |
+| Status manipulation | Derived status model (§9) eliminates any mutable status field; no `CROSS_ORG_STATUS_UPDATE` event exists. |
+
+**Scope limitation:** ACP does not address network-layer confidentiality (use TLS), business-level dispute resolution, or Byzantine fault tolerance. It provides structured detection, handling, and auditing of protocol-level failures.
 
 ---
 
