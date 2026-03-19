@@ -11,8 +11,8 @@ Depends-on: ACP-SIGN-1.0, ACP-CT-1.0, ACP-CAP-REG-1.0, ACP-HP-1.0,
             ACP-PROVENANCE-1.0, ACP-POLICY-CTX-1.0, ACP-PSN-1.0,
             ACP-PAY-1.0, ACP-REP-1.2, ACP-REP-PORTABILITY-1.0,
             ACP-GOV-EVENTS-1.0, ACP-LIA-1.0, ACP-HIST-1.0,
-            ACP-NOTIFY-1.0, ACP-DISC-1.0, ACP-BULK-1.0, ACP-CROSS-ORG-1.0,
-            ACP-DCMA-1.0
+            ACP-NOTIFY-1.0, ACP-DISC-1.0, ACP-BULK-1.0, ACP-CROSS-ORG-1.1,
+            ACP-DCMA-1.1
 Required-by: —
 
 ---
@@ -58,7 +58,7 @@ ACP 1.2 defines five cumulative conformance levels:
 | L2    | SECURITY      | L1 + RISK + REV + ITA-1.0                                       |
 | L3    | FULL          | L2 + API + EXEC + LEDGER + PROVENANCE + POLICY-CTX + PSN        |
 | L4    | EXTENDED      | L3 + PAY + REP-1.2 + ITA-1.1 + GOV-EVENTS + LIA + HIST +       |
-|       |               | NOTIFY + DISC + BULK + CROSS-ORG + REP-PORTABILITY              |
+|       |               | NOTIFY + DISC + BULK + CROSS-ORG-1.1 + REP-PORTABILITY          |
 | L5    | DECENTRALIZED | L4 + ACP-D + ITA-1.1 BFT                                        |
 
 Levels are cumulative. An implementation that declares level Lk MUST satisfy
@@ -345,14 +345,23 @@ The implementation MUST:
 - Partial success MUST be supported: the response MUST include per-item
   status for every item in the batch.
 
-7.10 Cross-Organization (ACP-CROSS-ORG-1.0)
+7.10 Cross-Organization (ACP-CROSS-ORG-1.1)
 
 The implementation MUST:
 
-- Support cross-organizational capability delegation.
+- Support cross-organizational capability delegation per ACP-CROSS-ORG-1.1.
 - Cross-org tokens MUST include org_id in the claim.
 - The verifier MUST validate cross-org trust anchors per ACP-ITA-1.1
   before accepting cross-org tokens.
+- Assign a UUIDv7 `interaction_id` at first emission and reuse it across
+  all retries of the same logical interaction.
+- Implement the fault-tolerant retry protocol: 3 attempts with backoff
+  +30s/+60s/+120s per ACP-CROSS-ORG-1.1 §8.
+- Deduplicate incoming bundles by `interaction_id` at the target.
+- Emit `CROSS_ORG_ACK` as a first-class ACP-LEDGER-1.3 event type.
+- Compute derived interaction status from ledger events per
+  ACP-CROSS-ORG-1.1 §9 (no mutable status field).
+- Enforce `pending_review` SLA of 24 hours per ACP-CROSS-ORG-1.1 §8.4.
 
 7.11 Reputation Portability (ACP-REP-PORTABILITY-1.0)
 
