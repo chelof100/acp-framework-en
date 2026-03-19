@@ -498,3 +498,13 @@ informative and MUST NOT be used in certification declarations:
 | Governance           | L2              |
 | Extended             | L4              |
 | Full v1.1            | L4              |
+
+
+---
+
+## Errata
+
+**Errata (2026-03-19):** ACP-POLICY-CTX-1.0 has been superseded by ACP-POLICY-CTX-1.1.
+Implementations targeting L3-FULL SHOULD adopt ACP-POLICY-CTX-1.1 to ensure
+temporal validity of policy evaluation. ACP-POLICY-CTX-1.1 is backward-compatible
+with 1.0 — existing ver: "1.0" snapshots remain valid without freshness validation.

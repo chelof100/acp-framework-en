@@ -1,4 +1,4 @@
-// Package policyctx implements ACP-POLICY-CTX-1.0.
+// Package policyctx implements ACP-POLICY-CTX-1.1.
 //
 // A PolicyContextSnapshot is a point-in-time evidence artifact that preserves
 // the exact policy state in force at the moment an agent action was authorized.
@@ -23,7 +23,7 @@ import (
 	"github.com/gowebpki/jcs"
 )
 
-// ─── Error Sentinels (ACP-POLICY-CTX-1.0 §9) ─────────────────────────────────
+// ─── Error Sentinels (ACP-POLICY-CTX-1.1 §10) ────────────────────────────────
 
 var (
 	ErrExecutionIDMismatch = errors.New("PCTX-001: execution_id does not match bound ET")
@@ -34,10 +34,14 @@ var (
 	ErrInstitutionalSig    = errors.New("PCTX-006: institutional signature invalid")
 	ErrRequiredField       = errors.New("PCTX-007: required field missing")
 	ErrNoETForApproval     = errors.New("PCTX-008: decision APPROVED but no bound ET found")
-	ErrInvalidVersion      = errors.New("PCTX-010: unsupported version, expected 1.0")
+	// ErrPolicyCaptureStale covers all PCTX-009 conditions:
+	// missing policy_captured_at, freshness exceeded,
+	// snapshot.delta_max > verifier.delta_max_allowed, or clock skew exceeded.
+	ErrPolicyCaptureStale = errors.New("PCTX-009: policy capture stale or invalid")
+	ErrInvalidVersion     = errors.New("PCTX-010: unsupported version, expected 1.0 or 1.1")
 )
 
-// ─── Types (ACP-POLICY-CTX-1.0 §4) ───────────────────────────────────────────
+// ─── Types (ACP-POLICY-CTX-1.1 §4) ───────────────────────────────────────────
 
 // PolicyBlock identifies the policy document in force at snapshot time (§4.3).
 type PolicyBlock struct {
@@ -79,6 +83,8 @@ type PolicyContextSnapshot struct {
 	ExecutionID       string            `json:"execution_id"`
 	ProvenanceID      string            `json:"provenance_id,omitempty"`
 	SnapshotAt        int64             `json:"snapshot_at"`
+	PolicyCapturedAt  int64             `json:"policy_captured_at,omitempty"` // MUST at L3-FULL (ACP-POLICY-CTX-1.1 §4.2)
+	DeltaMax          int64             `json:"delta_max,omitempty"`           // MUST at L3-FULL (ACP-POLICY-CTX-1.1 §4.2)
 	Policy            PolicyBlock       `json:"policy"`
 	EvaluationContext EvaluationContext `json:"evaluation_context"`
 	EvaluationResult  EvaluationResult  `json:"evaluation_result"`
@@ -89,6 +95,8 @@ type PolicyContextSnapshot struct {
 type CaptureRequest struct {
 	ExecutionID       string
 	ProvenanceID      string // optional; MUST at L3-FULL
+	PolicyCapturedAt  int64  // Timestamp when policy was retrieved from store. Caller MUST provide.
+	DeltaMax          int64  // Max permitted staleness seconds. Caller MUST provide.
 	Policy            PolicyBlock
 	EvaluationContext EvaluationContext
 	EvaluationResult  EvaluationResult
@@ -101,6 +109,8 @@ type signableSnapshot struct {
 	ExecutionID       string            `json:"execution_id"`
 	ProvenanceID      string            `json:"provenance_id,omitempty"`
 	SnapshotAt        int64             `json:"snapshot_at"`
+	PolicyCapturedAt  int64             `json:"policy_captured_at,omitempty"`
+	DeltaMax          int64             `json:"delta_max,omitempty"`
 	Policy            PolicyBlock       `json:"policy"`
 	EvaluationContext EvaluationContext `json:"evaluation_context"`
 	EvaluationResult  EvaluationResult  `json:"evaluation_result"`
@@ -129,11 +139,13 @@ func Capture(req CaptureRequest, privKey ed25519.PrivateKey) (PolicyContextSnaps
 	}
 
 	pcs := PolicyContextSnapshot{
-		Ver:               "1.0",
+		Ver:               "1.1",
 		SnapshotID:        snapshotID,
 		ExecutionID:       req.ExecutionID,
 		ProvenanceID:      req.ProvenanceID,
 		SnapshotAt:        time.Now().Unix(),
+		PolicyCapturedAt:  req.PolicyCapturedAt,
+		DeltaMax:          req.DeltaMax,
 		Policy:            req.Policy,
 		EvaluationContext: req.EvaluationContext,
 		EvaluationResult:  req.EvaluationResult,
@@ -152,9 +164,9 @@ func Capture(req CaptureRequest, privKey ed25519.PrivateKey) (PolicyContextSnaps
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-// VerifySig verifies the institutional signature on a PolicyContextSnapshot (§6 step 8).
+// VerifySig verifies the institutional signature on a PolicyContextSnapshot (§6 step 12).
 func VerifySig(pcs PolicyContextSnapshot, pubKey ed25519.PublicKey) error {
-	if pcs.Ver != "1.0" {
+	if pcs.Ver != "1.0" && pcs.Ver != "1.1" {
 		return ErrInvalidVersion
 	}
 	if pcs.Sig == "" {
@@ -167,6 +179,8 @@ func VerifySig(pcs PolicyContextSnapshot, pubKey ed25519.PublicKey) error {
 		ExecutionID:       pcs.ExecutionID,
 		ProvenanceID:      pcs.ProvenanceID,
 		SnapshotAt:        pcs.SnapshotAt,
+		PolicyCapturedAt:  pcs.PolicyCapturedAt,
+		DeltaMax:          pcs.DeltaMax,
 		Policy:            pcs.Policy,
 		EvaluationContext: pcs.EvaluationContext,
 		EvaluationResult:  pcs.EvaluationResult,
@@ -198,6 +212,76 @@ func VerifyPolicyHash(pcs PolicyContextSnapshot, policyDocHash string) error {
 		return fmt.Errorf("%w: stored %q != computed %q",
 			ErrPolicyHashMismatch, pcs.Policy.PolicyHash, policyDocHash)
 	}
+	return nil
+}
+
+// VerifyCaptureFreshness validates the temporal invariants of ACP-POLICY-CTX-1.1 §5.3–5.4.
+//
+// verifierDeltaMax is the calling institution's maximum permitted policy staleness.
+// If 0 or negative, the normative default of 300 seconds is applied.
+//
+// Enforcement rule: freshness ≤ min(pcs.DeltaMax, verifierDeltaMax)
+// snapshot.DeltaMax MUST NOT exceed verifierDeltaMax — else PCTX-009.
+//
+// Backward compatibility: snapshots with ver "1.0" pass without freshness check (§12).
+//
+// Clock skew: if policy_captured_at > snapshot_at by ≤ 5s, accepted as clock drift.
+// If the skew exceeds 5s → PCTX-009.
+func VerifyCaptureFreshness(pcs PolicyContextSnapshot, verifierDeltaMax time.Duration) error {
+	// Backward compatibility: ver "1.0" snapshots skip freshness (§12)
+	if pcs.Ver == "1.0" {
+		return nil
+	}
+
+	// policy_captured_at and delta_max are MUST at L3-FULL
+	if pcs.PolicyCapturedAt == 0 {
+		return fmt.Errorf("%w: policy_captured_at is missing", ErrPolicyCaptureStale)
+	}
+	if pcs.DeltaMax == 0 {
+		return fmt.Errorf("%w: delta_max is missing", ErrPolicyCaptureStale)
+	}
+
+	// Apply normative default if verifier passes 0
+	if verifierDeltaMax <= 0 {
+		verifierDeltaMax = 300 * time.Second
+	}
+
+	const clockSkewMax = 5 * time.Second
+
+	diff := time.Duration(pcs.SnapshotAt-pcs.PolicyCapturedAt) * time.Second
+
+	if diff < 0 {
+		// policy_captured_at > snapshot_at: accept only if within clock skew tolerance (§5.3)
+		if -diff > clockSkewMax {
+			return fmt.Errorf("%w: clock skew %ds exceeds 5s tolerance",
+				ErrPolicyCaptureStale, int64((-diff)/time.Second))
+		}
+		return nil
+	}
+
+	// diff >= 0: apply hybrid model min(snapshot.delta_max, verifier.delta_max_allowed) (§5.4)
+	snapshotMax := time.Duration(pcs.DeltaMax) * time.Second
+
+	// snapshot.delta_max must not exceed verifier's limit
+	if snapshotMax > verifierDeltaMax {
+		return fmt.Errorf("%w: snapshot.delta_max=%ds exceeds verifier.delta_max_allowed=%ds",
+			ErrPolicyCaptureStale, pcs.DeltaMax, int64(verifierDeltaMax/time.Second))
+	}
+
+	effectiveMax := snapshotMax
+	if verifierDeltaMax < effectiveMax {
+		effectiveMax = verifierDeltaMax
+	}
+
+	if diff > effectiveMax {
+		return fmt.Errorf("%w: freshness=%ds exceeds effectiveMax=%ds (snapshot=%ds, verifier=%ds)",
+			ErrPolicyCaptureStale,
+			int64(diff/time.Second),
+			int64(effectiveMax/time.Second),
+			pcs.DeltaMax,
+			int64(verifierDeltaMax/time.Second))
+	}
+
 	return nil
 }
 
@@ -275,6 +359,8 @@ func signSnapshot(pcs PolicyContextSnapshot, privKey ed25519.PrivateKey) (string
 		ExecutionID:       pcs.ExecutionID,
 		ProvenanceID:      pcs.ProvenanceID,
 		SnapshotAt:        pcs.SnapshotAt,
+		PolicyCapturedAt:  pcs.PolicyCapturedAt,
+		DeltaMax:          pcs.DeltaMax,
 		Policy:            pcs.Policy,
 		EvaluationContext: pcs.EvaluationContext,
 		EvaluationResult:  pcs.EvaluationResult,

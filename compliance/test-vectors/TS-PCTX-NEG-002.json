@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "id": "TS-PCTX-NEG-002",
+    "layer": "PCTX",
+    "severity": "mandatory",
+    "acp_version": "1.1",
+    "conformance_level": "L3",
+    "description": "PCTX-002: snapshot_at is outside the ET validity window"
+  },
+  "input": {
+    "institution_public_key": "AP8eMF8a-KYPW-2LFlCjKNjJaKUxVX2oQBG2XPIaFOI",
+    "snapshot": {
+      "delta_max": 60,
+      "evaluation_context": {
+        "agent_id": "agent.test.executor",
+        "delegation_active": true,
+        "requested_capability": "acp:cap:financial.payment",
+        "resource": "payment:transfer:USD",
+        "risk_score": 0.2
+      },
+      "evaluation_result": {
+        "checks": [],
+        "decision": "APPROVED",
+        "denial_reason": null
+      },
+      "execution_id": "et-pctx-test-0000-0000-0001",
+      "policy": {
+        "policy_engine": "opa",
+        "policy_hash": "373f4248f70c22b101858873f511dd4e6cd1584310e994f233ef6a3bbe546005",
+        "policy_id": "payment_policy",
+        "policy_version": "v3"
+      },
+      "policy_captured_at": 1741200330,
+      "provenance_id": "prov-pctx-0000-0000-0001",
+      "sig": "o23k0l3Hg6xw-twZ5ZrS7HIeaefvNWg-5JQS-JCo8Xe76JLfUvsjC5gzW_DVAGvuPQTsaCWaBa2iWBKH5gv7BA",
+      "snapshot_at": 1741200360,
+      "snapshot_id": "snap-pctx-0000-0000-0000-0001",
+      "ver": "1.1"
+    },
+    "et_issued_at": 1741200000,
+    "et_expires_at": 1741200300,
+    "verifier_config": {
+      "delta_max_allowed": 300
+    }
+  },
+  "expected": {
+    "decision": "INVALID",
+    "error_code": "PCTX-002"
+  }
+}
