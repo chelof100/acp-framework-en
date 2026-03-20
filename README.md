@@ -15,7 +15,7 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19130818](https://doi.org/10.5281/zenodo.19130818) — Zenodo (v1.13)
+DOI: [10.5281/zenodo.19135282](https://doi.org/10.5281/zenodo.19135282) — Zenodo (v1.14)
 
 arXiv: [2603.18829](https://arxiv.org/abs/2603.18829)
 
@@ -575,7 +575,7 @@ curl http://localhost:8080/acp/v1/health
 | ACP-CONF-1.2 | ✅ Complete — sole normative conformance source |
 | ACP-LEDGER-1.3 | ✅ Complete — sig normatively mandatory |
 | OpenAPI spec (`openapi/acp-api-1.0.yaml`) | ✅ Complete — OpenAPI 3.1.0, all ACP-API-1.0 endpoints |
-| Conformance test vectors (CORE · DCMA · HP · LEDGER · EXEC · PROV) | ✅ Complete — 51 signed test vectors, real Ed25519 + SHA-256 |
+| Conformance test vectors (CORE · DCMA · HP · LEDGER · EXEC · PROV · PCTX · REP) | ✅ Complete — 73 signed test vectors, real Ed25519 + SHA-256 |
 | Reference implementation — 23 Go packages (L1–L4) | ✅ Complete — `impl/go/pkg/` covers all conformance levels |
 | `pkg/psn` policy snapshot | ✅ Complete — atomic transitions, single ACTIVE snapshot |
 | Python SDK — `ACPAdmissionGuard` + `@acp_tool` (LangChain) | ✅ Complete — `impl/python/` |
