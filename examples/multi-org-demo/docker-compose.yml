@@ -1,0 +1,39 @@
+# ACP multi-org demo — docker-compose.yml
+#
+# Run from this directory:
+#   docker compose up --build
+#
+# Then in another terminal:
+#   curl -s http://localhost:8081/request | jq .
+#
+# Build context is ../../ (the repo root) so both the impl/go packages
+# and the demo module are available to the Dockerfile.
+
+services:
+  org-a:
+    build:
+      context: ../..
+      dockerfile: examples/multi-org-demo/Dockerfile
+      args:
+        ORG: org-a
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/snapshot > /dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  org-b:
+    build:
+      context: ../..
+      dockerfile: examples/multi-org-demo/Dockerfile
+      args:
+        ORG: org-b
+    ports:
+      - "8081:8081"
+    environment:
+      - ORG_A_URL=http://org-a:8080
+    depends_on:
+      org-a:
+        condition: service_healthy
