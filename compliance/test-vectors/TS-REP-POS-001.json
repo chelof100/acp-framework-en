@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "id": "TS-REP-POS-001",
+    "layer": "REP",
+    "severity": "mandatory",
+    "acp_version": "1.1",
+    "conformance_level": "L4",
+    "description": "Valid v1.1 snapshot: score=0.82, scale=0-1, real Ed25519 signature"
+  },
+  "input": {
+    "issuer_public_key": "AP8eMF8a-KYPW-2LFlCjKNjJaKUxVX2oQBG2XPIaFOI",
+    "snapshot": {
+      "evaluated_at": 1741200000,
+      "issuer": "inst-test-alpha",
+      "model_id": "risk-v3",
+      "rep_id": "3f7a1c9e-0b2d-4e8a-a5f6-000000000001",
+      "scale": "0-1",
+      "score": 0.82,
+      "signature": "_-jCj5Sk3PoP3OFjkFLY4WO4WhMwaq9ehqp8n5Ygk1AVxiavo2vlfpoqzC9xKX6np6Y01EoOxtifDBKFkSEuAA",
+      "subject_id": "agent.test.subject",
+      "valid_until": 1741203600,
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1741201800
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

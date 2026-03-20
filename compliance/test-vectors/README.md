@@ -126,8 +126,17 @@ Negative test vectors with wrong signatures use `aGVsbG8gd29ybGQ` (base64url of 
 | TS-PCTX-NEG-007 | PCTX | L3 | Negative | PCTX-009: freshness=120s exceeds snapshot.delta_max=60s |
 | TS-PCTX-NEG-008 | PCTX | L3 | Negative | PCTX-009: clock skew=10s exceeds 5s tolerance |
 | TS-PCTX-NEG-009 | PCTX | L3 | Negative | PCTX-009: snapshot.delta_max=300s > verifier.delta_max_allowed=60s — verifier dominates |
+| TS-REP-POS-001 | REP | L4 | Positive | Valid v1.1 snapshot: score=0.82, scale=0-1, real Ed25519 signature |
+| TS-REP-POS-002 | REP | L4 | Positive | Borderline expiration: now == valid_until (limit is inclusive) |
+| TS-REP-POS-003 | REP | L4 | Positive | Backward compatibility: ver=1.0 snapshot — expiration NOT enforced (§12) |
+| TS-REP-NEG-001 | REP | L4 | Negative | REP-001: evaluated_at > valid_until (temporal order violated) |
+| TS-REP-NEG-002 | REP | L4 | Negative | REP-011: snapshot expired — now > valid_until |
+| TS-REP-NEG-003 | REP | L4 | Negative | REP-002: score=1.5 exceeds scale=0-1 upper bound |
+| TS-REP-NEG-004 | REP | L4 | Negative | REP-004: issuer field is empty |
+| TS-REP-NEG-005 | REP | L4 | Negative | REP-010: signature field is empty |
+| TS-REP-NEG-006 | REP | L4 | Negative | REP-002: scale=unknown is not a supported scale value |
 
-**Total: 64 vectors** — 8 CORE (L1) + 4 DCMA (L1) + 10 HP (L1) + 11 LEDGER (L3) + 9 EXEC (L3) + 9 PROV (L3) + 13 PCTX (L3)
+**Total: 73 vectors** — 8 CORE (L1) + 4 DCMA (L1) + 10 HP (L1) + 11 LEDGER (L3) + 9 EXEC (L3) + 9 PROV (L3) + 13 PCTX (L3) + 9 REP (L4)
 
 ---
 

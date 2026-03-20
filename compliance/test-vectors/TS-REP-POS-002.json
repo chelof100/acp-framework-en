@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "id": "TS-REP-POS-002",
+    "layer": "REP",
+    "severity": "mandatory",
+    "acp_version": "1.1",
+    "conformance_level": "L4",
+    "description": "Borderline expiration: now == valid_until (limit is inclusive per §5.2)"
+  },
+  "input": {
+    "issuer_public_key": "AP8eMF8a-KYPW-2LFlCjKNjJaKUxVX2oQBG2XPIaFOI",
+    "snapshot": {
+      "evaluated_at": 1741200000,
+      "issuer": "inst-test-alpha",
+      "model_id": "risk-v3",
+      "rep_id": "3f7a1c9e-0b2d-4e8a-a5f6-000000000001",
+      "scale": "0-1",
+      "score": 0.75,
+      "signature": "LxNpQx-3kJB-OHlURDU0Va4lbMXvvxSdiWlECZmzs_7f1SczlNNAmS3LWLTxJlhPgjESfN8Sq1XsvxFQvZoQAA",
+      "subject_id": "agent.test.subject",
+      "valid_until": 1741203600,
+      "ver": "1.1"
+    }
+  },
+  "context": {
+    "current_time": 1741203600
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

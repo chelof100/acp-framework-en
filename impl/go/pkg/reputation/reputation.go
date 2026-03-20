@@ -197,3 +197,36 @@ var (
 	// ErrInvalidConfig is returned when Config values are out of allowed ranges.
 	ErrInvalidConfig = errors.New("acp/reputation: invalid configuration parameter")
 )
+
+// ─── ACP-REP-PORTABILITY-1.1 Types ───────────────────────────────────────────
+
+// ReputationSnapshot is the ACP-REP-PORTABILITY-1.1 signed portable score.
+//
+// ver "1.0" snapshots omit ValidUntil, Scale, and ModelID; expiration is NOT
+// enforced for those snapshots (§12 backward compat).
+type ReputationSnapshot struct {
+	Ver         string  `json:"ver"`
+	RepID       string  `json:"rep_id"`
+	SubjectID   string  `json:"subject_id"`
+	Issuer      string  `json:"issuer"`
+	Score       float64 `json:"score"`
+	Scale       string  `json:"scale"`
+	ModelID     string  `json:"model_id"`
+	EvaluatedAt int64   `json:"evaluated_at"`
+	ValidUntil  int64   `json:"valid_until"`
+	Signature   string  `json:"signature"`
+}
+
+// signableReputation mirrors ReputationSnapshot without Signature.
+// Used as the canonical payload for Ed25519 signing via JCS (RFC 8785).
+type signableReputation struct {
+	Ver         string  `json:"ver"`
+	RepID       string  `json:"rep_id"`
+	SubjectID   string  `json:"subject_id"`
+	Issuer      string  `json:"issuer"`
+	Score       float64 `json:"score"`
+	Scale       string  `json:"scale"`
+	ModelID     string  `json:"model_id"`
+	EvaluatedAt int64   `json:"evaluated_at"`
+	ValidUntil  int64   `json:"valid_until"`
+}

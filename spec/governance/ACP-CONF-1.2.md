@@ -9,7 +9,7 @@ Depends-on: ACP-SIGN-1.0, ACP-CT-1.0, ACP-CAP-REG-1.0, ACP-HP-1.0,
             ACP-RISK-1.0, ACP-REV-1.0, ACP-ITA-1.1,
             ACP-API-1.0, ACP-EXEC-1.0, ACP-LEDGER-1.3,
             ACP-PROVENANCE-1.0, ACP-POLICY-CTX-1.0, ACP-PSN-1.0,
-            ACP-PAY-1.0, ACP-REP-1.2, ACP-REP-PORTABILITY-1.0,
+            ACP-PAY-1.0, ACP-REP-1.2, ACP-REP-PORTABILITY-1.1,
             ACP-GOV-EVENTS-1.0, ACP-LIA-1.0, ACP-HIST-1.0,
             ACP-NOTIFY-1.0, ACP-DISC-1.0, ACP-BULK-1.0, ACP-CROSS-ORG-1.1,
             ACP-DCMA-1.1
@@ -363,14 +363,21 @@ The implementation MUST:
   ACP-CROSS-ORG-1.1 §9 (no mutable status field).
 - Enforce `pending_review` SLA of 24 hours per ACP-CROSS-ORG-1.1 §8.4.
 
-7.11 Reputation Portability (ACP-REP-PORTABILITY-1.0)
+7.11 Reputation Portability (ACP-REP-PORTABILITY-1.1)
+
+> **Errata 2026-03-20:** This section now references ACP-REP-PORTABILITY-1.1
+> (supersedes 1.0). The requirements below have been updated accordingly.
 
 The implementation MUST:
 
-- Support export of signed reputation records per agent.
-- Exported records MUST be signed by the originating institution's key.
-- An importing institution MUST verify the origin signature before
-  incorporating a portable reputation record.
+- Issue signed `ReputationSnapshot` objects per agent using `Capture()` with
+  JCS (RFC 8785) + SHA-256 + Ed25519 (ACP-REP-PORTABILITY-1.1 §6).
+- Set `valid_until` on all v1.1 snapshots and enforce expiration on receipt
+  (REP-011).
+- Enforce `evaluated_at ≤ valid_until` (REP-001) and score-within-scale
+  bounds (REP-002).
+- Verify the issuer's Ed25519 signature via `VerifySig()` before incorporating
+  a portable reputation snapshot (REP-010).
 
 ---
 

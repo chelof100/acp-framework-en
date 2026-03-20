@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "id": "TS-REP-POS-003",
+    "layer": "REP",
+    "severity": "mandatory",
+    "acp_version": "1.0",
+    "conformance_level": "L4",
+    "description": "Backward compatibility: ver=1.0 snapshot — expiration NOT enforced (§12)"
+  },
+  "input": {
+    "issuer_public_key": "AP8eMF8a-KYPW-2LFlCjKNjJaKUxVX2oQBG2XPIaFOI",
+    "snapshot": {
+      "evaluated_at": 1741200000,
+      "issuer": "inst-test-alpha",
+      "rep_id": "3f7a1c9e-0b2d-4e8a-a5f6-000000000001",
+      "score": 0.6,
+      "signature": "dSNgRkGBnlCNwtmDs0unUCSf6BIkYeb46ihgMu2bVCD_3ldY2oBA_PotVNRQEW-aed38WAvdTIrlOEXercg4DA",
+      "subject_id": "agent.test.subject",
+      "ver": "1.0"
+    }
+  },
+  "context": {
+    "current_time": 1741204000
+  },
+  "expected": {
+    "decision": "VALID",
+    "error_code": null
+  }
+}

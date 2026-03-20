@@ -1,7 +1,9 @@
+> **SUPERSEDED** — This specification has been superseded by [ACP-REP-PORTABILITY-1.1](../operations/ACP-REP-PORTABILITY-1.1.md). Archived 2026-03-20.
+
 # ACP-REP-PORTABILITY-1.0 — Cross-Organizational Reputation Portability
 
 **Version:** 1.0
-**Status:** Active
+**Status:** Superseded
 **Dependencies:** ACP-REP-1.2, ACP-ITA-1.1, ACP-HIST-1.0, ACP-LEDGER-1.2, ACP-SIGN-1.0
 **Implements:** ACP-CONF-1.1 Conformance Level L4
 **Implements:** ACP-REP-1.1 §12.1 (Inter-institutional reputation federation)
