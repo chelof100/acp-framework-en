@@ -1,3 +1,7 @@
+> **Status:** Superseded
+> **Superseded by:** ACP-POLICY-CTX-1.1
+> **Superseded date:** 2026-03-19
+
 # ACP-POLICY-CTX-1.0
 ## Policy Context Snapshot Specification
 
