@@ -7,6 +7,86 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.16.0] — 2026-03-22
+
+### Added
+
+#### Specification
+- `spec/security/ACP-RISK-2.0.md` — supersedes RISK-1.0. Introduces `F_anom` (3 deterministic rules): Rule 1 high request rate (>N in 60s, +20), Rule 2 recent denials (≥X in 24h, +15), Rule 3 repeated pattern via `hash(agent_id||capability||resource)` (≥Y in 5min, +15). Cooldown mechanism (§3.5): 3 DENIED in 10min → agent blocked for `cooldown_period`. Full factor breakdown in evaluation record. `LedgerQuerier` interface. Error codes RISK-008/009. Fail-closed design.
+- `spec/core/ACP-SIGN-2.0.md` — post-quantum hybrid signing spec. Ed25519 + ML-DSA-65 (NIST FIPS 204 / Dilithium). Three transition modes: `CLASSIC_ONLY → HYBRID → PQC_ONLY`. Policy fields: `acp_sign_mode`, `pqc_required`, `pqc_required_after`. Wire format and signing/verification procedures. Error codes SIGN-010–015. Reference library: `github.com/cloudflare/circl/sign/dilithium`. Go implementation planned for v1.17. "Crypto-agility by design."
+- `spec/operations/ACP-LEDGER-1.3.md` — updated for RISK-2.0: `RISK_EVALUATION` event schema adds `f_anom`, `anomaly_detail` (rule1/2/3_triggered), `denied_reason`, `policy_hash` fields. §13 conformance requirement for RISK-2.0 users.
+
+#### Reference Implementation — Go (23 packages)
+- `impl/go/pkg/risk/engine.go` — rewritten for ACP-RISK-2.0. `Evaluate()` entry point. `F_anom` with 3 rules, sliding windows, `PatternKey` (SHA-256 hash). Cooldown short-circuit. `LedgerQuerier` interface with `InMemoryQuerier`. `ShouldEnterCooldown()`. Integer arithmetic only, no floats.
+- `impl/go/pkg/risk/engine_v2_test.go` — 26 new tests (33 total pass). Covers all F_anom rules, cooldown trigger/expiry, RS boundary cases, anti-gaming vectors.
+- `impl/go/pkg/risk/engine_bench_test.go` — 6 benchmarks: `Evaluate` APPROVED (1,012 ns/op), `Evaluate` DENIED (863 ns/op), `Evaluate` all 3 F_anom rules (1,331 ns/op), `Evaluate` COOLDOWN short-circuit (149 ns/op), `PatternKey` SHA-256 (996 ns/op), `ShouldEnterCooldown` (88 ns/op). Measured on Intel i7-8665U @ 1.90GHz, Go 1.22.
+
+#### Compliance — Test Vectors
+- `compliance/test-vectors/risk-2.0/` — 65 unsigned RISK-2.0 vectors (23 APPROVED + 19 ESCALATED + 23 DENIED). 6 blocks: base cases, context factors, history factors, F_anom boundaries, complex mixes, anti-gaming/cooldown/autonomy edge cases. Note: unsigned — test the scoring formula, not the cryptographic pipeline.
+- `impl/go/cmd/gen-risk2-vectors/main.go` — reproducible generator for RISK-2.0 vectors.
+- `compliance/test-vectors/README.md` — updated: 73 signed + 65 unsigned = 138 total vectors.
+
+#### API
+- `openapi/acp-api-1.0.yaml` — endpoint 18: `GET /audit/agent/{id}?window=24h` — agent decision timeline with full F_anom inputs, cooldown state, and factor breakdown per ACP-RISK-2.0 §6. New schemas: `AgentAuditData`, `AgentDecisionEvent`. Total: 18 endpoints.
+
+#### Demo
+- `examples/payment-agent/` — payment-agent killer demo. Executable Go server. `POST /admission` → RISK-2.0 evaluation → decision + factor breakdown. Cooldown auto-triggers after 3 DENIED in 10min. Append-only in-memory ledger. `GET /audit/agent/{id}` (endpoint 18). 5 documented scenarios. `go run .` → server on :8080.
+
+#### Paper (local, gitignored)
+- `paper/arxiv/main.tex` — updated to v1.16: benchmark table (real ns/op data), Appendix B formal verification sketch (TLA+ module with `Safety`, `LedgerAppendOnly`, `RiskDeterminism` invariants + `THEOREM SafetyAndDeterminism`), roadmap and conclusion updated.
+
+---
+
+## [1.15.0] — 2026-03-21
+
+### Added
+
+#### API
+- `openapi/acp-api-1.0.yaml` — T5 extended: 17 endpoints covering POLICY-CTX-1.1 + REP-PORTABILITY-1.1. New endpoints: `GET /policy/context/{agent_id}`, `GET /policy/context/history/{agent_id}`, `POST /policy/context/validate`, `GET /reputation/export/{agent_id}`, `GET /reputation/diff`. New schemas: `PolicyContext`, `PolicyContextHistory`, `ReputationExport`.
+
+#### Python SDK — Integrations (GAP-A complete)
+- `impl/python/examples/langchain_agent_demo.py` — `@acp_tool()` decorator factory for LangChain. 5 scenarios. `--with-llm` flag for ReAct agent.
+- `impl/python/examples/pydantic_ai_demo.py` — `ACPAdmissionGuard` as Pydantic AI `deps`. DENIED/ESCALATED → `ModelRetry`.
+- `impl/python/examples/mcp_server_demo.py` — `ACPToolDispatcher`: ACP admission check in MCP dispatch layer. FastMCP-compatible via `dispatcher.mount()`.
+
+### Fixed
+- Website HTML audit: corrected version references, updated stats, synchronized EN/ES pages.
+
+---
+
+## [1.14.0] — 2026-03-20
+
+### Added
+
+#### Specification
+- `spec/reputation/ACP-REP-PORTABILITY-1.1.md` — supersedes 1.0. Temporal validity enforcement: `valid_from` / `valid_until` per record. Divergence detection: `divergence_flag` when δ > threshold. Portability export signed with institutional key.
+
+#### Demo
+- `examples/multi-org-demo/` — GAP-14 multi-org interoperability demo. Org-A issues tokens, Org-B validates cross-org delegation. Docker Compose (`docker-compose.yml`). `go run .` → both orgs on :8080/:8081.
+
+#### Compliance
+- `compliance/test-vectors/` — 73 signed test vectors total: 8 CORE + 4 DCMA + 10 HP + 11 LEDGER + 9 EXEC + 9 PROV + 13 PCTX + 9 REP. All carry real Ed25519 signatures over SHA-256(JCS).
+
+### Published
+- **arXiv:** `2603.18829` — v1 live (cs.CR primary, cs.AI cross-list).
+- **Zenodo:** `10.5281/zenodo.19135282` — ACP v1.14 specification archive.
+
+---
+
+## [1.13.0] — 2026-03-18
+
+### Added
+
+#### Specification
+- `spec/core/ACP-DCMA-1.1.md` — supersedes DCMA-1.0. Max depth 7 hops (S-3). Delegation record schema with `delegation_chain_id`, `hop_index`, `delegator_agent_id`, `delegatee_agent_id`. Non-escalation property formally stated.
+- `spec/core/ACP-CROSS-ORG-1.1.md` — supersedes CROSS-ORG-1.0. Fault-tolerant bilateral protocol (GAP-10). §9.1 State Invariants. §13.1 Security Considerations. `VerifyBundle()`, `SignBundle()`, `BuildAck()`, `VerifyAck()`.
+- `spec/operations/ACP-POLICY-CTX-1.1.md` — supersedes POLICY-CTX-1.0. Temporal validity enforcement for policy snapshots. `valid_from` / `valid_until` on `PolicySnapshot`. Error code PCTX-009 for expired snapshot.
+
+### Published
+- **arXiv submission initiated.** arXiv ID: `2603.18829`. Zenodo v1.13: `10.5281/zenodo.19077019`.
+
+---
+
 ## [1.12.0] — 2026-03-17
 
 ### Added

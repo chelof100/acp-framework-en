@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "id": "TS-RISK2-POS-029",
+    "layer": "RISK2",
+    "severity": "mandatory",
+    "acp_version": "2.0",
+    "spec": "ACP-RISK-2.0",
+    "conformance_level": "L2",
+    "description": "payment + public + amount_near_limit: RS=55 → ESCALATED",
+    "note": "Unsigned vector — tests deterministic formula only, not cryptographic pipeline"
+  },
+  "policy": {
+    "autonomy_level": 2,
+    "approved_max": 39,
+    "escalated_max": 69,
+    "anomaly_rule1_threshold_n": 10,
+    "anomaly_rule2_threshold_x": 3,
+    "anomaly_rule3_threshold_y": 3,
+    "cooldown_trigger_denials": 3,
+    "cooldown_period_seconds": 300,
+    "policy_hash": "sha256:test-policy-v1-default"
+  },
+  "input": {
+    "agent_id": "acp:agent:org.example:agent-001",
+    "capability": "acp:cap:financial.payment",
+    "resource": "org.example/payments/batch",
+    "resource_class": "public",
+    "context": {
+      "external_ip": false,
+      "off_hours": false,
+      "non_business_day": false,
+      "geo_outside": false,
+      "timestamp_drift": false,
+      "untrusted_device": false
+    },
+    "history": {
+      "denial_rate_high": false,
+      "unresolved_escalations": false,
+      "recent_denial": false,
+      "freq_anomaly": false,
+      "amount_near_limit": true,
+      "no_history": false
+    },
+    "anomaly": {
+      "rule1_count": 0,
+      "rule2_count": 0,
+      "rule3_count": 0,
+      "cooldown_active": false
+    }
+  },
+  "expected": {
+    "factors": {
+      "base": 35,
+      "context": 0,
+      "history": 20,
+      "resource": 0,
+      "anomaly": 0
+    },
+    "rs_raw": 55,
+    "rs_final": 55,
+    "decision": "ESCALATED",
+    "anomaly_detail": {
+      "rule1_triggered": false,
+      "rule2_triggered": false,
+      "rule3_triggered": false
+    }
+  }
+}

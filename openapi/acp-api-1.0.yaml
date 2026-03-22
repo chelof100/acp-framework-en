@@ -4,16 +4,18 @@ info:
   title: ACP HTTP API
   version: "1.0"
   description: |
-    Formal HTTP API specification for the Agent Control Protocol (ACP) v1.15.
-    17 endpoints across 10 groups.
+    Formal HTTP API specification for the Agent Control Protocol (ACP) v1.16.
+    18 endpoints across 10 groups.
 
     Core API (ACP-API-1.0): health, handshake, agents, authorize, tokens, audit, exec-tokens.
     Extended (v1.15):
       - GET /conformance        — ACP-CONF-1.2 conformance declaration (L3)
       - POST/GET /policy-ctx-snapshots — ACP-POLICY-CTX-1.1 snapshot storage (L3-FULL)
       - POST/GET /rep-snapshots — ACP-REP-PORTABILITY-1.1 + divergence detection (L4)
+    v1.16:
+      - GET /audit/agent/{id}?window=24h — ACP-RISK-2.0 agent audit timeline (L2)
 
-    Depends on: ACP-SIGN-1.0, ACP-CT-1.0, ACP-HP-1.0, ACP-RISK-1.0, ACP-REV-1.0,
+    Depends on: ACP-SIGN-1.0, ACP-CT-1.0, ACP-HP-1.0, ACP-RISK-1.0, ACP-RISK-2.0, ACP-REV-1.0,
                 ACP-CAP-REG-1.0, ACP-CONF-1.2, ACP-POLICY-CTX-1.1, ACP-REP-PORTABILITY-1.1
   contact:
     name: ACP Framework
@@ -410,6 +412,133 @@ components:
                 type: string
               message:
                 type: string
+
+    # ── ACP-RISK-2.0: Agent Audit Timeline ──────────────────────────────────────
+
+    AgentAuditData:
+      type: object
+      description: |
+        Agent audit timeline response (ACP-RISK-2.0 §6 + §3.5).
+        Includes decision events with full factor breakdown, cooldown state,
+        and aggregated F_anom inputs for observability.
+      properties:
+        agent_id:
+          type: string
+          description: Agent identifier queried.
+        window:
+          type: string
+          description: Effective time window applied (e.g. "24h").
+        cooldown:
+          type: object
+          description: Current cooldown state for this agent (ACP-RISK-2.0 §3.5).
+          properties:
+            active:
+              type: boolean
+              description: True if agent is currently in cooldown.
+            until:
+              type: integer
+              description: Unix timestamp when cooldown expires. Null if not active.
+              nullable: true
+            triggered_by:
+              type: string
+              description: Reason cooldown was triggered (e.g. "3_DENIED_in_10min").
+              nullable: true
+        anomaly_summary:
+          type: object
+          description: Aggregated F_anom inputs for the window (ACP-RISK-2.0 §3.4).
+          properties:
+            request_count:
+              type: integer
+              description: Total requests by this agent in the window.
+            denial_count:
+              type: integer
+              description: Total DENIED decisions in the window.
+            escalation_count:
+              type: integer
+              description: Total ESCALATED decisions in the window.
+            pattern_counts:
+              type: object
+              description: Map of pattern_key → hit count for repeated-pattern detection (Rule 3).
+              additionalProperties:
+                type: integer
+        events:
+          type: array
+          description: Decision events ordered by timestamp descending.
+          items:
+            $ref: '#/components/schemas/AgentDecisionEvent'
+        total_count:
+          type: integer
+          description: Total matching events before the limit was applied.
+
+    AgentDecisionEvent:
+      type: object
+      description: Single decision event with full factor breakdown (ACP-RISK-2.0 §6).
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: integer
+          description: Unix timestamp of the evaluation.
+        capability:
+          type: string
+          description: ACP capability evaluated.
+          example: "acp:cap:financial.payment"
+        resource:
+          type: string
+          description: Resource identifier.
+        resource_class:
+          type: string
+          enum: [public, sensitive, restricted]
+        risk_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Final RS value after min(100, ...) capping.
+        decision:
+          type: string
+          enum: [APPROVED, ESCALATED, DENIED]
+        denied_reason:
+          type: string
+          description: Machine-readable denial reason — present only when decision=DENIED.
+          nullable: true
+          example: "COOLDOWN_ACTIVE"
+        factors:
+          type: object
+          description: Factor breakdown for forensic reproducibility (ACP-RISK-2.0 §6).
+          required: [base, context, history, resource, anomaly]
+          properties:
+            base:
+              type: integer
+              description: B(c) — base score from capability class.
+            context:
+              type: integer
+              description: F_ctx — contextual risk contribution.
+            history:
+              type: integer
+              description: F_hist — historical behavior contribution.
+            resource:
+              type: integer
+              description: F_res — resource sensitivity contribution.
+            anomaly:
+              type: integer
+              description: F_anom — anomaly detection contribution (Rules 1+2+3).
+        anomaly_detail:
+          type: object
+          description: Per-rule F_anom trigger state for this evaluation.
+          properties:
+            rule1_triggered:
+              type: boolean
+              description: "High request rate triggered (Rule 1: sliding 60s window > N)."
+            rule2_triggered:
+              type: boolean
+              description: "Recent denials triggered (Rule 2: DENIED count last 24h ≥ X)."
+            rule3_triggered:
+              type: boolean
+              description: "Repeated pattern triggered (Rule 3: pattern_key count last 5min ≥ Y)."
+        policy_hash:
+          type: string
+          description: Hash of the policy configuration used for this evaluation (sha256:...).
 
     LedgerEvent:
       type: object
@@ -1135,6 +1264,116 @@ paths:
         "503":
           $ref: '#/components/responses/503ServiceUnavailable'
 
+  # ── Endpoint 18 (v1.16) ──────────────────────────────────────────────────────
+
+  /audit/agent/{agent_id}:
+    get:
+      operationId: getAgentAuditTimeline
+      summary: Agent audit timeline
+      description: |
+        Returns the decision timeline for a specific agent within a time window.
+
+        Exposes the full F_anom input set and current cooldown state for observability
+        and forensic analysis, per ACP-RISK-2.0 §6 (extended evaluation record)
+        and §3.5 (Cooldown mechanism).
+
+        Each event in `data.events` includes the complete factor breakdown
+        (base, context, history, resource, anomaly) and per-rule F_anom triggers,
+        enabling any third party to recalculate the risk score independently from
+        the signed policy snapshot.
+
+        Required capability: `acp:cap:audit.query`
+        Conformance: L2 (ACP-RISK-2.0 deployments).
+      tags: [Audit]
+      security:
+        - ACPAgent: []
+          ACPPoP: []
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - $ref: '#/components/parameters/AgentIDPath'
+        - name: window
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 7d, 30d]
+            default: 24h
+          description: |
+            Time window for the audit query.
+            Values: 1h, 6h, 24h (default), 7d, 30d.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of decision events to return (most recent first).
+      responses:
+        "200":
+          description: Agent audit timeline.
+          headers:
+            X-ACP-Version:
+              $ref: '#/components/headers/XACPVersion'
+            X-ACP-Request-ID:
+              $ref: '#/components/headers/XACPRequestID'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentAuditData'
+              example:
+                status: ok
+                data:
+                  agent_id: "acp:agent:org.example:agent-001"
+                  window: "24h"
+                  cooldown:
+                    active: false
+                    until: null
+                    triggered_by: null
+                  anomaly_summary:
+                    request_count: 47
+                    denial_count: 1
+                    escalation_count: 3
+                    pattern_counts:
+                      "a3f2b1c9d4e5f6a7b8c9d0e1": 2
+                  events:
+                    - event_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                      timestamp: 1700000000
+                      capability: "acp:cap:financial.payment"
+                      resource: "org.example/accounts/ACC-001"
+                      resource_class: restricted
+                      risk_score: 80
+                      decision: DENIED
+                      denied_reason: null
+                      factors:
+                        base: 35
+                        context: 0
+                        history: 0
+                        resource: 45
+                        anomaly: 0
+                      anomaly_detail:
+                        rule1_triggered: false
+                        rule2_triggered: false
+                        rule3_triggered: false
+                      policy_hash: "sha256:test-policy-v1-default"
+                  total_count: 47
+        "400":
+          $ref: '#/components/responses/400BadRequest'
+        "401":
+          $ref: '#/components/responses/401Unauthorized'
+        "403":
+          $ref: '#/components/responses/403Forbidden'
+        "404":
+          $ref: '#/components/responses/404NotFound'
+        "503":
+          $ref: '#/components/responses/503ServiceUnavailable'
+
   # ── Execution Tokens ─────────────────────────────────────────────────────────
 
   /exec-tokens/{et_id}/consume:
@@ -1443,7 +1682,7 @@ tags:
   - name: Tokens
     description: Capability token issuance.
   - name: Audit
-    description: Audit ledger query and event verification.
+    description: Audit ledger query, event verification, and agent decision timeline (ACP-RISK-2.0).
   - name: ExecutionTokens
     description: Execution token lifecycle (consume, status).
   - name: Conformance

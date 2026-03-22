@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "id": "TS-RISK2-NEG-008",
+    "layer": "RISK2",
+    "severity": "mandatory",
+    "acp_version": "2.0",
+    "spec": "ACP-RISK-2.0",
+    "conformance_level": "L2",
+    "description": "Anti-gaming: burst of 15 requests in 60s triggers Rule1 (+20)",
+    "note": "Unsigned vector — tests deterministic formula only, not cryptographic pipeline"
+  },
+  "policy": {
+    "autonomy_level": 2,
+    "approved_max": 39,
+    "escalated_max": 69,
+    "anomaly_rule1_threshold_n": 10,
+    "anomaly_rule2_threshold_x": 3,
+    "anomaly_rule3_threshold_y": 3,
+    "cooldown_trigger_denials": 3,
+    "cooldown_period_seconds": 300,
+    "policy_hash": "sha256:test-policy-v1-default"
+  },
+  "input": {
+    "agent_id": "acp:agent:org.example:agent-001",
+    "capability": "acp:cap:data.read",
+    "resource": "org.example/reports/Q1",
+    "resource_class": "public",
+    "context": {
+      "external_ip": false,
+      "off_hours": false,
+      "non_business_day": false,
+      "geo_outside": false,
+      "timestamp_drift": false,
+      "untrusted_device": false
+    },
+    "history": {
+      "denial_rate_high": false,
+      "unresolved_escalations": false,
+      "recent_denial": false,
+      "freq_anomaly": false,
+      "amount_near_limit": false,
+      "no_history": false
+    },
+    "anomaly": {
+      "rule1_count": 15,
+      "rule2_count": 0,
+      "rule3_count": 0,
+      "cooldown_active": false
+    }
+  },
+  "expected": {
+    "factors": {
+      "base": 0,
+      "context": 0,
+      "history": 0,
+      "resource": 0,
+      "anomaly": 20
+    },
+    "rs_raw": 20,
+    "rs_final": 20,
+    "decision": "APPROVED",
+    "anomaly_detail": {
+      "rule1_triggered": true,
+      "rule2_triggered": false,
+      "rule3_triggered": false
+    }
+  }
+}

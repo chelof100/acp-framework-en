@@ -15,7 +15,7 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19135282](https://doi.org/10.5281/zenodo.19135282) — Zenodo (v1.14)
+DOI: [10.5281/zenodo.19150239](https://doi.org/10.5281/zenodo.19150239) — Zenodo (v1.15)
 
 arXiv: [2603.18829](https://arxiv.org/abs/2603.18829)
 
@@ -580,10 +580,13 @@ curl http://localhost:8080/acp/v1/health
 | ACP-CONF-1.2 | ✅ Complete — sole normative conformance source |
 | ACP-LEDGER-1.3 | ✅ Complete — sig normatively mandatory |
 | OpenAPI spec (`openapi/acp-api-1.0.yaml`) | ✅ Complete — OpenAPI 3.1.0, all ACP-API-1.0 endpoints |
-| Conformance test vectors (CORE · DCMA · HP · LEDGER · EXEC · PROV · PCTX · REP) | ✅ Complete — 73 signed test vectors, real Ed25519 + SHA-256 |
+| Conformance test vectors (CORE · DCMA · HP · LEDGER · EXEC · PROV · PCTX · REP · RISK-2.0) | ✅ Complete — 73 signed + 65 unsigned RISK-2.0 test vectors |
 | Reference implementation — 23 Go packages (L1–L4) | ✅ Complete — `impl/go/pkg/` covers all conformance levels |
 | `pkg/psn` policy snapshot | ✅ Complete — atomic transitions, single ACTIVE snapshot |
 | Python SDK — `ACPAdmissionGuard` + `@acp_tool` (LangChain) | ✅ Complete — `impl/python/` |
+| ACP-RISK-2.0 — `F_anom` + Cooldown + `pkg/risk` | ✅ Complete — deterministic, sub-µs, 65 vectors |
+| Payment-agent demo (`examples/payment-agent/`) | ✅ Complete — v1.16 |
+| ACP-SIGN-2.0 — Post-quantum hybrid spec (Ed25519 + ML-DSA-65) | ✅ Complete — v1.16 spec; Go impl v1.17 |
 | TypeScript / Rust SDKs | 🔜 On roadmap |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |

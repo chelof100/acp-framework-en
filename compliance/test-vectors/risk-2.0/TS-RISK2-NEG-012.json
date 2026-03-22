@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "id": "TS-RISK2-NEG-012",
+    "layer": "RISK2",
+    "severity": "mandatory",
+    "acp_version": "2.0",
+    "spec": "ACP-RISK-2.0",
+    "conformance_level": "L2",
+    "description": "RS cap: all factors sum to 150 but rs_final must be capped at 100",
+    "note": "Unsigned vector — tests deterministic formula only, not cryptographic pipeline"
+  },
+  "policy": {
+    "autonomy_level": 2,
+    "approved_max": 39,
+    "escalated_max": 69,
+    "anomaly_rule1_threshold_n": 10,
+    "anomaly_rule2_threshold_x": 3,
+    "anomaly_rule3_threshold_y": 3,
+    "cooldown_trigger_denials": 3,
+    "cooldown_period_seconds": 300,
+    "policy_hash": "sha256:test-policy-v1-default"
+  },
+  "input": {
+    "agent_id": "acp:agent:org.example:agent-001",
+    "capability": "acp:cap:financial.payment",
+    "resource": "org.example/accounts/ACC-001",
+    "resource_class": "restricted",
+    "context": {
+      "external_ip": true,
+      "off_hours": true,
+      "non_business_day": false,
+      "geo_outside": false,
+      "timestamp_drift": false,
+      "untrusted_device": false
+    },
+    "history": {
+      "denial_rate_high": false,
+      "unresolved_escalations": false,
+      "recent_denial": true,
+      "freq_anomaly": false,
+      "amount_near_limit": false,
+      "no_history": false
+    },
+    "anomaly": {
+      "rule1_count": 15,
+      "rule2_count": 5,
+      "rule3_count": 5,
+      "cooldown_active": false
+    }
+  },
+  "expected": {
+    "factors": {
+      "base": 35,
+      "context": 35,
+      "history": 20,
+      "resource": 45,
+      "anomaly": 50
+    },
+    "rs_raw": 185,
+    "rs_final": 100,
+    "decision": "DENIED",
+    "anomaly_detail": {
+      "rule1_triggered": true,
+      "rule2_triggered": true,
+      "rule3_triggered": true
+    }
+  }
+}

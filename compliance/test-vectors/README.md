@@ -136,7 +136,10 @@ Negative test vectors with wrong signatures use `aGVsbG8gd29ybGQ` (base64url of 
 | TS-REP-NEG-005 | REP | L4 | Negative | REP-010: signature field is empty |
 | TS-REP-NEG-006 | REP | L4 | Negative | REP-002: scale=unknown is not a supported scale value |
 
-**Total: 73 vectors** — 8 CORE (L1) + 4 DCMA (L1) + 10 HP (L1) + 11 LEDGER (L3) + 9 EXEC (L3) + 9 PROV (L3) + 13 PCTX (L3) + 9 REP (L4)
+**Total: 73 signed vectors** — 8 CORE (L1) + 4 DCMA (L1) + 10 HP (L1) + 11 LEDGER (L3) + 9 EXEC (L3) + 9 PROV (L3) + 13 PCTX (L3) + 9 REP (L4)
+
+**+ 65 unsigned RISK-2.0 vectors** in `risk-2.0/` — see `risk-2.0/README.md`.
+These test the deterministic scoring formula (ACP-RISK-2.0 §3) without cryptographic pipeline.
 
 ---
 
