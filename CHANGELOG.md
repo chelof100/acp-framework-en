@@ -35,6 +35,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 #### Paper (local, gitignored)
 - `paper/arxiv/main.tex` — updated to v1.16: benchmark table (real ns/op data), Appendix B formal verification sketch (TLA+ module with `Safety`, `LedgerAppendOnly`, `RiskDeterminism` invariants + `THEOREM SafetyAndDeterminism`), roadmap and conclusion updated.
 
+### Published
+- **Zenodo:** `10.5281/zenodo.19185033` — ACP v1.16 specification archive. https://zenodo.org/records/19185033
+- **arXiv:** `2603.18829` — v3 submitted as `submit/7396824` (replacement). Pending announcement.
+
 ---
 
 ## [1.15.0] — 2026-03-21

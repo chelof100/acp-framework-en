@@ -1,0 +1,42 @@
+{
+  "id": "SEQ-BENIGN-001",
+  "description": "Benign flow: legitimate agent with minimal risk profile. All requests must be APPROVED. Validates no false positives from state accumulation.",
+  "steps": [
+    {
+      "agent_id": "AGENT-BENIGN",
+      "capability": "acp:cap:data.read",
+      "resource": "res://corp/data/summary",
+      "resource_class": "public",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 0
+      }
+    },
+    {
+      "agent_id": "AGENT-BENIGN",
+      "capability": "acp:cap:data.read",
+      "resource": "res://corp/data/summary",
+      "resource_class": "public",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 0
+      }
+    },
+    {
+      "agent_id": "AGENT-BENIGN",
+      "capability": "acp:cap:data.read",
+      "resource": "res://corp/data/summary",
+      "resource_class": "public",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 0
+      }
+    }
+  ]
+}

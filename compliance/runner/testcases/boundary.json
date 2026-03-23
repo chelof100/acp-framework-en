@@ -1,0 +1,42 @@
+{
+  "id": "SEQ-BOUNDARY-001",
+  "description": "Threshold boundaries: RS=35 → APPROVED (≤39), RS=40 → ESCALATED (40–69), RS=70 → DENIED (≥70). Uses distinct agents to isolate each boundary from state accumulation.",
+  "steps": [
+    {
+      "agent_id": "BOUNDARY-APPROVED",
+      "capability": "acp:cap:data.read",
+      "resource": "res://corp/data/report",
+      "resource_class": "sensitive",
+      "context": {},
+      "history": { "denial_rate_high": true, "no_history": true },
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 35
+      }
+    },
+    {
+      "agent_id": "BOUNDARY-ESCALATED",
+      "capability": "acp:cap:data.write",
+      "resource": "res://corp/data/report",
+      "resource_class": "sensitive",
+      "context": { "off_hours": true },
+      "history": {},
+      "expected": {
+        "decision": "ESCALATED",
+        "risk_score": 40
+      }
+    },
+    {
+      "agent_id": "BOUNDARY-DENIED",
+      "capability": "acp:cap:financial.transfer",
+      "resource": "res://corp/finance/payments",
+      "resource_class": "sensitive",
+      "context": { "external_ip": true },
+      "history": {},
+      "expected": {
+        "decision": "DENIED",
+        "risk_score": 70
+      }
+    }
+  ]
+}
