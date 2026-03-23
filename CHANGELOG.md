@@ -7,6 +7,44 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.17.0] — Sprint F — EN PROGRESO
+
+### Added (parcial — 2026-03-23)
+
+#### Compliance — ACR-1.0 Compliance Runner
+- `compliance/runner/` — ACR-1.0 sequence compliance runner. Go module independiente (8 archivos, 548 LOC) con replace directive a `impl/go`. Dos modos: `library` (default, llama a `pkg/risk` directo) y `http` (servidor externo). CLI flags: `--mode`, `--url`, `--dir`, `--out`, `--strict`.
+- `compliance/runner/library.go` — `LibraryBackend` implementa el execution contract de ACP-RISK-2.0 §4: `Evaluate()` stateless → `AddRequest()` → `AddPattern()` (siempre, alimenta Rule 3 de F_anom) → `AddDenial()` (condicional) → `ShouldEnterCooldown()` → `SetCooldown(agentID, now.Add(period))`.
+- `compliance/runner/http.go` — `HTTPBackend` para validar implementaciones externas via HTTP POST.
+- `compliance/runner/report.go` — JSON report + resumen stdout. Exit code 1 si algún test falla (CI-ready).
+
+#### Compliance — Sequence Test Vectors (5 vectores)
+- `compliance/runner/testcases/cooldown.json` — `SEQ-COOLDOWN-001`: 3 DENIED en 10 min activan cooldown; step 4 (benign) bloqueado con `denied_reason: COOLDOWN_ACTIVE`.
+- `compliance/runner/testcases/f_anom_rule3.json` — `SEQ-FANOM-RULE3-001`: mismo patrón agent+cap+resource ≥3 veces activa Rule 3 (+15 RS); decisión APPROVED→ESCALATED en step 4 (pattern_count=3 visible en Evaluate del step 4, ya que AddPattern ocurre después de Evaluate).
+- `compliance/runner/testcases/benign_flow.json` — `SEQ-BENIGN-001`: agente legítimo, 3 requests RS=0, todos APPROVED. Valida ausencia de falsos positivos.
+- `compliance/runner/testcases/boundary.json` — `SEQ-BOUNDARY-001`: fronteras exactas RS=35→APPROVED, RS=40→ESCALATED, RS=70→DENIED.
+- `compliance/runner/testcases/privilege_jump.json` — `SEQ-PRIVJUMP-001`: agente pasa de data.read/public (RS=0, APPROVED) a admin.delete/restricted (RS=105→100, DENIED) en un solo salto.
+
+**Resultado de verificación:** 5/5 PASS | CONFORMANT
+
+**Commits:** EN `0f04c92` / ES `288d3e4`
+
+#### Formal Verification — TLA+ Model
+- `tla/ACP.tla` — TLC-runnable TLA+ module. Formalizes ACP-RISK-2.0 evaluation pipeline with three checked properties: `Safety` (APPROVED decisions have RS ≤ 39), `LedgerAppendOnly` (entries never modified/removed), `RiskDeterminism` (same cap+resource always produces same RS). Corrects v1.16 Appendix B: `LedgerAppendOnly` now uses `[][Len(ledger') >= Len(ledger) ∧ ∀i: ledger'[i] = ledger[i]]_ledger`; `RiskDeterminism` now has a concrete `ComputeRisk` function, not an abstract placeholder.
+- `tla/ACP.cfg` — TLC configuration. Bounded constants: Agents={"A1","A2"}, Capabilities={"read","write","financial","admin"}, Resources={"public","sensitive","restricted"}, ledger bound=5. Declares INVARIANTS (TypeInvariant, Safety, LedgerAppendOnly, RiskDeterminism) and PROPERTIES (LedgerAppendOnlyTemporal).
+
+#### Compliance — Canonical Sequence Vectors
+- `compliance/test-vectors/sequence/` — canonical location for the 5 stateful test vectors (same content as `compliance/runner/testcases/`, referenced by ACR-1.0 runner with `--dir ../test-vectors/sequence`).
+- `compliance/test-vectors/sequence/README.md` — format docs, vector table, execution contract summary.
+
+#### Reference Implementation — Post-Quantum Stub
+- `impl/go/pkg/sign2/sign2.go` — ACP-SIGN-2.0 §3.1 HYBRID mode. `SignHybrid()`: Ed25519 real + ML-DSA-65 nil stub (TODO v1.18: cloudflare/circl). `VerifyHybrid()`: verifies Ed25519; tolerates nil PQCSig per transition rules §4.2. `HybridSignature` wire format stable. Narrative: crypto-agility by design — migration path defined, implementation staged.
+
+### Pendiente en Sprint F
+- `paper/arxiv/main.tex` — Figura TikZ end-to-end verifiability + §Compliance Testing + §Formal Verification upgrade (Appendix B TLC) + §End-to-End Verifiability
+- arXiv v4 — timing: esperar anuncio de `submit/7396824`
+
+---
+
 ## [1.16.0] — 2026-03-22
 
 ### Added

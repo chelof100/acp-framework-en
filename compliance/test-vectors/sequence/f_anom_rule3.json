@@ -1,0 +1,54 @@
+{
+  "id": "SEQ-FANOM-RULE3-001",
+  "description": "F_anom Rule 3: same agent+capability+resource repeated ≥3 times activates +15. Decision changes from APPROVED to ESCALATED on step 4 (pattern_count reaches threshold).",
+  "steps": [
+    {
+      "agent_id": "AGENT-FANOM",
+      "capability": "acp:cap:data.write",
+      "resource": "res://corp/data/report",
+      "resource_class": "sensitive",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 25
+      }
+    },
+    {
+      "agent_id": "AGENT-FANOM",
+      "capability": "acp:cap:data.write",
+      "resource": "res://corp/data/report",
+      "resource_class": "sensitive",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 25
+      }
+    },
+    {
+      "agent_id": "AGENT-FANOM",
+      "capability": "acp:cap:data.write",
+      "resource": "res://corp/data/report",
+      "resource_class": "sensitive",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 25
+      }
+    },
+    {
+      "agent_id": "AGENT-FANOM",
+      "capability": "acp:cap:data.write",
+      "resource": "res://corp/data/report",
+      "resource_class": "sensitive",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "ESCALATED",
+        "risk_score": 40
+      }
+    }
+  ]
+}

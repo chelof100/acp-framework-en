@@ -1,0 +1,30 @@
+{
+  "id": "SEQ-PRIVJUMP-001",
+  "description": "Privilege jump: agent starts with a benign low-risk request (APPROVED), then immediately requests admin.delete on restricted resource. No prior history — jump is caught purely by RS formula.",
+  "steps": [
+    {
+      "agent_id": "AGENT-JUMP",
+      "capability": "acp:cap:data.read",
+      "resource": "res://corp/data/summary",
+      "resource_class": "public",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "APPROVED",
+        "risk_score": 0
+      }
+    },
+    {
+      "agent_id": "AGENT-JUMP",
+      "capability": "acp:cap:admin.delete",
+      "resource": "res://corp/systems/core",
+      "resource_class": "restricted",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "DENIED",
+        "risk_score": 100
+      }
+    }
+  ]
+}

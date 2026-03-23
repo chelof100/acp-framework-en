@@ -1,0 +1,54 @@
+{
+  "id": "SEQ-COOLDOWN-001",
+  "description": "Cooldown activation: 3 DENIED in 10 min triggers cooldown. Benign request in step 4 is blocked by COOLDOWN_ACTIVE.",
+  "steps": [
+    {
+      "agent_id": "AGENT-COOLDOWN",
+      "capability": "acp:cap:admin.write",
+      "resource": "res://corp/systems/core",
+      "resource_class": "restricted",
+      "context": { "external_ip": true },
+      "history": {},
+      "expected": {
+        "decision": "DENIED",
+        "risk_score": 100
+      }
+    },
+    {
+      "agent_id": "AGENT-COOLDOWN",
+      "capability": "acp:cap:admin.write",
+      "resource": "res://corp/systems/core",
+      "resource_class": "restricted",
+      "context": { "external_ip": true },
+      "history": {},
+      "expected": {
+        "decision": "DENIED",
+        "risk_score": 100
+      }
+    },
+    {
+      "agent_id": "AGENT-COOLDOWN",
+      "capability": "acp:cap:admin.write",
+      "resource": "res://corp/systems/core",
+      "resource_class": "restricted",
+      "context": { "external_ip": true },
+      "history": {},
+      "expected": {
+        "decision": "DENIED",
+        "risk_score": 100
+      }
+    },
+    {
+      "agent_id": "AGENT-COOLDOWN",
+      "capability": "acp:cap:data.read",
+      "resource": "res://corp/data/report",
+      "resource_class": "public",
+      "context": {},
+      "history": {},
+      "expected": {
+        "decision": "DENIED",
+        "denied_reason": "COOLDOWN_ACTIVE"
+      }
+    }
+  ]
+}
