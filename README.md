@@ -510,8 +510,13 @@ acp-framework/
 ├── openapi/
 │   └── acp-api-1.0.yaml  ← OpenAPI 3.1.0 spec for all ACP-API-1.0 endpoints
 ├── compliance/
-│   ├── ACP-TS-1.1.md  ← test vector format specification
-│   └── test-vectors/  ← official conformance test vectors (CORE, DCMA, HP)
+│   ├── ACP-TS-1.1.md      ← test vector format specification
+│   ├── test-vectors/      ← single-shot conformance vectors (CORE · DCMA · HP · LEDGER · EXEC · RISK-2.0)
+│   │   └── sequence/      ← stateful sequence vectors (ACR-1.0, 5 scenarios)
+│   └── runner/            ← ACR-1.0 compliance runner (library mode + HTTP mode)
+├── tla/
+│   ├── ACP.tla            ← TLC-runnable formal model — Safety · LedgerAppendOnly · RiskDeterminism
+│   └── ACP.cfg            ← TLC configuration (2 agents × 4 caps × 3 resources, depth 5)
 ├── archive/
 │   └── specs/         ← superseded specification versions (historical reference)
 ├── impl/
@@ -529,6 +534,11 @@ acp-framework/
 # Option 1: Go reference server
 cd impl/go
 docker compose up
+
+# Option 6: ACR-1.0 sequence compliance runner — validate ACP-RISK-2.0 stateful behavior
+cd compliance/runner
+go run . --mode library --dir ../test-vectors/sequence --strict
+# PASS 5/5 — SEQ-BENIGN-001 SEQ-BOUNDARY-001 SEQ-PRIVJUMP-001 SEQ-FANOM-RULE3-001 SEQ-COOLDOWN-001
 
 # Option 5: Multi-org demo — Org-A issues signed policy+reputation, Org-B validates independently
 cd examples/multi-org-demo
@@ -586,7 +596,10 @@ curl http://localhost:8080/acp/v1/health
 | Python SDK — `ACPAdmissionGuard` + `@acp_tool` (LangChain) | ✅ Complete — `impl/python/` |
 | ACP-RISK-2.0 — `F_anom` + Cooldown + `pkg/risk` | ✅ Complete — deterministic, sub-µs, 65 vectors |
 | Payment-agent demo (`examples/payment-agent/`) | ✅ Complete — v1.16 |
-| ACP-SIGN-2.0 — Post-quantum hybrid spec (Ed25519 + ML-DSA-65) | ✅ Complete — v1.16 spec; Go impl v1.17 |
+| ACP-SIGN-2.0 — Post-quantum hybrid spec (Ed25519 + ML-DSA-65) | ✅ Complete — spec v1.16; HYBRID stub `pkg/sign2/` v1.17 |
+| ACR-1.0 sequence compliance runner (`compliance/runner/`) | ✅ Complete — v1.17 · library + HTTP mode · 5/5 PASS |
+| Sequence test vectors (`compliance/test-vectors/sequence/`) | ✅ Complete — v1.17 · 5 stateful scenarios |
+| TLA+ formal model (`tla/ACP.tla`) | ✅ Complete — v1.17 · TLC-runnable · 0 violations |
 | TypeScript / Rust SDKs | 🔜 On roadmap |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
