@@ -7,6 +7,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.19.0] — Sprint H — 2026-03-24
+
+### Added
+
+#### Adversarial Evaluation (`compliance/adversarial/`)
+- `compliance/adversarial/` — 8-file Go module (`go-redis/v9` dependency) with 3 ACP-RISK-2.0 adversarial experiments and a `RedisQuerier` implementation of `LedgerMutator`.
+- **Experiment 1 — Cooldown Evasion Attack:** 1 agent, 500 requests, alternating high-risk/low-risk pattern. Cooldown triggers after exactly 3 real DENIED decisions; 495/500 requests blocked (99%). Throughput: 815,927 req/s.
+- **Experiment 2 — Distributed Multi-Agent Attack:** 100/500/1,000 agents × 10 requests each. Each agent individually blocked after 3 DENIED; total free denials = 3N (linear in agent count). Demonstrates per-agent design boundary.
+- **Experiment 3 — State Backend Stress:** 500 agents × 20 requests (10,000 total). InMemoryQuerier ~350k req/s (mutex-bound, ±30% variance); RedisQuerier ~2,100 req/s (RTT-bound, ±4%). Validates LedgerQuerier as replaceable abstraction.
+- `redis_querier.go` — Full `RedisQuerier` implementing `LedgerMutator` using Redis sorted sets (ZAdd/ZCount) with per-operation commands (no pipelining).
+
+#### Paper — v1.19
+- `paper/arxiv/main.tex` — Version bumped to v1.19. Added `\subsection{Adversarial Evaluation (ACP-RISK-2.0)}` with 3 tables and results. Added Q4 to Evaluation Goals. Updated Limitations, roadmap table (adversarial evaluation v1.19 Complete; Dilithium deferred to v1.20).
+
+### Fixed
+- API usage corrected vs planning docs: `PatternKey(agentID, capability, resource)` takes 3 parameters; `ShouldEnterCooldown(agentID, policy, querier, now)` takes 4 parameters with policy second.
+
+---
+
 ## [1.17.0] — Sprint F — EN PROGRESO
 
 ### Added (parcial — 2026-03-23)

@@ -600,6 +600,7 @@ curl http://localhost:8080/acp/v1/health
 | ACR-1.0 sequence compliance runner (`compliance/runner/`) | ✅ Complete — v1.17 · library + HTTP mode · 5/5 PASS |
 | Sequence test vectors (`compliance/test-vectors/sequence/`) | ✅ Complete — v1.17 · 5 stateful scenarios |
 | TLA+ formal model (`tla/ACP.tla`) | ✅ Complete — v1.17 · TLC-runnable · 0 violations |
+| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.19 · 3 experiments · real benchmark numbers |
 | TypeScript / Rust SDKs | 🔜 On roadmap |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
