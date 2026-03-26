@@ -1376,21 +1376,20 @@ and exploit shared state contention.
 \textbf{Results.}
 \begin{table}[h!]
 \centering\small
-\begin{tabular}{lrrr}
+\begin{tabular}{lrrrl}
 \toprule
-Backend                    & RTTs/req & Duration         & Throughput \\
+Backend                    & RTTs/req & Throughput (req/s) & Duration       & Relative \\
 \midrule
-InMemoryQuerier            & $\sim$1  & $\sim$15\,ms      & $\sim$600{,}000\,req/s \\
-RedisQuerier (unpipelined) & $\sim$7--8 & $\sim$2.0\,s   & $\sim$4{,}700\,req/s \\
-RedisPipelinedQuerier      & 2        & $\sim$1.2\,s      & $\sim$8{,}000\,req/s \\
+InMemoryQuerier            & $\sim$1  & $\sim$600{,}000    & $\sim$15\,ms   & 1.0$\times$ \\
+RedisQuerier (unpipelined) & $\sim$7--8 & $\sim$4{,}700    & $\sim$2.0\,s   & 0.008$\times$ \\
+RedisPipelinedQuerier      & 2        & $\sim$8{,}000      & $\sim$1.2\,s   & \textbf{1.7$\times$} \\
 \bottomrule
 \end{tabular}
 \caption{Experiment 3: State Backend Stress (500 agents $\times$ 20 requests
 $= 10{,}000$ total, Intel i7-8665U, Go~1.22, Redis~7 Docker loopback).
 InMemoryQuerier variance is high ($\pm$30\%) due to Go mutex scheduling.
 Redis backends are stable ($\pm$5--7\%).
-Pipelining reduces per-request round-trips from $\sim$7--8 to 2, yielding
-$\sim$1.7$\times$ throughput gain over single-command Redis.}
+Relative column is normalized to unpipelined Redis (1.7$\times$) and to InMemoryQuerier (1.0$\times$).}
 \label{tab:adv-exp3}
 \end{table}
 
@@ -1406,15 +1405,30 @@ before \texttt{Evaluate} (serving \texttt{CountRequests}, \texttt{CountDenials},
 \texttt{readCache}) and all writes into a single pipeline after,
 reducing RTTs from $\sim$7--8 to 2 and achieving $\sim$8{,}000~req/s
 ($\sim$1.7$\times$ over unpipelined Redis).
-The $\sim$1.7$\times$ factor is a conservative lower bound for this workload:
-once an agent enters cooldown, \texttt{Evaluate} short-circuits at Step~2
-(\texttt{CooldownActive} is true), so the unpipelined backend also performs
-fewer reads per cooldown request.
-For workloads without cooldown saturation, the full 4-read pipeline advantage
-applies and the speedup approaches the theoretical $\sim$3--4$\times$.
-The key architectural result is unchanged: ACP protocol semantics are stable
-across backends; deployment performance scales with the state backend,
-not the admission control logic.
+There are no read-after-write dependencies within either pipeline:
+the evaluation step consumes only the pre-fetched \texttt{readCache} values
+(0 RTTs), so pipeline operations within each batch are fully independent.
+
+The $\sim$1.7$\times$ factor is a conservative lower bound.
+In this workload, frequent cooldown-triggered short-circuits reduce the number
+of write operations and limit pipeline utilization.
+Under steady-state evaluation without early exits, the effective speedup
+is expected to approach the theoretical RTT reduction ($\approx$3--4$\times$).
+
+The $\sim$75$\times$ gap between \texttt{InMemoryQuerier} and Redis-backed
+execution (600k vs.\ 8k~req/s) reflects network and I/O overhead exclusively;
+it is not a property of the admission control logic.
+The evaluation function (\texttt{pkg/risk.Evaluate}) remains computationally
+cheap ($\sim$820\,ns per request) in all three configurations.
+System throughput is bounded by state backend latency, not by protocol complexity.
+
+\textbf{Key insight.}
+These results reinforce a central property of ACP:
+the protocol is \textbf{compute-cheap but state-sensitive}.
+Admission decisions incur minimal computational cost, while system performance
+is primarily determined by the efficiency of state access and synchronization.
+ACP does not eliminate the cost of distributed state access---it makes that
+cost explicit and measurable.
 
 \subsubsection*{Experiment 4: Token Replay Attack}
 
