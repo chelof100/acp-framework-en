@@ -7,6 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.20.0] — Sprint I (partial) — 2026-03-26
+
+### Added
+
+#### Adversarial Evaluation — Experiment 4 (`compliance/adversarial/`)
+- `exp_token_replay.go` — Experiment 4: Token Replay Attack. Four sub-cases demonstrating ACP's bounded replay resistance without nonce tracking.
+  - **Case 1 — Normal traffic baseline:** 10 requests, unique resource per call, RS=0, no pattern accumulation, no cooldown. (Comparison anchor.)
+  - **Case 2 — Sequential replay:** 10 identical tokens (`financial.transfer / sensitive / NoHistory=true`, RS_base=55 ESCALATED). F_anom Rule 3 fires at request 4 after 3 pattern accumulations in 5-min window (+15 RS → RS=70 DENIED). Cooldown triggers after 3 DENIED; 4/10 subsequent requests blocked.
+  - **Case 3 — Concurrent replay:** 5 workers × 4 requests. InMemoryQuerier mutex serializes reads; concurrency does not bypass accumulation. 14/20 requests blocked.
+  - **Case 4 — Near-identical replay:** Resource suffix varies per request (`accounts/sensitive-000…009`). Different patternKey per call → Rule 3 never fires → RS stays at 55 (ESCALATED) → no cooldown. Demonstrates bounded replay resistance; motivates §Limitations note.
+- `main.go` — Updated: `--exp=4` flag added (`token-replay`); `--exp=0` (all) includes Experiment 4.
+
+#### Paper — v1.20
+- `paper/arxiv/main.tex` — Version bumped to v1.20. Added `\subsubsection*{Experiment 4}` with results table and RS-trajectory figure (pgfplots). Updated: abstract (4 attack scenarios), Q4, adversarial section intro, Security Properties (Bounded Replay Resistance paragraph), Limitations (nonce note), Roadmap table, spec changelog, conclusion. Added `\usepackage{pgfplots}`.
+
+### Key results (Experiment 4, Intel i7-8665U, Go 1.22)
+| Case | Requests | ESCALATED | DENIED | Cooldown-blocked |
+|------|----------|-----------|--------|-----------------|
+| Normal baseline | 10 | 0 | 0 | 0 |
+| Sequential replay | 10 | 3 | 3 | 4 |
+| Concurrent replay | 20 | 3 | 3 | 14 |
+| Near-identical | 10 | 10 | 0 | 0 |
+
+RS trajectory (sequential): reqs 1–3 → RS=55 (ESCALATED); reqs 4–6 → RS=70 (DENIED, Rule 3); reqs 7–10 → COOLDOWN_ACTIVE.
+
+---
+
 ## [1.19.0] — Sprint H — 2026-03-24
 
 ### Added
