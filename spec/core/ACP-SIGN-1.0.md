@@ -1,6 +1,6 @@
 # ACP-SIGN-1.0
 ## Serialization and Signing Specification
-**Status:** Draft
+**Status:** Active (baseline). See [ACP-SIGN-2.0](ACP-SIGN-2.0.md) for post-quantum extension (ML-DSA-65).
 **Version:** 1.0
 **Depends-on:** RFC 8785 (JCS), RFC 8032 (Ed25519)
 **Required-by:** ACP-CT-1.0, ACP-REV-1.0, ACP-API-1.0, ACP-LEDGER-1.2, ACP-ITA-1.1

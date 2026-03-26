@@ -15,9 +15,9 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19150239](https://doi.org/10.5281/zenodo.19150239) — Zenodo (v1.15)
+DOI: [10.5281/zenodo.19219776](https://doi.org/10.5281/zenodo.19219776) — Zenodo (v1.19)
 
-arXiv: [2603.18829](https://arxiv.org/abs/2603.18829)
+arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v5 (v1.19)
 
 ---
 
@@ -87,7 +87,7 @@ agent intent
     ↓
 [2] Capability check     →  pkg/ct + pkg/dcma         (ACP-CT-1.0, ACP-DCMA-1.0)
     ↓
-[3] Policy check         →  pkg/risk + pkg/psn        (ACP-RISK-1.0, ACP-PSN-1.0)
+[3] Policy check         →  pkg/risk + pkg/psn        (ACP-RISK-2.0, ACP-PSN-1.0)
     ↓
 [4] ADMIT / DENY / ESCALATE
     ↓  (if ADMIT)
@@ -110,7 +110,7 @@ Every interaction passes through six structured stages:
 
 1. **Identity verification** — confirm who the agent is (`ACP-AGENT-1.0`, `ACP-HP-1.0`)
 2. **Capability validation** — confirm what the agent is authorized to do (`ACP-CT-1.0`, `ACP-DCMA-1.0`)
-3. **Policy authorization** — confirm the action is permitted under current policy (`ACP-RISK-1.0`, `ACP-PSN-1.0`)
+3. **Policy authorization** — confirm the action is permitted under current policy (`ACP-RISK-2.0`, `ACP-PSN-1.0`)
 4. **Deterministic execution** — execute exactly what was authorized, nothing more (`ACP-EXEC-1.0`)
 5. **Verifiable recording** — produce cryptographic proof of what occurred (`ACP-LEDGER-1.3`, `ACP-PROVENANCE-1.0`)
 6. **Trust update** — update reputation and attestation state based on the interaction (`ACP-REP-1.2`, `ACP-LIA-1.0`)
@@ -394,14 +394,14 @@ Current active version per specification. This table is the authoritative refere
 
 | Spec | Active version | Level |
 |---|---|---|
-| ACP-SIGN | 1.0 | L1 |
+| ACP-SIGN | **2.0** ¹ | L1 |
 | ACP-AGENT | 1.0 | L1 |
 | ACP-CT | 1.0 | L1 |
 | ACP-CAP-REG | 1.0 | L1 |
 | ACP-HP | 1.0 | L1 |
 | ACP-DCMA | 1.0 | L1 |
 | ACP-MESSAGES | 1.0 | L1 |
-| ACP-RISK | 1.0 | L2 |
+| ACP-RISK | **2.0** | L2 |
 | ACP-REV | 1.0 | L2 |
 | ACP-ITA | 1.1 | L2/L4 |
 | ACP-API | 1.0 | L3 |
@@ -421,6 +421,8 @@ Current active version per specification. This table is the authoritative refere
 | ACP-CROSS-ORG | 1.0 | L4 |
 | ACP-REP-PORTABILITY | 1.1 | L4 |
 | **ACP-CONF** | **1.2** | — |
+
+¹ ACP-SIGN-1.0 remains active as the Ed25519 baseline. ACP-SIGN-2.0 adds the post-quantum extension (ML-DSA-65). Both are in effect until Dilithium is deployed in production.
 
 Superseded versions are archived in [`archive/specs/`](archive/specs/README.md).
 
@@ -455,7 +457,8 @@ Full normative requirements per level:
 ## Specifications
 
 ### L1 · Core Execution
-- [ACP-SIGN-1.0](spec/core/ACP-SIGN-1.0.md) — cryptographic signing, foundation of all protocol objects
+- [ACP-SIGN-1.0](spec/core/ACP-SIGN-1.0.md) — cryptographic signing, Ed25519 baseline
+- [ACP-SIGN-2.0](spec/core/ACP-SIGN-2.0.md) — post-quantum hybrid signing (Ed25519 + ML-DSA-65)
 - [ACP-AGENT-1.0](spec/core/ACP-AGENT-1.0.md) — formal agent identity `A=(ID,C,P,D,L,S)`
 - [ACP-CT-1.0](spec/core/ACP-CT-1.0.md) — Capability Token structure, issuance and verification
 - [ACP-CAP-REG-1.0](spec/core/ACP-CAP-REG-1.0.md) — canonical capability registry `acp:cap:*`
@@ -464,7 +467,7 @@ Full normative requirements per level:
 - [ACP-MESSAGES-1.0](spec/core/ACP-MESSAGES-1.0.md) — wire format, 5 normalized message types
 
 ### L2 · Trust Layer
-- [ACP-RISK-1.0](spec/security/ACP-RISK-1.0.md) — deterministic risk engine, Risk Score RS (0–100)
+- [ACP-RISK-2.0](spec/security/ACP-RISK-2.0.md) — deterministic risk engine, Risk Score RS (0–100), `F_anom` + cooldown
 - [ACP-REV-1.0](spec/security/ACP-REV-1.0.md) — revocation protocol, endpoint and CRL
 - [ACP-ITA-1.0](spec/security/ACP-ITA-1.0.md) — Institutional Trust Anchor, centralized model
 - [ACP-ITA-1.1](spec/security/ACP-ITA-1.1.md) — Trust Anchor Governance, distributed BFT model
@@ -513,6 +516,7 @@ acp-framework/
 │   ├── ACP-TS-1.1.md      ← test vector format specification
 │   ├── test-vectors/      ← single-shot conformance vectors (CORE · DCMA · HP · LEDGER · EXEC · RISK-2.0)
 │   │   └── sequence/      ← stateful sequence vectors (ACR-1.0, 5 scenarios)
+│   ├── adversarial/       ← adversarial evaluation (Exp 1–3: token replay, privilege escalation, anomaly detection)
 │   └── runner/            ← ACR-1.0 compliance runner (library mode + HTTP mode)
 ├── tla/
 │   ├── ACP.tla            ← TLC-runnable formal model — Safety · LedgerAppendOnly · RiskDeterminism
