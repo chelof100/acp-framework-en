@@ -260,6 +260,7 @@ The ET is single-use.
 The entire chain is recorded in the Audit Ledger with an externally verifiable institutional signature.
 
 \subsection{Design Insight}
+\label{sec:design-insight}
 
 ACP is \textbf{compute-cheap but state-sensitive}: decision evaluation is computationally
 inexpensive, while system performance is primarily constrained by state access patterns.
@@ -1013,7 +1014,7 @@ New in v1.16: ACP-RISK-2.0 (L2, deterministic engine v2 with F\_anom + Cooldown)
 New in v1.17: ACR-1.0 sequence compliance runner, TLA+ formal model, ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}).
 New in v1.18: performance benchmarks (latency, throughput, state contention), formal security/threat model, system comparison table.
 New in v1.19: adversarial evaluation (cooldown evasion, distributed multi-agent attack, state backend stress with Redis backend, \texttt{compliance/adversarial/}).
-New in v1.20: token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation, bounded replay resistance characterization).
+New in v1.20: token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation, bounded replay resistance characterization); Deployment Considerations section (\S\ref{sec:deployment}: state backend selection, multi-org boundaries, cross-agent coordination boundary, policy tuning).
 Superseded versions (CONF-1.0, CONF-1.1, LEDGER-1.2, REP-1.1, AGENT-SPEC-0.3, DCMA-1.0, CROSS-ORG-1.0, REP-PORTABILITY-1.0) archived in \texttt{archive/specs/}.}
 \end{table}
 
@@ -1616,6 +1617,7 @@ ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}) & v1.17 Complete \\
 Performance benchmarks (latency, throughput, state contention) & v1.18 Complete \\
 Adversarial evaluation (cooldown evasion, distributed multi-agent, state backend stress) & v1.19 Complete \\
 Token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation) & v1.20 Complete \\
+Deployment Considerations section (state backend selection, cross-agent boundary, policy tuning) & v1.20 Complete \\
 Post-quantum Go implementation (Dilithium, circl) & v1.20 \\
 L5 Decentralized (ACP-D) & Specification in design (v2.0) \\
 IETF RFC submission & After L5 stabilization \\
@@ -1787,6 +1789,137 @@ ACP defines the \emph{what}---mechanisms, flows, data structures, requirements.
 It does not prescribe the \emph{how} of internal implementation:
 programming language, database, HSM provider, ITA provider,
 or specific integration with existing RBAC or Zero Trust systems.
+
+% ============================================================
+\section{Deployment Considerations}
+\label{sec:deployment}
+% ============================================================
+
+ACP does not replace higher-level coordination or monitoring systems;
+it provides a verifiable admission control primitive within a larger operational stack.
+This section characterizes the deployment decisions that adopters must make
+when integrating ACP into production infrastructure.
+
+\subsection{State Backend Selection}
+
+The \texttt{LedgerQuerier} interface is the primary deployment decision surface.
+The reference \texttt{InMemoryQuerier} is suitable for development, single-process
+testing, and conformance evaluation.
+Production deployments require an external backend with durability and horizontal
+scalability guarantees.
+
+\begin{table}[h!]
+\centering\small
+\begin{tabular}{llll}
+\toprule
+Backend & Throughput & Durability & Recommended use \\
+\midrule
+InMemoryQuerier   & $\sim$920k req/s  & None (process-local) & Dev / conformance testing \\
+Redis sorted sets & $\sim$2{,}100 req/s (unpipelined) & AOF/RDB & Multi-process, low-latency \\
+Redis + pipelining / Lua & $\gg$2{,}100 req/s & AOF/RDB & High-throughput production \\
+Postgres / MySQL  & Backend-dependent & Full ACID & Audit-grade persistence \\
+\bottomrule
+\end{tabular}
+\caption{LedgerQuerier backend options.
+The admission control logic (\texttt{pkg/risk.Evaluate}) is stateless and backend-agnostic;
+all state transitions are delegated to the LedgerQuerier abstraction.
+Redis throughput measured in Experiment~3 (single-command, no pipelining, Docker loopback).}
+\label{tab:backends}
+\end{table}
+
+The key architectural property is that the ACP decision function is compute-cheap
+and the throughput ceiling is set entirely by the state backend.
+Replacing the backend does not require modifying the admission control logic
+or redeploying the protocol layer.
+
+\subsection{Agent Identity Provisioning}
+
+ACP requires a stable \texttt{agent\_id} per agent instance.
+Provisioning can be integrated with existing IAM or service mesh identity systems:
+the \texttt{agent\_id} is an opaque string from ACP's perspective,
+provided it is unique, stable across requests, and included in signed capability tokens.
+Key pairs (Ed25519 for L1--L4) should be provisioned at agent registration time
+and rotated according to the organization's key management policy.
+
+\subsection{Multi-Organization Boundaries}
+
+Each organization deploys its own ACP instance with a sovereign Institutional Key.
+Admission control decisions are evaluated locally against the deploying organization's
+\texttt{LedgerQuerier} and \texttt{PolicyConfig}.
+Cross-organization request flows are handled by ACP-CROSS-ORG-1.0:
+the receiving organization evaluates the incoming execution token independently,
+applying its own risk policy and local ledger state.
+
+Federated deployments use mutual recognition (ACP-ITA-1.1) to establish
+cross-org trust anchors without requiring a shared root of trust.
+The per-org isolation model is intentional: an organization's admission control
+decisions are not visible to or affected by another organization's ledger.
+
+\subsection{Cross-Agent Coordination (L3)}
+
+ACP enforces admission control \emph{per agent} and \emph{per request}.
+When multiple agents collaborate on a composite task,
+each agent's admission request is evaluated independently against its own
+\texttt{agent\_id}, capability token, and ledger history.
+
+ACP does not implement cross-agent correlation or orchestration-level coordination.
+This is an explicit scope boundary: as demonstrated in Experiment~2 (§\ref{sec:adversarial}),
+a coordinated group of $N$ agents can collectively execute $3N$ high-risk requests before
+all agents are individually blocked.
+Mitigating coordinated multi-agent threats requires attribution at the orchestration layer
+(e.g., shared-resource rate limits, agent group policies, identity clustering),
+which ACP is designed to \emph{complement}, not replace.
+
+The ACP-CROSS-ORG-1.0 interaction model provides a protocol-level primitive for
+multi-organization agent coordination; full L3 cross-agent orchestration is
+a deployment-layer concern outside the scope of this specification.
+
+\subsection{Integration with Existing Infrastructure}
+
+ACP occupies the Execution Governance layer of the Agent Governance Stack
+(Section~\ref{sec:design-insight}).
+It is designed to complement---not replace---existing access control and
+observability infrastructure:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{RBAC / ABAC / OPA:} ACP provides per-request admission control with
+    temporal state (history, cooldown). Existing resource-authorization systems
+    continue to apply \emph{after} ACP admission succeeds.
+  \item \textbf{Zero Trust:} Environmental signals (\texttt{external\_ip},
+    \texttt{off\_hours}, \texttt{geo\_outside}, \texttt{untrusted\_device})
+    integrate Zero Trust context directly into the ACP risk score via F\_ctx.
+  \item \textbf{SIEM / Observability:} The Audit Ledger (ACP-LEDGER-1.3) produces
+    per-decision signed records suitable for ingestion into log aggregation pipelines.
+    Each entry carries a \texttt{policy\_hash} enabling post-hoc attribution of
+    decisions to specific policy versions.
+  \item \textbf{Monitoring systems:} ACP's cooldown and escalation events are
+    observable state transitions---not silent blocks. They are designed to be
+    surfaced to monitoring systems for incident response.
+\end{itemize}
+
+\subsection{Policy Tuning}
+
+The \texttt{PolicyConfig} parameters (defaults documented in ACP-RISK-2.0 Appendix~A
+and exposed via \texttt{DefaultPolicyConfig()}) are the primary operational levers:
+
+\begin{itemize}[noitemsep]
+  \item \texttt{CooldownPeriodSeconds}: Tune based on threat model.
+    Shorter ($<300$s) enables faster recovery for false positives;
+    longer ($\geq600$s) provides stronger containment under sustained attack.
+  \item \texttt{CooldownTriggerDenials}: Lower values ($=2$) increase sensitivity
+    at the cost of higher false-positive rate; higher values allow more free denials
+    before containment.
+  \item \texttt{AnomalyRule3ThresholdY}: Controls the pattern-accumulation window.
+    Default $Y=3$ balances replay detection latency against false positives from
+    legitimate repeated requests (e.g., polling agents).
+  \item \texttt{PolicyHash}: Pin policy versions in capability tokens to prevent
+    silent policy changes from altering admission decisions post-issuance.
+\end{itemize}
+
+\noindent ACP provides sensible defaults via \texttt{DefaultPolicyConfig()}
+(Appendix~A of ACP-RISK-2.0).
+Organizations should treat policy calibration as an operational process,
+informed by observed denial rates, throughput baselines, and threat model requirements.
 
 % ============================================================
 \section{Security Model}

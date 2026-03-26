@@ -21,6 +21,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 #### Paper — v1.20
 - `paper/arxiv/main.tex` — Version bumped to v1.20. Added `\subsubsection*{Experiment 4}` with results table and RS-trajectory figure (pgfplots). Updated: abstract (4 attack scenarios), Q4, adversarial section intro, Security Properties (Bounded Replay Resistance paragraph), Limitations (nonce note), Roadmap table, spec changelog, conclusion. Added `\usepackage{pgfplots}`.
+- Added `\section{Deployment Considerations}` — state backend selection table (InMemory / Redis / Postgres), agent identity provisioning, multi-organization boundaries (per-org LedgerQuerier, ACP-ITA-1.1 federated trust), cross-agent coordination boundary (L3 scope clarification), integration with existing infrastructure (RBAC/ABAC/ZeroTrust/SIEM), policy tuning guidance (CooldownPeriodSeconds, CooldownTriggerDenials, Rule3ThresholdY, PolicyHash). Framing: "ACP does not replace higher-level coordination or monitoring systems."
 
 ### Key results (Experiment 4, Intel i7-8665U, Go 1.22)
 | Case | Requests | ESCALATED | DENIED | Cooldown-blocked |
