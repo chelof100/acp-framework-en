@@ -23,6 +23,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `paper/arxiv/main.tex` — Version bumped to v1.20. Added `\subsubsection*{Experiment 4}` with results table and RS-trajectory figure (pgfplots). Updated: abstract (4 attack scenarios), Q4, adversarial section intro, Security Properties (Bounded Replay Resistance paragraph), Limitations (nonce note), Roadmap table, spec changelog, conclusion. Added `\usepackage{pgfplots}`.
 - Added `\section{Deployment Considerations}` — state backend selection table (InMemory / Redis / Postgres), agent identity provisioning, multi-organization boundaries (per-org LedgerQuerier, ACP-ITA-1.1 federated trust), cross-agent coordination boundary (L3 scope clarification), integration with existing infrastructure (RBAC/ABAC/ZeroTrust/SIEM), policy tuning guidance (CooldownPeriodSeconds, CooldownTriggerDenials, Rule3ThresholdY, PolicyHash). Framing: "ACP does not replace higher-level coordination or monitoring systems."
 
+#### Redis Pipelining (`compliance/adversarial/`)
+- `redis_pipelined.go` — `RedisPipelinedQuerier`: reduces per-request Redis RTTs from ~7-8 to 2.
+  - Pipeline 1 (before Evaluate): ZCount(req) + ZCount(denial) + ZCount(pattern) + GET(cooldown) — 1 RTT
+  - Evaluate: zero RTTs (served from `readCache`)
+  - Pipeline 2 (after Evaluate): ZAdd(req) + ZAdd(pattern) + maybe ZAdd(denial) + maybe SET(cooldown) — 1 RTT
+  - Cooldown check inline using `denCount + 1` (semantically equivalent to ShouldEnterCooldown post-flush)
+- `exp_backend_stress.go` — Experiment 3 updated with 3-backend comparison + `runStressPipelined`
+
+### Key results (Experiment 3, Intel i7-8665U, Go 1.22, Redis 7 Docker loopback)
+| Backend | RTTs/req | Duration | Throughput |
+|---------|----------|----------|------------|
+| InMemoryQuerier | ~1 | ~15ms | ~600k req/s |
+| RedisQuerier (unpipelined) | ~7-8 | ~2.0s | ~4,700 req/s |
+| RedisPipelinedQuerier | 2 | ~1.2s | ~8,000 req/s |
+
+Pipelining speedup: ~1.7× (conservative — workload includes cooldown short-circuits that reduce unpipelined overhead)
+
 ### Key results (Experiment 4, Intel i7-8665U, Go 1.22)
 | Case | Requests | ESCALATED | DENIED | Cooldown-blocked |
 |------|----------|-----------|--------|-----------------|
