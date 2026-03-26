@@ -50,6 +50,25 @@ Pipelining speedup: ~1.7× (conservative — workload includes cooldown short-ci
 
 RS trajectory (sequential): reqs 1–3 → RS=55 (ESCALATED); reqs 4–6 → RS=70 (DENIED, Rule 3); reqs 7–10 → COOLDOWN_ACTIVE.
 
+#### Post-Quantum Implementation — ACP-SIGN-2.0 (`impl/go/pkg/sign2/`)
+- `pkg/sign2/sign2.go` — ML-DSA-65 (Dilithium mode3) integrated via `github.com/cloudflare/circl v1.6.3`.
+  - `SignHybridFull(msg, edKey, pqKey)` — produces real Ed25519 + ML-DSA-65 signature pair (`mode3.SignTo`).
+  - `VerifyHybrid(msg, edPub, pqPub, sig)` — conditional verification: both MUST verify when `PQCSig != nil` (AND); Ed25519 alone when `PQCSig == nil` (backward-compatible transition period per ACP-SIGN-2.0 §4.2).
+  - `GenerateHybridKeyPair()` — generates fresh Ed25519 + ML-DSA-65 keypair for tests and provisioning.
+  - `SignHybrid` (Ed25519-only path) and wire format `HybridSignature` unchanged.
+  - Error codes: SIGN-011 (Ed25519 fail), SIGN-012 (ML-DSA-65 fail), SIGN-013 (PQCSig present, no PQ public key).
+- `pkg/sign2/sign2_test.go` — 4 tests: classic path (nil PQCSig accepted), full PQ path (both verify), tampered message (both fail), SIGN-013 error path.
+- `impl/go/go.mod` — added `github.com/cloudflare/circl v1.6.3`.
+- Performance characteristics of ML-DSA-65 are not evaluated in this work; inclusion demonstrates integration feasibility.
+
+#### Paper — v1.20 (updated)
+- Added `\paragraph{Post-Quantum Extension}` in Reference Implementation section: describes `SignHybridFull`, conditional verification (AND when PQCSig present), forward-compatible migration path. Protective framing: "Performance characteristics of ML-DSA-65 are not evaluated in this work."
+- Added `pkg/sign2` row to Go packages table (ACP-SIGN-2.0, L1).
+- Updated spec changelog caption: "New in v1.20" entry includes ML-DSA-65 CIRCL integration.
+- Updated Roadmap: "Post-quantum Go implementation (Dilithium, circl) → v1.20 Complete".
+- Updated Limitations: stub → implemented; protective phrase added.
+- Updated Conclusion: "HYBRID mode stub" → "real ML-DSA-65 hybrid implementation via Cloudflare CIRCL".
+
 ---
 
 ## [1.19.0] — Sprint H — 2026-03-24

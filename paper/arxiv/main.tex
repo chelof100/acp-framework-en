@@ -1014,7 +1014,7 @@ New in v1.16: ACP-RISK-2.0 (L2, deterministic engine v2 with F\_anom + Cooldown)
 New in v1.17: ACR-1.0 sequence compliance runner, TLA+ formal model, ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}).
 New in v1.18: performance benchmarks (latency, throughput, state contention), formal security/threat model, system comparison table.
 New in v1.19: adversarial evaluation (cooldown evasion, distributed multi-agent attack, state backend stress with Redis backend, \texttt{compliance/adversarial/}).
-New in v1.20: token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation, bounded replay resistance); Deployment Considerations section (\S\ref{sec:deployment}); Redis pipelining (\texttt{RedisPipelinedQuerier}, 2~RTTs/request, $\sim$1.7$\times$ vs unpipelined Redis, Experiment~3 updated with 3 backends).
+New in v1.20: token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation, bounded replay resistance); Deployment Considerations section (\S\ref{sec:deployment}); Redis pipelining (\texttt{RedisPipelinedQuerier}, 2~RTTs/request, $\sim$1.7$\times$ vs unpipelined Redis, Experiment~3 updated with 3 backends); ML-DSA-65 (Dilithium mode3) real implementation via Cloudflare CIRCL (\texttt{pkg/sign2/}).
 Superseded versions (CONF-1.0, CONF-1.1, LEDGER-1.2, REP-1.1, AGENT-SPEC-0.3, DCMA-1.0, CROSS-ORG-1.0, REP-PORTABILITY-1.0) archived in \texttt{archive/specs/}.}
 \end{table}
 
@@ -1034,6 +1034,7 @@ The \texttt{examples/payment-agent/} directory (Sprint E) provides an executable
 \textbf{Package} & \textbf{Spec} & \textbf{Level} \\
 \midrule
 \texttt{pkg/crypto} & ACP-SIGN-1.0 + ACP-AGENT-1.0 & L1 \\
+\texttt{pkg/sign2} & ACP-SIGN-2.0 (Ed25519 + ML-DSA-65) & L1 \\
 \texttt{pkg/tokens} & ACP-CT-1.0 & L1 \\
 \texttt{pkg/registry} & ACP-CAP-REG-1.0 & L1 \\
 \texttt{pkg/handshake} & ACP-HP-1.0 & L1 \\
@@ -1059,6 +1060,19 @@ The \texttt{examples/payment-agent/} directory (Sprint E) provides an executable
 \end{tabular}
 \caption{Go reference implementation packages (23 total). All pass \texttt{go test ./...}.}
 \end{table}
+
+\paragraph{Post-Quantum Extension (ACP-SIGN-2.0).}
+The \texttt{pkg/sign2} package implements ACP-SIGN-2.0 HYBRID mode,
+combining Ed25519 with ML-DSA-65 (Dilithium mode3) via the Cloudflare CIRCL library
+(\texttt{github.com/cloudflare/circl/sign/dilithium/mode3}).
+\texttt{SignHybridFull} produces a real Ed25519 + ML-DSA-65 signature pair;
+\texttt{VerifyHybrid} applies conditional verification:
+if the ML-DSA-65 component is present, both signatures \emph{must} verify (logical AND per ACP-SIGN-2.0~\S4.2);
+if absent, Ed25519 verification alone is accepted (backward-compatible transition period).
+This design provides a forward-compatible migration path to post-quantum cryptography
+while preserving compatibility with classical-only deployments.
+Performance characteristics of ML-DSA-65 are not evaluated in this work;
+inclusion demonstrates integration feasibility and implementation readiness.
 
 \subsection{Conformance Test Vectors --- 73 Signed Vectors}
 
@@ -1645,6 +1659,7 @@ ACP-SIGN-2.0 spec (Ed25519 + ML-DSA-65 hybrid) & v1.16 Complete \\
 ACR-1.0 sequence compliance runner + 5 stateful vectors & v1.17 Complete \\
 TLA+ formal model (TLC-runnable, 3 invariants) & v1.17 Complete \\
 ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}) & v1.17 Complete \\
+ML-DSA-65 (Dilithium mode3) real implementation via CIRCL (\texttt{pkg/sign2/}) & v1.20 Complete \\
 Performance benchmarks (latency, throughput, state contention) & v1.18 Complete \\
 Adversarial evaluation (cooldown evasion, distributed multi-agent, state backend stress) & v1.19 Complete \\
 Token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation) & v1.20 Complete \\
@@ -2053,8 +2068,9 @@ The security guarantees of ACP rely on the integrity of the execution environmen
   \item Compromise of the state backend (deletion or modification of history) breaks core guarantees.
   \item Incorrect implementation of the execution contract may lead to inconsistent behavior.
   \item The model does not address side-channel attacks or network-level adversaries.
-  \item Post-quantum signature migration (ACP-SIGN-2.0 HYBRID, Ed25519 $\to$ ML-DSA-65)
-    is specified and stubbed; full implementation is deferred to v1.20.
+  \item Post-quantum signature migration (ACP-SIGN-2.0 HYBRID, Ed25519 + ML-DSA-65)
+    is implemented via the Cloudflare CIRCL library (\texttt{pkg/sign2/}).
+    Performance characteristics of ML-DSA-65 are not evaluated in this work.
 \end{itemize}
 
 ACP is therefore best understood as a control-layer mechanism that assumes a trusted
@@ -2214,7 +2230,7 @@ The v1.20 specification is complete.
 A full Go reference implementation (23 packages, L1--L4), 73 signed + 65 unsigned RISK-2.0 conformance test vectors,
 5 stateful sequence test vectors (ACR-1.0 compliance runner),
 a TLC-runnable TLA+ formal model (3 invariants, 0 violations),
-an ACP-SIGN-2.0 HYBRID mode stub with Ed25519 and ML-DSA-65 migration path,
+a real ML-DSA-65 (Dilithium mode3) hybrid implementation via Cloudflare CIRCL (\texttt{pkg/sign2/}, \texttt{SignHybridFull} + \texttt{VerifyHybrid}),
 an executable multi-organization interoperability demo (\texttt{examples/multi-org-demo/}),
 a payment-agent killer demo (\texttt{examples/payment-agent/}),
 an extended OpenAPI 3.1.0 specification (18 endpoints),
