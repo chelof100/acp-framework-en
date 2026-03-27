@@ -69,6 +69,21 @@ RS trajectory (sequential): reqs 1–3 → RS=55 (ESCALATED); reqs 4–6 → RS=
 - Updated Limitations: stub → implemented; protective phrase added.
 - Updated Conclusion: "HYBRID mode stub" → "real ML-DSA-65 hybrid implementation via Cloudflare CIRCL".
 
+#### Formal Verification — TLA+ Extended Model (`tla/`)
+- `tla/ACP_Extended.tla` — `ACP_Extended` module: extends `ACP.tla` with per-agent cooldown temporal state, denial accumulation, static delegation chain integrity.
+  - New state variables: `now` (discrete time counter), `denial_count` ([Agents → Nat]), `cooldown_until` ([Agents → Nat]).
+  - `Tick` action: advances time by one tick; bounded by `MAX_TIME`. `WF_vars(Tick)` in `Spec` ensures time eventually advances (liveness requirement).
+  - `EvaluateRequest`: RS always `ComputeRisk(cap, res)` (deterministic); cooldown overrides decision, not RS (preserves `RiskDeterminism`). `denial_count` increments only for RS-based DENIED, not cooldown-forced DENIED (faithful to ACP-RISK-2.0 §4).
+  - `DelegationChain == <<"A1", "A2">>` — hardcoded operator (TLC CFG does not support sequence literals); models 2-hop chain (ACP-DCMA-1.1 §3).
+  - Safety invariants (7 total): `TypeInvariant`, `Safety`, `LedgerAppendOnly`, `RiskDeterminism`, `CooldownEnforced` (active cooldown forces DENIED), `CooldownImpliesThreshold` (cooldown only after `COOLDOWN_TRIGGER` denials), `DelegationIntegrity` (no consecutive self-delegation).
+  - Temporal properties (2): `LedgerAppendOnlyTemporal` (append-only across steps), `CooldownExpires` (active cooldown eventually expires — conditioned on `cooldown_until[a] <= MAX_TIME` for bounded time horizon correctness).
+- `tla/ACP_Extended.cfg` — TLC model-checking configuration: 2 agents × 3 capabilities × 2 resources, ledger bound 5, `COOLDOWN_TRIGGER=3`, `COOLDOWN_WINDOW=3`, `MAX_TIME=5`. Run with `-deadlock` flag (intended terminal states: `now=MAX_TIME` or `Len(ledger)=5`).
+- **TLC result** (tla2tools.jar v1.7.1, Java 1.8): *Model checking completed. No error has been found.* 3,031,730 states generated, 1,672,254 distinct states found, graph depth 11. All 7 invariants and both temporal properties hold with zero violations.
+- Framing: "model checking of selected safety properties under a bounded state model"; `denial_count` monotone within bounded trace (per-window decay not modeled); dynamic chain mutation out of scope for v1.20.
+
+#### Paper — v1.20 (updated, TLA+)
+- Updated `\section{Formal Verification}`: added `\noindent\textbf{Extended model (v1.20)}` paragraph describing `ACP_Extended.tla` module, per-agent cooldown state, 7 invariants, 2 temporal properties, design decisions. Added `\noindent\textbf{Extended TLC result}` with real numbers and protective framing.
+
 ---
 
 ## [1.19.0] — Sprint H — 2026-03-24
