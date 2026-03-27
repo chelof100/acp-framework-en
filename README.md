@@ -519,10 +519,11 @@ acp-framework/
 │   ├── adversarial/       ← adversarial evaluation (Exp 1–4: cooldown evasion, multi-agent, backend stress, token replay)
 │   └── runner/            ← ACR-1.0 compliance runner (library mode + HTTP mode)
 ├── tla/
-│   ├── ACP.tla            ← base formal model — Safety · LedgerAppendOnly · RiskDeterminism (v1.17)
-│   ├── ACP.cfg            ← TLC configuration for ACP.tla
-│   ├── ACP_Extended.tla   ← extended model — cooldown temporal state · delegation integrity (v1.20)
-│   └── ACP_Extended.cfg   ← TLC configuration — 3,031,730 states · 0 violations
+│   ├── ACP.tla                   ← base formal model — Safety · LedgerAppendOnly · RiskDeterminism (v1.17)
+│   ├── ACP.cfg                   ← TLC configuration for ACP.tla
+│   ├── ACP_Extended.tla          ← extended model — F_anom · cooldown · liveness · 9 invariants + 4 temporal (Sprint J2)
+│   ├── ACP_Extended.cfg          ← single-agent config — 5,684,342 states · 3,147,864 distinct · depth 15 · 0 violations
+│   └── ACP_Extended_2agents.cfg  ← two-agent config — multi-agent isolation check (Sprint J2c)
 ├── archive/
 │   └── specs/         ← superseded specification versions (historical reference)
 ├── impl/
