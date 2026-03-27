@@ -516,11 +516,13 @@ acp-framework/
 │   ├── ACP-TS-1.1.md      ← test vector format specification
 │   ├── test-vectors/      ← single-shot conformance vectors (CORE · DCMA · HP · LEDGER · EXEC · RISK-2.0)
 │   │   └── sequence/      ← stateful sequence vectors (ACR-1.0, 5 scenarios)
-│   ├── adversarial/       ← adversarial evaluation (Exp 1–3: token replay, privilege escalation, anomaly detection)
+│   ├── adversarial/       ← adversarial evaluation (Exp 1–4: cooldown evasion, multi-agent, backend stress, token replay)
 │   └── runner/            ← ACR-1.0 compliance runner (library mode + HTTP mode)
 ├── tla/
-│   ├── ACP.tla            ← TLC-runnable formal model — Safety · LedgerAppendOnly · RiskDeterminism
-│   └── ACP.cfg            ← TLC configuration (2 agents × 4 caps × 3 resources, depth 5)
+│   ├── ACP.tla            ← base formal model — Safety · LedgerAppendOnly · RiskDeterminism (v1.17)
+│   ├── ACP.cfg            ← TLC configuration for ACP.tla
+│   ├── ACP_Extended.tla   ← extended model — cooldown temporal state · delegation integrity (v1.20)
+│   └── ACP_Extended.cfg   ← TLC configuration — 3,031,730 states · 0 violations
 ├── archive/
 │   └── specs/         ← superseded specification versions (historical reference)
 ├── impl/
@@ -600,11 +602,13 @@ curl http://localhost:8080/acp/v1/health
 | Python SDK — `ACPAdmissionGuard` + `@acp_tool` (LangChain) | ✅ Complete — `impl/python/` |
 | ACP-RISK-2.0 — `F_anom` + Cooldown + `pkg/risk` | ✅ Complete — deterministic, sub-µs, 65 vectors |
 | Payment-agent demo (`examples/payment-agent/`) | ✅ Complete — v1.16 |
-| ACP-SIGN-2.0 — Post-quantum hybrid spec (Ed25519 + ML-DSA-65) | ✅ Complete — spec v1.16; HYBRID stub `pkg/sign2/` v1.17 |
+| ACP-SIGN-2.0 — Post-quantum hybrid (Ed25519 + ML-DSA-65) | ✅ Complete — spec v1.16; real ML-DSA-65 via `cloudflare/circl` `pkg/sign2/` v1.20 |
 | ACR-1.0 sequence compliance runner (`compliance/runner/`) | ✅ Complete — v1.17 · library + HTTP mode · 5/5 PASS |
 | Sequence test vectors (`compliance/test-vectors/sequence/`) | ✅ Complete — v1.17 · 5 stateful scenarios |
-| TLA+ formal model (`tla/ACP.tla`) | ✅ Complete — v1.17 · TLC-runnable · 0 violations |
-| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.19 · 3 experiments · real benchmark numbers |
+| TLA+ base model (`tla/ACP.tla`) | ✅ Complete — v1.17 · 3 invariants · 0 violations |
+| TLA+ extended model (`tla/ACP_Extended.tla`) | ✅ Complete — v1.20 · 7 invariants + 2 temporal properties · 3,031,730 states · 0 violations |
+| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.20 · 4 experiments · real benchmark numbers |
+| Redis pipelining (`compliance/adversarial/redis_pipelined.go`) | ✅ Complete — v1.20 · 2 RTTs/request · ~1.7× speedup |
 | TypeScript / Rust SDKs | 🔜 On roadmap |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
