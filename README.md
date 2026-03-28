@@ -15,7 +15,7 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19219776](https://doi.org/10.5281/zenodo.19219776) — Zenodo (v1.19)
+DOI: [10.5281/zenodo.19284473](https://doi.org/10.5281/zenodo.19284473) — Zenodo (v1.20)
 
 arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v5 (v1.19)
 
@@ -607,9 +607,12 @@ curl http://localhost:8080/acp/v1/health
 | ACR-1.0 sequence compliance runner (`compliance/runner/`) | ✅ Complete — v1.17 · library + HTTP mode · 5/5 PASS |
 | Sequence test vectors (`compliance/test-vectors/sequence/`) | ✅ Complete — v1.17 · 5 stateful scenarios |
 | TLA+ base model (`tla/ACP.tla`) | ✅ Complete — v1.17 · 3 invariants · 0 violations |
-| TLA+ extended model (`tla/ACP_Extended.tla`) | ✅ Complete — v1.20 · 7 invariants + 2 temporal properties · 3,031,730 states · 0 violations |
+| TLA+ extended model (`tla/ACP_Extended.tla`) | ✅ Complete — v1.20 · 9 invariants + 4 temporal properties · 5,684,342 states · 0 violations |
 | Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.20 · 4 experiments · real benchmark numbers |
 | Redis pipelining (`compliance/adversarial/redis_pipelined.go`) | ✅ Complete — v1.20 · 2 RTTs/request · ~1.7× speedup |
+| ML-DSA-65 benchmarks (`pkg/sign2/sign2_bench_test.go`) | ✅ Complete — v1.20 · Ed25519 ~25 µs sign / ~56 µs verify · ML-DSA-65 ~100–130 µs sign / ~81 µs verify |
+| State-mixing attack analysis (paper §State-Mixing and Context Fragmentation) | ✅ Complete — v1.20 · formal counterexample · ContextIsolation property · mitigation path |
+| ITA trust model (paper §Trust Model and Failure Modes) | ✅ Complete — v1.20 · bootstrap / compromise window / revocation authority — semi-formal claims |
 | TypeScript / Rust SDKs | 🔜 On roadmap |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |

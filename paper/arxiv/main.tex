@@ -113,7 +113,7 @@
   \url{https://agentcontrolprotocol.xyz}
 }
 
-\date{March 2026 \\ \small Draft Standard \\ \small \href{https://arxiv.org/abs/2603.18829}{arXiv:2603.18829 [cs.CR]} \quad \href{https://doi.org/10.5281/zenodo.19219776}{DOI: 10.5281/zenodo.19219776}}
+\date{March 2026 \\ \small Draft Standard \\ \small \href{https://arxiv.org/abs/2603.18829}{arXiv:2603.18829 [cs.CR]} \quad \href{https://doi.org/10.5281/zenodo.19284473}{DOI: 10.5281/zenodo.19284473}}
 
 \maketitle
 
@@ -122,25 +122,29 @@
 % ============================================================
 ACP defines a deterministic admission control protocol for autonomous agents, combining
 capability, resource, and temporal signals (history, anomaly, cooldown) into runtime admission
-decisions that existing stateless frameworks (RBAC, ABAC, OPA, Cedar) cannot enforce.
+decisions that existing stateless frameworks (RBAC, ABAC, OPA, Cedar) are not designed to enforce.
 The key design insight is that the protocol is \textbf{compute-cheap but state-sensitive}:
 decision evaluation is computationally inexpensive ($\sim$820~ns), while system performance
 is primarily constrained by state access patterns---a separation that allows the state backend
-to be replaced or scaled without modifying protocol semantics.
+to be replaced or scaled without modifying protocol semantics;
+security properties, however, are conditioned on the integrity of the
+deployed backend (see \S\ref{sec:security-model}).
 Experimental evaluation demonstrates throughput up to $\sim$920k~req/s under moderate
 concurrency, with the cooldown containment path at $\sim$88~ns (9.5$\times$ faster via
-Step~2 early exit), and throughput degrading gracefully to $\sim$712k~req/s at 500 workers
-due to state backend contention.
+Step~2 early exit), and throughput degrading predictably to $\sim$712k~req/s at 500 workers
+due to state backend latency, as isolated in Experiment~3.
 Adversarial evaluation across four attack scenarios---cooldown evasion,
 distributed multi-agent coordination, state backend stress, and token replay---confirms
-that ACP-RISK-2.0 enforcement holds under active evasion: 99\% (495/500) of
+that ACP-RISK-2.0 enforcement resists the evaluated evasion scenarios: 99\% (495/500) of
 single-agent evasion attempts are blocked after only five requests (Experiment~1),
-per-agent isolation is preserved across 100 coordinated agents, throughput
-degradation under stress is attributable solely to state-backend latency rather than decision logic,
-and repeated identical tokens trigger F\_anom Rule~3 escalation from ESCALATED to DENIED
-after three occurrences in a 5-minute window (Experiment~4).
+per-agent isolation is preserved across 100 coordinated agents (Experiment~2),
+throughput degradation under stress is attributable solely to state-backend latency
+rather than decision logic (Experiment~3), and repeated identical tokens trigger
+F\_anom Rule~3 escalation from ESCALATED to DENIED after three occurrences
+in a 5-minute window (Experiment~4).
 ACP provides end-to-end verifiability through 73~signed conformance test vectors,
-a TLC-checked TLA+~formal model (3~invariants, 0~violations), and an ACR-1.0 sequence
+a TLC-checked TLA+~formal model (base: 3~invariants; extended v1.20: 9~invariants
++ 4~temporal properties, 5,684,342~states generated, 3,147,864~distinct, graph depth~15, 0~violations within the bounded state space), and an ACR-1.0 sequence
 compliance runner that validates stateful multi-step behavior at runtime.
 
 \textbf{Specification and implementation:} \url{https://github.com/chelof100/acp-framework-en}
@@ -169,7 +173,7 @@ An autonomous agent cannot be questioned. It can only be audited---and only if t
 
 \begin{quote}
 \textit{The problem is not whether agents are trustworthy.
-The problem is that currently no formal technical mechanism exists that allows an institution to demonstrate that its agents operated within authorized limits.}
+The problem is that currently no standardized, protocol-level mechanism exists that allows an institution to demonstrate that its agents operated within authorized limits.}
 \end{quote}
 
 \subsection{ACP as Admission Control}
@@ -215,6 +219,16 @@ This \emph{admission control} framing also clarifies the relationship with relat
   \item \textbf{SPIFFE / SPIRE} \cite{spiffe} provides cryptographic workload identity.
         ACP builds on that identity to add capability scoping and governance.
 \end{itemize}
+
+\noindent Viewed through the lens of classical security theory, ACP is a
+\emph{decentralized reference monitor}: a component that mediates every agent
+action, is always invoked before execution, and produces a tamper-evident record
+of every admission decision---extending Anderson's reference monitor concept~\cite{anderson1972planning}
+to multi-organizational environments where no single trusted party controls all agents.
+Stateless policy engines evaluate requests in isolation and can enforce safety properties
+over individual interactions; they do not capture temporal behavioral properties that
+require reasoning over accumulated execution history.
+ACP addresses this gap by enforcing admission decisions over stateful interaction traces.
 
 \subsection{Why RBAC and Zero Trust Are Insufficient}
 
@@ -294,6 +308,152 @@ This paper makes the following contributions:
     6.7$\times$ throughput difference between single-agent and multi-agent workloads that
     identifies state backend contention as the primary performance boundary.
 \end{itemize}
+
+% ============================================================
+\section{Related Work}
+\label{sec:related-work}
+% ============================================================
+
+\subsection{Access Control and Policy Enforcement}
+
+Traditional access control models such as Role-Based Access Control (RBAC)~\cite{sandhu1996rbac}
+and Attribute-Based Access Control (ABAC)~\cite{hu2015abac} provide structured mechanisms for
+regulating access decisions based on predefined roles or attributes.
+Policy languages such as XACML~\cite{oasis2013xacml} and modern policy engines such as
+Open Policy Agent~\cite{opa} and Cedar~\cite{cedar} extend these paradigms with expressive
+evaluation engines.
+
+These systems are fundamentally designed around \emph{stateless decision evaluation}:
+they evaluate a request against policy at a single point in time.
+They do not define how system state evolves as a result of decisions over time,
+and they do not formalize how historical behavior (repeated denials, temporal patterns)
+influences subsequent decisions in a deterministic and auditable manner.
+
+ACP differs by explicitly separating:
+(i)~stateless decision evaluation,
+(ii)~externalized state management, and
+(iii)~an execution contract governing state evolution across requests.
+This enables reasoning not only about individual decisions, but about the temporal behavior
+of the admission system.
+
+\subsection{Runtime Policy Systems and Agent Frameworks}
+
+Recent protocols for autonomous agents and multi-agent coordination define structured interactions
+between components and services.
+The Model Context Protocol (MCP)~\cite{mcp} provides structured tool access between LLM applications and services.
+Agent-to-Agent (A2A)~\cite{a2a} defines communication and task delegation between agents.
+
+While these protocols address interoperability and orchestration, they do not define:
+\begin{itemize}[noitemsep]
+  \item a deterministic risk evaluation model that accumulates state across requests,
+  \item explicit state evolution semantics with a testable execution contract, or
+  \item externally verifiable execution traces that can be reproduced by third parties.
+\end{itemize}
+
+Recent work has begun to address security governance for LLM-based agentic systems.
+Syros et al.~\cite{syros2025saga} propose SAGA, a security architecture that provides
+user-controlled access policies and cryptographic mediation for agent-to-agent tool use
+and inter-agent communication.
+Unlike SAGA, which focuses on high-level governance architecture and inter-agent
+communication policies, ACP enforces admission constraints at the execution layer:
+every action request passes through a stateful risk evaluation with deterministic
+outcomes, a verifiable execution contract (ACR-1.0), and a tamper-evident ledger---
+providing enforcement rather than governance framing.
+Tsai and Bagdasarian~\cite{tsai2025contextual} argue at HotOS~2025 that security policies
+must be purpose-specific rather than uniformly applied, emphasising that one-size-fits-all
+approaches are inadequate for diverse agent deployments---a perspective consistent with
+ACP's per-agent isolation and stateful enforcement boundaries.
+
+ACP complements these approaches by providing a governance layer that is independent of
+orchestration protocols, focusing specifically on verifiable decision enforcement and auditability.
+
+\subsection{Auditability and Tamper-Evident Logs}
+
+Secure audit logging~\cite{schneier1999secure} and event sourcing~\cite{fowler2005event} ensure
+that past events can be reconstructed and verified after the fact.
+These approaches operate \emph{post hoc}: they provide evidence of what occurred without
+constraining system behavior in real time.
+
+ACP integrates auditability directly into the admission process.
+Every decision---APPROVED, ESCALATED, or DENIED---is recorded in an append-only, cryptographically
+chained ledger (ACP-LEDGER-1.3) before the governed action executes.
+This enables both real-time enforcement and post-hoc verification from the same artifact.
+The \texttt{LedgerAppendOnlyTemporal} invariant in the TLA+ model formally specifies
+that ledger entries are never modified or removed.
+
+\subsection{Formal Verification and Runtime Enforcement}
+
+Model checking~\cite{lamport2002specifying} and symbolic reasoning are used to establish
+correctness properties in distributed systems and protocols, typically focusing on safety
+and liveness of state transitions.
+
+The theoretical foundations of runtime enforcement trace to Anderson's reference monitor
+concept~\cite{anderson1972planning} and Schneider's formal characterization of enforceable
+security policies~\cite{schneider2000enforceable}, which established the boundary between
+properties that can be \emph{verified} post-hoc and those that can be \emph{enforced}
+at the point of execution via a security automaton.
+Falcone et al.~\cite{falcone2012runtime} systematize runtime enforcement monitors,
+distinguishing enforceable property classes (safety, co-safety, guarantee, persistence)
+and the suppression or insertion mechanisms each requires.
+
+Stateless policy engines (e.g., ABAC, RBAC, OPA) evaluate requests independently
+and are therefore limited to enforcing safety properties over individual interactions.
+They do not capture temporal behavioral properties, where violations depend on
+accumulated execution history.
+In contrast, ACP instantiates a stateful enforcement mechanism over agent interaction
+traces, aligning with Schneider's security automaton model and enabling formal reasoning
+about temporal properties of agent behavior that stateless engines, by construction,
+cannot enforce.
+
+ACP instantiates these principles in a decentralized, multi-organizational setting.
+The ACR-1.0 compliance runner acts as an enforcement monitor over the ACP execution
+contract: every request passes through the monitor before state mutation occurs,
+the monitor is always invoked (no bypass path), and its decisions are recorded in a
+tamper-evident ledger.
+The TLA+ model specifies the safety and liveness properties the monitor is designed to
+enforce; formally checked invariants are then instantiated as concrete sequence test
+vectors and validated at runtime by the compliance runner.
+This creates a three-layer verifiability chain: formal $\to$ data $\to$ runtime.
+
+\subsection{Summary}
+
+Table~\ref{tab:comparison} summarizes the properties of ACP relative to existing approaches.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Property} & \textbf{RBAC} & \textbf{ABAC} & \textbf{OPA} & \textbf{Cedar} & \textbf{MCP/A2A} & \textbf{ACP} \\
+\midrule
+Stateful decisions       & \no & \no & \no & \no & \no & \yes \\
+Deterministic evaluation & \yes & \yes & \yes & \yes & \no & \yes \\
+Auditability             & partial & partial & partial & partial & \no & \yes \\
+Runtime enforcement      & \yes & \yes & \yes & \yes & partial & \yes \\
+Temporal behavior        & \no & \no & \no & \no & \no & \yes \\
+External verifiability   & \no & \no & \no & \no & \no & \yes \\
+Execution contract       & \no & \no & \no & \no & \no & \yes \\
+Agent-native             & \no & \no & \no & \no & partial & \yes \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of ACP with existing access control and agent governance approaches.
+\yes~=~fully supported; \no~=~not supported; partial~=~partially addressed.}
+\label{tab:comparison}
+\end{table}
+
+Existing systems address individual aspects of the problem---policy evaluation,
+agent orchestration, audit logging, or formal verification.
+ACP's contribution lies in combining these elements into a unified model centered on
+an explicit execution contract.
+This enables a property not directly provided by prior systems:
+the ability to deterministically reproduce and externally verify the behavior of
+an admission decision system over time.
+
+Unlike existing systems, ACP explicitly models temporal behavior---history accumulation,
+anomaly detection, and cooldown enforcement---within the admission decision itself,
+and provides verifiable execution semantics through signed test vectors and a runtime compliance runner.
+This combination of temporal state, runtime enforcement, and external verifiability
+is not jointly addressed by any prior system in Table~\ref{tab:comparison}.
 
 % ============================================================
 \section{What ACP Is}
@@ -418,7 +578,9 @@ It is a signed JSON object that specifies exactly what an agent can do, on what 
 
 \textbf{Critical fields:}
 \texttt{exp} is mandatory---a token without expiry is invalid by definition.
-The 128-bit nonce prevents replay attacks.
+The 128-bit nonce enforces request uniqueness within the canonical representation and
+supports anomaly accumulation; it does not constitute nonce-based replay prevention
+(see Section~\ref{sec:adversarial} and Section~\ref{sec:limitations}).
 \texttt{parent\_hash} chains delegated tokens in a verifiable way.
 The signature covers all fields except \texttt{sig}.
 
@@ -437,7 +599,7 @@ The protocol is stateless---it does not establish sessions, does not produce a \
   \item The challenge is deleted immediately after use---it cannot be reused.
 \end{enumerate}
 
-This sequence guarantees four formal properties:
+This sequence is designed to provide four properties:
 identity authentication, cryptographic request binding, anti-replay, and transport channel independence.
 
 \subsection{Deterministic Risk Evaluation (ACP-RISK-2.0)}
@@ -553,7 +715,7 @@ and the proxy resolution mechanism.
 Recognition is explicitly non-transitive.
 If A recognizes B and B recognizes C, A does not automatically recognize C.
 Each bilateral relationship requires its own signed MRA.
-This prevents uncontrolled expansion of the trust graph.
+This limits uncontrolled expansion of the trust graph.
 
 \subsection{Institutional Key Rotation and Revocation}
 
@@ -561,9 +723,87 @@ This prevents uncontrolled expansion of the trust graph.
 allowing artifacts signed with the old key to be verified during the transition.
 
 \textbf{Emergency rotation} is activated when a key is compromised.
-The result is immediate: the key is marked \texttt{revoked},
-all artifacts signed with it are invalid from that moment,
+The key is marked \texttt{revoked}; all artifacts signed with it are invalid
+from the moment revocation is \emph{observed} by the verifier,
 and there is no transition period.
+
+\subsection{Trust Model and Failure Modes}
+\label{sec:ita-trust-model}
+
+ACP makes its trust assumptions explicit, bounded, and temporally scoped:
+all protocol guarantees hold only after successful bootstrap and until revocation is observed.
+This section formalizes the three structural trust scenarios that determine the security boundary
+of the ITA layer.
+
+\paragraph{K1a --- Bootstrap Trust Assumption.}
+
+\textit{Assumption.}
+The initial distribution of the ITA root public key occurs over an authentic out-of-band channel.
+
+\textit{Adversary capability.}
+An adversary who controls the bootstrap channel can substitute an attacker-controlled key,
+after which all ACP artifact verification by the victim is performed against the wrong authority.
+
+\textit{Formal claim.}
+ACP provides no cryptographic security guarantees if the bootstrap trust anchor is compromised.
+All subsequent guarantees---token verification, delegation validity, ledger integrity---are
+conditional on the authenticity of the bootstrapped ITA public key.
+
+\textit{Security implication.}
+This is an explicit design boundary, not a protocol defect.
+ACP reduces the trust problem from continuous dependence on a third party
+to a single, auditable bootstrap event.
+Deployment environments may use out-of-band channels with varying integrity guarantees
+(e.g., DNSSEC, certificate pinning, in-person key ceremony);
+the choice of channel is a deployment decision outside the protocol scope.
+
+\paragraph{K1b --- Key Compromise Window.}
+
+\textit{Assumption.}
+Key compromise occurs at time $T_{\mathit{compromise}}$ and is detected and revoked at
+$T_{\mathit{revoke}}$, with $T_{\mathit{compromise}} < T_{\mathit{revoke}}$.
+
+\textit{Adversary capability.}
+During the interval $[T_{\mathit{compromise}},\, T_{\mathit{revoke}}]$,
+the adversary holds a valid signing key and can issue ACP-conformant tokens and ledger events
+that are indistinguishable from legitimate artifacts.
+
+\textit{Formal claim.}
+ACP evaluates token validity at \emph{verification time}, not issuance time.
+Security is monotonic with respect to revocation:
+once a key is marked \texttt{revoked}, all subsequent verifications reject tokens derived from it,
+regardless of when they were issued.
+Tokens issued during the compromise window remain valid until revocation is observed.
+
+\textit{Security implication.}
+The window $[T_{\mathit{compromise}},\, T_{\mathit{revoke}}]$ represents an irrecoverable
+exposure interval: ACP cannot retroactively invalidate actions that completed before revocation
+was processed.
+Minimizing this window is a deployment concern (monitoring, anomaly detection, HSM audit logs)
+that the protocol does not prescribe but does not preclude.
+
+\paragraph{K1c --- Revocation Authority Model.}
+
+\textit{Assumption.}
+The ITA authority is reachable and uncompromised.
+
+\textit{Adversary capability.}
+If the ITA authority is unavailable or compromised, revocation cannot be issued
+or cannot be propagated, leaving previously valid tokens uncancellable.
+
+\textit{Formal claim.}
+ACP assumes the existence of an ITA authority capable of issuing revocations
+independent of delegation chains.
+Delegation chains are not self-healing:
+a compromised intermediate agent cannot unilaterally revoke its own parent;
+revocation authority flows from the ITA downward, not upward through the chain.
+
+\textit{Security implication.}
+Security depends on the availability and integrity of the ITA revocation authority.
+This is a known architectural constraint shared with all PKI-based systems.
+ACP makes this dependency explicit rather than implicit.
+Deployments requiring high availability of revocation must provision the ITA
+with appropriate redundancy outside the protocol scope.
 
 % ============================================================
 \section{Cross-Organization Execution}
@@ -807,9 +1047,9 @@ Elevation & Delegation that expands privileges & $C_{\text{delegated}} \subseteq
 \caption{STRIDE threat model and ACP mitigations.}
 \end{table}
 
-\subsection{Guaranteed Security Properties}
+\subsection{Security Properties Under Correct Implementation}
 
-ACP guarantees the following properties when the implementation is compliant:
+ACP provides the following properties when the implementation is compliant:
 
 \begin{itemize}[noitemsep]
   \item \textbf{Artifact integrity.}
@@ -838,9 +1078,11 @@ ACP explicitly declares what it cannot resolve:
   \item \textbf{Implementation failures.}
         ACP is a specification. An implementation that violates prohibited behaviors can compromise all protocol guarantees.
         Conformance requires formal testing.
-  \item \textbf{ITA bootstrap.}
-        The only point that depends on an out-of-band channel.
-        Once the ITA root key is resolved, everything subsequent is autonomous.
+  \item \textbf{ITA trust model.}
+        Bootstrap, key compromise window, and revocation authority constraints are
+        formalized in \S\ref{sec:ita-trust-model}.
+        All protocol guarantees are conditioned on the authenticity of the bootstrapped ITA key
+        and the availability of the revocation authority.
 \end{itemize}
 
 % ============================================================
@@ -958,7 +1200,7 @@ The ledger provides the forensic record needed for post-incident analysis.
 ACP v1.20 is a complete Draft Standard specification with a full Go reference implementation
 and external verifiability through a TLC-checked formal model and an ACR-1.0 sequence compliance runner.
 
-\subsection{Active Specifications --- v1.19 (38 documents)}
+\subsection{Active Specifications --- v1.20 (38 documents)}
 
 \begin{table}[h!]
 \centering
@@ -1008,17 +1250,18 @@ Gov. & RFC-REGISTRY & Specification Registry \\
 Gov. & ACP-CR-1.0 & Change Request Process \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.19 active specification documents by conformance level (38 primary documents shown).
+\caption{ACP v1.20 active specification documents by conformance level (38 primary documents shown).
 The remaining 3 documents are the ACP-D decentralized suite (L5, design phase) not yet published.
 New in v1.16: ACP-RISK-2.0 (L2, deterministic engine v2 with F\_anom + Cooldown), ACP-SIGN-2.0 (L1, PQC hybrid spec).
 New in v1.17: ACR-1.0 sequence compliance runner, TLA+ formal model, ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}).
 New in v1.18: performance benchmarks (latency, throughput, state contention), formal security/threat model, system comparison table.
 New in v1.19: adversarial evaluation (cooldown evasion, distributed multi-agent attack, state backend stress with Redis backend, \texttt{compliance/adversarial/}).
-New in v1.20: token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation, bounded replay resistance); Deployment Considerations section (\S\ref{sec:deployment}); Redis pipelining (\texttt{RedisPipelinedQuerier}, 2~RTTs/request, $\sim$1.7$\times$ vs unpipelined Redis, Experiment~3 updated with 3 backends); ML-DSA-65 (Dilithium mode3) real implementation via Cloudflare CIRCL (\texttt{pkg/sign2/}).
+New in v1.20: token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation, bounded replay resistance); Deployment Considerations section (\S\ref{sec:deployment}); Redis pipelining (\texttt{RedisPipelinedQuerier}, 2~RTTs/request, $\sim$1.7$\times$ vs unpipelined Redis, Experiment~3 updated with 3 backends); ML-DSA-65 (Dilithium mode3) real implementation via Cloudflare CIRCL (\texttt{pkg/sign2/}); ML-DSA-65 signing and verification benchmarks ($\sim$100--130\,\textmu s sign, $\sim$81\,\textmu s verify, Intel Core i7-8665U).
 Superseded versions (CONF-1.0, CONF-1.1, LEDGER-1.2, REP-1.1, AGENT-SPEC-0.3, DCMA-1.0, CROSS-ORG-1.0, REP-PORTABILITY-1.0) archived in \texttt{archive/specs/}.}
 \end{table}
 
 \subsection{Reference Implementation --- 23 Go Packages + Demos}
+\label{sec:implementation}
 
 The Go reference implementation in \texttt{impl/go/} covers all L1--L4 conformance levels.
 All 23 packages pass \texttt{go test ./...}.
@@ -1063,7 +1306,7 @@ The \texttt{examples/payment-agent/} directory (Sprint E) provides an executable
 
 \paragraph{Post-Quantum Extension (ACP-SIGN-2.0).}
 The \texttt{pkg/sign2} package implements ACP-SIGN-2.0 HYBRID mode,
-combining Ed25519 with ML-DSA-65 (Dilithium mode3) via the Cloudflare CIRCL library
+combining Ed25519 with ML-DSA-65 (Dilithium mode3)~\cite{nist2024fips204} via the Cloudflare CIRCL library~\cite{cloudflare-circl}
 (\texttt{github.com/cloudflare/circl/sign/dilithium/mode3}).
 \texttt{SignHybridFull} produces a real Ed25519 + ML-DSA-65 signature pair;
 \texttt{VerifyHybrid} applies conditional verification:
@@ -1071,8 +1314,16 @@ if the ML-DSA-65 component is present, both signatures \emph{must} verify (logic
 if absent, Ed25519 verification alone is accepted (backward-compatible transition period).
 This design provides a forward-compatible migration path to post-quantum cryptography
 while preserving compatibility with classical-only deployments.
-Performance characteristics of ML-DSA-65 are not evaluated in this work;
-inclusion demonstrates integration feasibility and implementation readiness.
+Benchmarks were executed using \texttt{go test -bench=. -benchmem -benchtime=3s} on a laptop-class CPU
+(Intel Core i7-8665U @ 1.90\,GHz, Go~1.22, Windows/amd64, \texttt{GOMAXPROCS=8}).
+Signing latency is approximately 25\,\textmu s for Ed25519 and 100--130\,\textmu s for ML-DSA-65;
+verification is 56\,\textmu s and 81\,\textmu s respectively
+(4 allocs/op for signing, 1 alloc/op for verification).
+The full hybrid path (ACP-SIGN-2.0, Ed25519 + ML-DSA-65) is dominated by the ML-DSA-65 component.
+ML-DSA-65 signatures are 3,293\,bytes (51$\times$ Ed25519's 64\,bytes).
+While post-quantum signing is approximately 4--5$\times$ more expensive than classical signing,
+both operations remain well below typical network round-trip and state-backend latency (1--10\,ms),
+and do not constitute a bottleneck in the admission control pipeline.
 
 \subsection{Conformance Test Vectors --- 73 Signed Vectors}
 
@@ -1154,7 +1405,7 @@ and (iv)~robustness of per-agent admission control under adversarial attack patt
 
 \subsection{Experimental Setup}
 
-All experiments use the Go reference implementation (v1.20) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22, \texttt{GOMAXPROCS=8}).
+All experiments use the Go reference implementation (v1.20) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22~\cite{go-language}, \texttt{GOMAXPROCS=8}).
 The evaluation uses three components:
 the stateless evaluation function (\texttt{pkg/risk.Evaluate}),
 an in-memory state backend (\texttt{InMemoryQuerier}),
@@ -1168,8 +1419,10 @@ The full evaluation path (all three F\_anom rules active) completes in 921\,ns.
 The cooldown short-circuit path (88\,ns) bypasses the risk function entirely.
 
 \noindent\textbf{Answer to Q1:}
-The admission check adds between 88\,ns and 921\,ns of latency per request.
+The admission check adds between 88\,ns and 921\,ns of decision latency per request.
 Given that the actions ACP governs (API calls, financial transactions, file mutations) operate in the millisecond-to-second range, the overhead is at least three orders of magnitude below the cost of the governed action.
+Note that this measures decision-logic latency only; aggregate throughput is governed
+by state backend access patterns and is reported separately in the following subsection.
 
 \subsection{Throughput and State Backend Contention}
 
@@ -1377,7 +1630,7 @@ This is a design boundary, not a correctness failure.
 500 agents execute 20 requests each (10{,}000 total, fully concurrent) against
 three backend implementations:
 (1)~\texttt{InMemoryQuerier} (Go mutex over in-process slices);
-(2)~\texttt{RedisQuerier} (Redis~7 sorted sets via \texttt{go-redis/v9},
+(2)~\texttt{RedisQuerier} (Redis~7~\cite{redis} sorted sets via \texttt{go-redis/v9},
 Docker loopback, one Redis command per ledger operation,
 $\sim$7--8~RTTs per request);
 (3)~\texttt{RedisPipelinedQuerier} (two Redis pipeline round-trips per request:
@@ -1403,7 +1656,8 @@ RedisPipelinedQuerier      & 2        & $\sim$8{,}000      & $\sim$1.2\,s   & \t
 $= 10{,}000$ total, Intel i7-8665U, Go~1.22, Redis~7 Docker loopback).
 InMemoryQuerier variance is high ($\pm$30\%) due to Go mutex scheduling.
 Redis backends are stable ($\pm$5--7\%).
-Relative column is normalized to unpipelined Redis (1.7$\times$) and to InMemoryQuerier (1.0$\times$).}
+Relative column: InMemoryQuerier and RedisQuerier are normalized to InMemoryQuerier (1.0$\times$ baseline);
+RedisPipelinedQuerier (1.7$\times$) is normalized to unpipelined Redis, showing the pipelining gain.}
 \label{tab:adv-exp3}
 \end{table}
 
@@ -1449,6 +1703,9 @@ cost explicit and measurable.
 \textbf{Setup.}
 ACP does not implement nonce-based replay prevention; replay resistance
 is bounded by temporal validation and state accumulation.
+Each sub-case submits cryptographically distinct requests (different signatures and
+challenge values) with the same logical token specification; detection is
+pattern-based via F\_anom, not cryptographic nonce matching.
 We evaluate four sub-cases using \texttt{compliance/adversarial/exp\_token\_replay.go}:
 (1)~\textit{Sequential replay}: a new agent (\texttt{NoHistory=true}) replays
 the same financial/sensitive token ($\langle$\texttt{financial.transfer},
@@ -1564,7 +1821,7 @@ including under concurrent execution and adversarial request patterns.
 \paragraph{Cooldown Enforcement.}
 Attack~1 (cooldown evasion via pattern alternation) directly targets the cooldown
 mechanism. Results show that cooldown activation cannot be indefinitely avoided:
-adversarial alternation delays but does not prevent enforcement. This confirms
+adversarial alternation delays but does not prevent enforcement. This demonstrates
 that cooldown is eventually enforced under repeated violations.
 
 \paragraph{Bounded Adaptation Resistance.}
@@ -1575,8 +1832,9 @@ asymptotically evade enforcement, establishing a bounded adaptation property.
 
 \paragraph{Per-Agent Isolation.}
 Attack~2 (distributed multi-agent attack) targets system-wide coordination. Results
-show that ACP enforces constraints independently per agent, maintaining isolation.
-However, coordinated behavior across agents is not detected, which constitutes an
+show that ACP applies constraints independently per agent, maintaining isolation
+under the experimental conditions.
+Coordinated behavior across agents is not detected, which constitutes an
 explicit design limitation rather than a violation.
 
 \paragraph{State Sensitivity Under Load.}
@@ -1587,7 +1845,7 @@ enforcement properties remain unaffected.
 \paragraph{Bounded Replay Resistance.}
 Attack~4 (token replay) targets the cryptographic layer, specifically the absence
 of nonce tracking in ACP's stateless admission model.
-Results confirm that identical replays are detected via F\_anom Rule~3 pattern
+Results show that identical replays are detected via F\_anom Rule~3 pattern
 accumulation, which escalates borderline-ESCALATED tokens to DENIED after $Y=3$
 occurrences in 5~minutes.
 Near-identical tokens with varied resource fields evade Rule~3, establishing an
@@ -1600,8 +1858,8 @@ validity and anomaly accumulation, not nonce-based prevention.}
 
 \medskip
 \noindent\textbf{Summary.}
-The evaluated attacks confirm that ACP enforces its core security properties under
-adversarial conditions. No violations are observed; instead, limitations arise from
+The evaluated attacks provide empirical evidence that ACP resists the tested
+adversarial scenarios. No violations are observed; instead, limitations arise from
 explicit design trade-offs, particularly in cross-agent correlation.
 These results reinforce the central design insight:
 \textbf{ACP is compute-cheap but state-sensitive}.
@@ -1625,6 +1883,117 @@ preventing cooldown activation (Experiment~4, Case~4).
 Nonce tracking requires cryptographic session state that is outside the scope of
 ACP's stateless per-request admission model.
 This is an explicit design boundary, empirically characterized in Experiment~4.
+ACP provides graduated replay resistance across conformance levels:
+L1 enforces temporal validity (\texttt{TimestampDrift}); L2 adds anomaly accumulation
+(F\_anom); L3 adds complete ledger auditing (ACP-LEDGER-1.3).
+Strict cryptographic nonce-based prevention is identified as a future specification
+extension, motivated by the ACP-LEDGER-1.0 hash-chained log work item.
+
+\textbf{State-Mixing and Context Fragmentation.}
+\label{sec:state-mixing}
+ACP-RISK-2.0 aggregates anomaly signals at the agent level:
+F\_anom Rules~1 and~2 are computed via \texttt{CountRequests(agentID)}
+and \texttt{CountDenials(agentID)}, both indexed exclusively by \texttt{agentID}.
+This introduces \emph{cross-context interference}: semantically distinct interaction
+patterns share a common anomaly accumulation register.
+
+\emph{Attack construction.}
+Consider agent $A_1$ sending three requests under context
+$\langle \textsf{read},\, \textsf{public} \rangle$ (\texttt{BaseRisk}~= 0)
+followed by one request under $\langle \textsf{write},\, \textsf{sensitive} \rangle$
+(\texttt{BaseRisk}~= 50), with \texttt{FLOOD\_THRESHOLD}~= 3.
+Table~\ref{tab:state-mixing-trace} shows the evaluation under the current model,
+where \texttt{pattern\_count} is indexed by \texttt{agentID} only.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}cllccc@{}}
+\toprule
+\textbf{Step} & \textbf{Context} & \textbf{\texttt{pattern\_count[A1]}} & \textbf{BaseRisk} & $F_{\textsf{anom}}$ & \textbf{Decision} \\
+\midrule
+1 & (read, public)   & 1 & 0  & 0  & \textsc{approved} \\
+2 & (read, public)   & 2 & 0  & 0  & \textsc{approved} \\
+3 & (read, public)   & 3 (= threshold) & 0 & 0 & \textsc{approved} \\
+4 & (write, sensitive) & 3 (inherited) & 50 & +25 & \textsc{denied} \\
+\bottomrule
+\end{tabular}
+\caption{State-mixing attack trace (baseline model).
+At Step~4, \texttt{pattern\_count[A1]}~= 3 is inherited from the (read,~public) context.
+The anomaly penalty of +25 fires incorrectly: the (write,~sensitive) request
+is a new context with zero prior occurrences, yet it is evaluated as if
+at the flood threshold.
+Total RS = 50 + 25 = 75 $\to$ \textsc{denied}.}
+\label{tab:state-mixing-trace}
+\end{table}
+
+Under a context-isolated model, \texttt{pattern\_count[A1][\textit{write/sensitive}]}~= 0
+at Step~4: $F_{\textsf{anom}}$~= 0, RS = 50, and the request is evaluated solely
+on its own context history.
+The cross-context penalty is eliminated.
+
+\emph{Asymmetric keying.}
+Notably, F\_anom Rule~3 (repeated-pattern detection) already applies a
+per-context key: $\texttt{PatternKey} = \texttt{SHA-256}(\textit{agentID} \parallel \textit{capability} \parallel \textit{resource})$.
+Rules~1 and~2, however, retain agent-level granularity.
+This asymmetry means that pattern frequency is isolated per context
+while aggregate frequency and denial rate are not.
+This is not a limitation of pattern detection (Rule~3, which is correctly partitioned),
+but a consequence of inconsistent state partitioning across anomaly signals,
+leading to violations of context-consistent temporal enforcement.
+
+\emph{Formal property.}
+A corrected model enforces \emph{ContextIsolation}:
+
+\begin{quote}
+\textit{For all agents $a$ and distinct contexts $\langle c_1, r_1 \rangle \neq \langle c_2, r_2 \rangle$,
+the anomaly state accumulated under $\langle c_1, r_1 \rangle$ does not
+contribute to the risk score computed for $\langle c_2, r_2 \rangle$.}
+\end{quote}
+
+The dual violation property \emph{StateMixingViolation} asserts that a trace exists
+in which the decision for context $\langle c_2, r_2 \rangle$ is influenced by
+anomaly accumulation from $\langle c_1, r_1 \rangle$.
+In the current model (Rules~1 and~2 keyed by \texttt{agentID} only),
+StateMixingViolation holds: the trace in Table~\ref{tab:state-mixing-trace}
+is a concrete counterexample.
+In the extended model (all rules keyed by context), ContextIsolation
+is expected to hold by construction: each counter is indexed by
+$\texttt{SHA-256}(\textit{agentID} \parallel \textit{capability} \parallel \textit{resource})$,
+eliminating any shared mutable state between contexts.
+The D4 liveness property (EventuallyRejected) is structurally preserved:
+an agent flooding a single context still accumulates anomaly signals within
+that context until enforcement triggers.
+Formal TLC verification of the extended model is identified as future work.
+This connects to Schneider's security automaton
+model~\cite{schneider2000enforceable}: a correct reference monitor must
+enforce temporal properties over equivalence classes of interactions;
+conflating distinct contexts violates that requirement.
+
+\emph{Impact.}
+The attack does not bypass enforcement entirely, but degrades anomaly accumulation,
+delaying or preventing escalation under mixed-context interaction patterns.
+An agent flooding a single context is still eventually enforced within that context;
+the vulnerability is that cross-context noise corrupts the signal for unrelated contexts,
+producing false positives (unwarranted penalties) or false negatives
+(missed escalation when benign context activity dilutes aggregate counters).
+
+\emph{Cooldown leakage.}
+Cooldown enforcement is also keyed at the agent level (\texttt{CooldownActive(agentID)}),
+allowing cross-context propagation of throttling effects.
+An agent whose cap-A activity triggers cooldown is blocked across all capabilities,
+including cap-B operations that have no prior violations.
+This constitutes a second cross-context interference vector, in the over-enforcement direction.
+
+\emph{Mitigation path.}
+The structural fix is a \emph{refinement of the state model}:
+extend the per-context key used by Rule~3 to Rules~1 and~2,
+so all anomaly counters are indexed by
+$\texttt{SHA-256}(\textit{agentID} \parallel \textit{capability} \parallel \textit{resource})$.
+Cooldown granularity should similarly be evaluated per context for independent capabilities.
+This aligns the anomaly accumulation granularity with the semantic unit of the request,
+at the cost of requiring finer-grained ledger storage.
+This is identified as a targeted extension to ACP-RISK-2.0 for future specification versions.
 
 \subsection{Summary}
 
@@ -1658,14 +2027,15 @@ Payment-agent demo (\texttt{examples/payment-agent/}) & v1.16 Complete \\
 ACP-SIGN-2.0 spec (Ed25519 + ML-DSA-65 hybrid) & v1.16 Complete \\
 ACR-1.0 sequence compliance runner + 5 stateful vectors & v1.17 Complete \\
 TLA+ formal model (TLC-runnable, 3 invariants) & v1.17 Complete \\
-ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}) & v1.17 Complete \\
+ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}) & v1.17 (superseded by v1.20) \\
 ML-DSA-65 (Dilithium mode3) real implementation via CIRCL (\texttt{pkg/sign2/}) & v1.20 Complete \\
 Performance benchmarks (latency, throughput, state contention) & v1.18 Complete \\
 Adversarial evaluation (cooldown evasion, distributed multi-agent, state backend stress) & v1.19 Complete \\
 Token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation) & v1.20 Complete \\
 Deployment Considerations section (state backend selection, cross-agent boundary, policy tuning) & v1.20 Complete \\
 Redis pipelining (\texttt{RedisPipelinedQuerier}, 2 RTTs, $\sim$1.7$\times$ vs unpipelined) & v1.20 Complete \\
-Post-quantum Go implementation (Dilithium, circl) & v1.20 \\
+Post-quantum Go implementation (Dilithium, circl) & v1.20 Complete \\
+ACP-LEDGER-1.0 (tamper-evident hash-chained audit log for state backend integrity) & Future work \\
 L5 Decentralized (ACP-D) & Specification in design (v2.0) \\
 IETF RFC submission & After L5 stabilization \\
 \bottomrule
@@ -1795,11 +2165,12 @@ and validated empirically by the compliance runner.
 \label{fig:acp-verifiability}
 \end{figure}
 
-\noindent What is formally verified in TLA+ holds at runtime.
-Each TLA+ invariant is instantiated as a concrete test vector
-and validated empirically by the compliance runner.
+\noindent What is model-checked in TLA+ over a bounded state space is instantiated
+as concrete test vectors and validated empirically by the compliance runner.
 This is the connection across the three layers of the v1.20 verifiability stack:
 formal $\to$ data $\to$ runtime.
+The TLA+ model verifies selected safety and liveness properties; the compliance
+runner validates the reference implementation against those properties.
 
 % ============================================================
 \section{How to Implement ACP}
@@ -2015,10 +2386,15 @@ the integrity of the control system itself.
 Under this model, ACP enforces the following properties:
 
 \paragraph{Determinism.}
-For a given request and system state, the evaluation function produces a unique and
-reproducible decision outcome.
-This prevents adversarial exploitation of non-determinism.
-The \texttt{RiskDeterminism} invariant in the TLA+ model formally specifies this property.
+ACP determinism is defined with respect to the evaluation context: given identical
+canonical request inputs, system state (ledger, pattern counters, cooldown state),
+policy definitions, and evaluation order, the protocol produces a consistent and
+reproducible admission decision.
+This form of determinism explicitly includes state as part of the input to the decision
+function; it does not imply independence from time or state evolution.
+This scoping prevents adversarial exploitation of non-determinism across evaluators.
+The \texttt{RiskDeterminism} and \texttt{AnomalyDeterminism} invariants in the TLA+
+model formally specify this property across all reachable states.
 
 \paragraph{State Consistency.}
 All state transitions follow the execution contract, ensuring that historical behavior
@@ -2046,13 +2422,18 @@ Policy enforcement is applied independently per agent.
 Actions by one agent do not affect the enforcement state of another.
 This property bounds the impact of a compromised or malicious agent to its own
 request history.
+Note that isolation holds \emph{across agents} but not across capability contexts
+within the same agent: anomaly signals from F\_anom Rules~1 and~2 aggregate
+at the agent level, enabling cross-context interference for agents holding
+multiple capability tokens under the same keypair
+(see \S\ref{sec:limitations}, ``State-Mixing and Context Fragmentation'').
 
 \subsection{Informal Security Argument}
 
 Because ACP separates stateless evaluation from state management and enforces a strict
 execution contract, every request results in a deterministic state transition that cannot
 be bypassed.
-The append-only nature of the state backend ensures that historical information accumulates
+When the state backend enforces append-only semantics, historical information accumulates
 monotonically: cooldown activation follows deterministic threshold conditions applied to
 accumulated state; repeated probing eventually triggers enforced denial periods.
 
@@ -2066,141 +2447,30 @@ The security guarantees of ACP rely on the integrity of the execution environmen
 
 \begin{itemize}[noitemsep]
   \item Compromise of the state backend (deletion or modification of history) breaks core guarantees.
+  \item \textbf{Distributed deployments:} ACP's determinism guarantee holds per evaluator instance.
+        In deployments with replicated or eventually-consistent state backends (e.g., Redis Cluster,
+        Postgres streaming replicas), two evaluators may observe divergent ledger states and reach
+        different admission decisions for the same agent at the same point in time.
+        ACP does not specify a distributed consensus protocol; deployments requiring strict
+        cross-instance consistency must enforce strong consistency at the storage layer.
   \item Incorrect implementation of the execution contract may lead to inconsistent behavior.
   \item The model does not address side-channel attacks or network-level adversaries.
   \item Post-quantum signature migration (ACP-SIGN-2.0 HYBRID, Ed25519 + ML-DSA-65)
     is implemented via the Cloudflare CIRCL library (\texttt{pkg/sign2/}).
-    Performance characteristics of ML-DSA-65 are not evaluated in this work.
+    ML-DSA-65 signing latency is approximately 100--130\,\textmu s (vs.\ 25\,\textmu s for Ed25519),
+    remaining well below state-backend latency; see \S\ref{sec:implementation}.
 \end{itemize}
 
-ACP is therefore best understood as a control-layer mechanism that assumes a trusted
-execution and storage environment, while providing strong guarantees on decision consistency
-and temporal behavior under adversarial inputs.
-
-% ============================================================
-\section{Related Work}
-\label{sec:related-work}
-% ============================================================
-
-\subsection{Access Control and Policy Enforcement}
-
-Traditional access control models such as Role-Based Access Control (RBAC)~\cite{sandhu1996rbac}
-and Attribute-Based Access Control (ABAC)~\cite{hu2015abac} provide structured mechanisms for
-regulating access decisions based on predefined roles or attributes.
-Policy languages such as XACML~\cite{oasis2013xacml} and modern policy engines such as
-Open Policy Agent~\cite{opa} and Cedar~\cite{cedar} extend these paradigms with expressive
-evaluation engines.
-
-These systems are fundamentally designed around \emph{stateless decision evaluation}:
-they evaluate a request against policy at a single point in time.
-They do not define how system state evolves as a result of decisions over time,
-and they do not formalize how historical behavior (repeated denials, temporal patterns)
-influences subsequent decisions in a deterministic and auditable manner.
-
-ACP differs by explicitly separating:
-(i)~stateless decision evaluation,
-(ii)~externalized state management, and
-(iii)~an execution contract governing state evolution across requests.
-This enables reasoning not only about individual decisions, but about the temporal behavior
-of the admission system.
-
-\subsection{Runtime Policy Systems and Agent Frameworks}
-
-Recent protocols for autonomous agents and multi-agent coordination define structured interactions
-between components and services.
-The Model Context Protocol (MCP)~\cite{mcp} provides structured tool access between LLM applications and services.
-Agent-to-Agent (A2A)~\cite{a2a} defines communication and task delegation between agents.
-
-While these protocols address interoperability and orchestration, they do not define:
-\begin{itemize}[noitemsep]
-  \item a deterministic risk evaluation model that accumulates state across requests,
-  \item explicit state evolution semantics with a testable execution contract, or
-  \item externally verifiable execution traces that can be reproduced by third parties.
-\end{itemize}
-
-Recent work has begun to address security governance for LLM-based agentic systems.
-Syros et al.~\cite{syros2025saga} propose SAGA, a security architecture that provides
-user-controlled access policies and cryptographic mediation for agent-to-agent tool use
-and inter-agent communication.
-ACP complements this line of work by focusing on deterministic, auditable admission
-control at the individual request level: rather than governing inter-agent communication
-channels, ACP enforces stateful risk evaluation and cooldown constraints on each action
-request, with an externally verifiable execution contract and formal invariants.
-Tsai and Bagdasarian~\cite{tsai2025contextual} argue at HotOS~2025 that security policies
-must be purpose-specific rather than uniformly applied, emphasising that one-size-fits-all
-approaches are inadequate for diverse agent deployments---a perspective consistent with
-ACP's per-agent isolation and stateful enforcement boundaries.
-
-ACP complements these approaches by providing a governance layer that is independent of
-orchestration protocols, focusing specifically on verifiable decision enforcement and auditability.
-
-\subsection{Auditability and Tamper-Evident Logs}
-
-Secure audit logging~\cite{schneier1999secure} and event sourcing~\cite{fowler2005event} ensure
-that past events can be reconstructed and verified after the fact.
-These approaches operate \emph{post hoc}: they provide evidence of what occurred without
-constraining system behavior in real time.
-
-ACP integrates auditability directly into the admission process.
-Every decision---APPROVED, ESCALATED, or DENIED---is recorded in an append-only, cryptographically
-chained ledger (ACP-LEDGER-1.3) before the governed action executes.
-This enables both real-time enforcement and post-hoc verification from the same artifact.
-The \texttt{LedgerAppendOnlyTemporal} invariant in the TLA+ model formally specifies
-that ledger entries are never modified or removed.
-
-\subsection{Formal Verification of Protocols}
-
-Model checking~\cite{lamport2002specifying} and symbolic reasoning are used to establish
-correctness properties in distributed systems and protocols, typically focusing on safety
-and liveness of state transitions.
-
-ACP incorporates formal methods in a targeted manner:
-the TLA+ model (\texttt{tla/ACP.tla}) mechanically checks three critical invariants
-(fail-closed admission, append-only ledger, risk determinism) using TLC.
-Rather than attempting full-system verification, ACP adopts a pragmatic approach in which
-formally verified invariants are instantiated as concrete sequence test vectors
-and validated at runtime by the ACR-1.0 compliance runner.
-This creates a three-layer verifiability chain: formal $\to$ data $\to$ runtime.
-
-\subsection{Summary}
-
-Table~\ref{tab:comparison} summarizes the properties of ACP relative to existing approaches.
-
-\begin{table}[h!]
-\centering
-\small
-\begin{tabular}{@{}lcccccc@{}}
-\toprule
-\textbf{Property} & \textbf{RBAC} & \textbf{ABAC} & \textbf{OPA} & \textbf{Cedar} & \textbf{MCP/A2A} & \textbf{ACP} \\
-\midrule
-Stateful decisions       & \no & \no & \no & \no & \no & \yes \\
-Deterministic evaluation & \yes & \yes & \yes & \yes & \no & \yes \\
-Auditability             & partial & partial & partial & partial & \no & \yes \\
-Runtime enforcement      & \yes & \yes & \yes & \yes & partial & \yes \\
-Temporal behavior        & \no & \no & \no & \no & \no & \yes \\
-External verifiability   & \no & \no & \no & \no & \no & \yes \\
-Execution contract       & \no & \no & \no & \no & \no & \yes \\
-Agent-native             & \no & \no & \no & \no & partial & \yes \\
-\bottomrule
-\end{tabular}
-\caption{Comparison of ACP with existing access control and agent governance approaches.
-\yes~=~fully supported; \no~=~not supported; partial~=~partially addressed.}
-\label{tab:comparison}
-\end{table}
-
-Existing systems address individual aspects of the problem---policy evaluation,
-agent orchestration, audit logging, or formal verification.
-ACP's contribution lies in combining these elements into a unified model centered on
-an explicit execution contract.
-This enables a property not directly provided by prior systems:
-the ability to deterministically reproduce and externally verify the behavior of
-an admission decision system over time.
-
-Unlike existing systems, ACP explicitly models temporal behavior---history accumulation,
-anomaly detection, and cooldown enforcement---within the admission decision itself,
-and provides verifiable execution semantics through signed test vectors and a runtime compliance runner.
-This combination of temporal state, runtime enforcement, and external verifiability
-is not jointly addressed by any prior system in Table~\ref{tab:comparison}.
+ACP is therefore best understood as a control-layer mechanism whose guarantees are
+conditioned on the integrity of the state backend and the execution environment.
+When these components operate correctly, ACP provides strong guarantees on decision
+consistency and temporal behavior under adversarial inputs.
+When the state backend is compromised (e.g., history deleted by a privileged operator),
+the governance guarantees collapse; this is a declared residual risk, not a
+design oversight.
+Deployments in high-assurance environments should pair ACP with tamper-evident
+storage---a cryptographically chained log structure that makes deletion and
+modification detectable (motivating a future ACP-LEDGER-1.0 specification).
 
 % ============================================================
 \section{Conclusion}
@@ -2211,9 +2481,9 @@ The question is not whether they will operate---it is whether they will do so wi
 ACP proposes that they operate with formal governance, with verifiable mechanisms,
 and with traceability that can withstand an external audit.
 
-ACP is not the first attempt to control autonomous agents.
-It is the first attempt to do so through a formal technical specification with precise state models,
-demonstrable security properties, and verifiable conformance requirements.
+ACP is not the only attempt to control autonomous agents.
+It advances this goal through a formal technical specification with precise state models,
+empirically validated security properties, and verifiable conformance requirements.
 The difference between a best-practices policy and a formal protocol is exactly that:
 behaviors are defined, failures have specific error codes, and conformance can be verified.
 
@@ -2229,14 +2499,14 @@ the layer that existing identity and policy frameworks leave unaddressed.
 The v1.20 specification is complete.
 A full Go reference implementation (23 packages, L1--L4), 73 signed + 65 unsigned RISK-2.0 conformance test vectors,
 5 stateful sequence test vectors (ACR-1.0 compliance runner),
-a TLC-runnable TLA+ formal model (3 invariants, 0 violations),
+a TLC-runnable TLA+ formal model (base: 3~invariants; extended v1.20: 9~invariants + 4~temporal properties, 5,684,342~states generated, 3,147,864~distinct, graph depth~15, 0~violations within the bounded state space),
 a real ML-DSA-65 (Dilithium mode3) hybrid implementation via Cloudflare CIRCL (\texttt{pkg/sign2/}, \texttt{SignHybridFull} + \texttt{VerifyHybrid}),
 an executable multi-organization interoperability demo (\texttt{examples/multi-org-demo/}),
 a payment-agent killer demo (\texttt{examples/payment-agent/}),
 an extended OpenAPI 3.1.0 specification (18 endpoints),
 and adversarial evaluation across four attack scenarios including token replay (Experiment~4)
 are publicly available at \url{https://github.com/chelof100/acp-framework-en}.\\
-\textbf{Preprint:} \url{https://arxiv.org/abs/2603.18829} \quad \textbf{Zenodo:} \href{https://doi.org/10.5281/zenodo.19219776}{10.5281/zenodo.19219776}\\
+\textbf{Preprint:} \url{https://arxiv.org/abs/2603.18829} \quad \textbf{Zenodo:} \href{https://doi.org/10.5281/zenodo.19284473}{10.5281/zenodo.19284473}\\
 The specification and implementation are open for technical review, pilot implementation, and formal standardization.
 
 TraslaIA invites organizations interested in adopting ACP, contributing to its evolution,
@@ -2292,7 +2562,13 @@ Fail Closed & Design principle: on any internal failure, the action is denied. N
 The \texttt{tla/ACP.tla} module is a complete TLC-runnable TLA+ model of the ACP-RISK-2.0
 admission control engine.
 It checks three invariants over a bounded state space
-(2 agents $\times$ 4 capabilities $\times$ 3 resources, ledger depth $\leq 5$):
+(2 agents $\times$ 4 capabilities $\times$ 3 resources, ledger depth $\leq 5$).
+Liveness properties in the extended model depend on two explicit assumptions:
+\emph{monotonic time progression} (time does not freeze indefinitely) and
+\emph{weak fairness in request evaluation} (an enabled request is eventually processed).
+These assumptions are declared in the \texttt{Spec} formula via \texttt{WF\_vars(Tick)} and
+\texttt{WF\_vars(EvaluateRequest)} respectively; they are standard for temporal verification
+and are stated here to make the verification scope transparent.
 
 \begin{verbatim}
 ---- MODULE ACP ----
@@ -2381,13 +2657,191 @@ existing entries are preserved and the ledger never shrinks.
 (capability, resource) pairs always produce identical risk scores,
 enabling third-party recalculation from a signed policy snapshot.
 
-\noindent\textbf{Scope of the formal model.}
-The TLA+ model intentionally focuses on the deterministic core of the protocol---admission
-evaluation, ledger append-only property, and risk score determinism---and does not cover all
-operational aspects of ACP. Behavioral properties such as cooldown state transitions,
-multi-step delegation sequences, and anomaly counter evolution are verified empirically through
-the ACR-1.0 sequence compliance runner and its five stateful test vectors.
-Extension of the formal model to cover these behaviors is left for future work.
+\noindent\textbf{Extended model (v1.20): cooldown, delegation integrity, and F\textsubscript{anom} flood detection.}
+The \texttt{tla/ACP\_Extended.tla} module extends \texttt{ACP.tla} with per-agent cooldown
+temporal state, denial accumulation, a static delegation chain, and---added in Sprint~J2---%
+per-agent request pattern accumulation ($F_{\text{anom}}$ flood detection).
+It introduces six additional invariants and three temporal properties beyond \texttt{ACP.tla}:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{CooldownEnforced} (safety): active cooldown forces \texttt{DENIED} for any
+        request by the affected agent, regardless of risk score.
+  \item \textbf{CooldownImpliesThreshold} (safety): cooldown only exists after the denial
+        threshold (\texttt{COOLDOWN\_TRIGGER}) has been reached---cooldown is never spurious.
+  \item \textbf{DelegationIntegrity} (safety): no consecutive self-delegation in the chain
+        (\texttt{chain[i] $\neq$ chain[i+1]}, ACP-DCMA-1.1~\S3).
+  \item \textbf{AnomalyDeterminism} (safety, Sprint~J2): same
+        (\texttt{capability}, \texttt{resource}, \texttt{pattern\_at\_eval}) triple always produces
+        the same risk score. Extends \textit{RiskDeterminism} to include per-agent state:
+        $\text{RS} = f(\text{static inputs} + \text{request history count})$.
+        RS is a deterministic policy function, not a statistical model.
+  \item \textbf{FloodEnforced} (safety, Sprint~J2): when the per-agent request count meets
+        or exceeds \texttt{FLOOD\_THRESHOLD} at evaluation time, the decision is
+        \texttt{DENIED}---the $F_{\text{anom}}$ flood override is never bypassed.
+  \item \textbf{CooldownExpires} (liveness): active cooldown eventually expires, conditioned on
+        the expiry time being within the model's time horizon (\texttt{cooldown\_until $\leq$ MAX\_TIME}).
+        Requires weak fairness on time advance (\texttt{WF\_vars(Tick)}) in \texttt{Spec}.
+  \item \textbf{EventuallyRejected} (liveness, Sprint~J2): an abusive agent not already in
+        cooldown will eventually receive a \texttt{DENIED} decision via the flood override.
+        Requires per-agent weak fairness on \texttt{EvaluateRequest} and
+        \texttt{LEDGER\_BOUND} $>$ \texttt{FLOOD\_THRESHOLD}.
+  \item \textbf{NoInfiniteExecutionUnderAbuse} (liveness, Sprint~J2, strong form):
+        no execution trace exists in which an agent exhibiting sustained abusive behavior
+        (request count $\geq$ \texttt{FLOOD\_THRESHOLD}) continues to be admitted indefinitely.
+        Formally: $\Box(\mathit{Abusive}(a) \Rightarrow \neg\Diamond(\Box\mathit{Accepted}(a)))$.
+        Holds in the bounded model via \textit{EventuallyRejected}; holds in the unbounded
+        specification by structural induction on \texttt{FloodActive} monotonicity
+        (\texttt{pattern\_count} is non-decreasing; once $\geq$ \texttt{FLOOD\_THRESHOLD},
+        all subsequent decisions are \texttt{DENIED}).
+\end{itemize}
+
+\noindent\textbf{Extended TLC result (Sprint~J2 configuration).}
+Running \texttt{java -jar tla2tools.jar -deadlock -config ACP\_Extended.cfg ACP\_Extended.tla}
+with $|\mathit{Agents}|=1$, $|\mathit{Capabilities}|=3$, $|\mathit{Resources}|=2$,
+\texttt{LEDGER\_BOUND}$=7$, \texttt{FLOOD\_THRESHOLD}$=4$, \texttt{FANOM\_BONUS}$=25$,
+\texttt{COOLDOWN\_TRIGGER}$=3$, \texttt{COOLDOWN\_WINDOW}$=3$, \texttt{MAX\_TIME}$=7$:
+
+\smallskip
+\noindent\textit{Model checking completed. No error has been found.}\\
+5,684,342 states generated, 3,147,864 distinct states found, 0 states left on queue.\\
+The depth of the complete state graph search is 15.\\
+Finished in 47min 30s (TLC2~v2.16, Java~1.8, single worker, 7241MB heap).
+
+\smallskip
+The model captures agent behavior under repeated request patterns, incorporating
+stateful anomaly detection and cooldown enforcement.
+All nine invariants and all four temporal properties hold with zero violations across
+the complete bounded state space, under the stated assumptions of monotonic time
+progression, weak fairness in request evaluation, and consistent atomic state updates.
+The graph depth of~15 confirms that the model exercises multiple execution paths and
+state transitions prior to enforcement---abusive behavior can persist across multiple
+steps before triggering rejection, confirming that enforcement is not immediate and
+that liveness properties are not satisfied trivially.
+
+\smallskip
+\noindent\textbf{D4 liveness result.}
+In particular, the model verifies a liveness property ensuring bounded execution under
+sustained abuse.
+No execution trace was found in which an agent exceeding the flood threshold could
+continue to be admitted indefinitely.
+This result provides evidence that, under the stated assumptions and within the bounded
+model, the protocol enforces eventual containment of abusive behavior rather than
+allowing unbounded execution under repeated high-risk patterns.
+
+\smallskip
+Single-agent configuration is used for $F_{\text{anom}}$ liveness verification;
+per-agent enforcement is independent by design (\texttt{pattern\_count[a]} and
+\texttt{last\_decision[a]} are per-agent maps), so the result generalizes structurally to $N$ agents.
+
+\smallskip
+\noindent\textbf{Two-agent safety check (J2c).}
+The model was further evaluated under a two-agent configuration
+(\texttt{Agents=\{``A1'',``A2''\}}, \texttt{FLOOD\_THRESHOLD=3},
+\texttt{LEDGER\_BOUND=5}, \texttt{MAX\_TIME=5}) to assess potential
+interference effects between agents.
+Due to the exponential growth of the state space under multi-agent interaction,
+reduced bounds were used for this configuration.
+All nine safety invariants hold across all 1,650,024 distinct states
+(3,011,690 states generated, graph depth~11, 1\,h\,08\,min) with zero violations,
+confirming per-agent enforcement isolation:
+\texttt{pattern\_count[A1]}, cooldown state, and admission decisions for \texttt{A1}
+do not affect \texttt{A2}'s evaluation state, and vice versa.
+
+Temporal properties were not enforced in this configuration, as liveness guarantees
+depend on continued request generation and sufficient time progression.
+Under reduced bounds, executions may terminate without additional requests, leading
+to spurious liveness violations that do not reflect protocol behavior under sustained
+interaction.
+The observed behavior highlights an important modeling consideration:
+temporal guarantees in ACP assume ongoing interaction with the system.
+In bounded executions where request generation ceases, the model may reach terminal
+states in which no further enforcement transitions occur; these traces do not represent
+sustained adversarial behavior and are therefore outside the intended scope of the
+liveness guarantees.
+Accordingly, liveness properties are evaluated under the single-agent configuration
+(\texttt{FLOOD\_THRESHOLD=4}, \texttt{MAX\_TIME=7}), where bounds are calibrated to
+allow sufficient interaction depth.
+
+ACP thus provides two distinct guarantees: \emph{safety in all executions}
+(invariants hold regardless of scheduling or agent count) and \emph{liveness under
+sustained interaction} (eventual enforcement holds when agents continue to generate
+requests within the time horizon).
+
+\noindent\textbf{Design notes on the extended model.}
+The base risk score \texttt{ComputeRisk(cap,\,res)} is preserved as a pure function;
+the extended function \texttt{ComputeRiskWithAnom(cap,\,res,\,pat\_count)} adds
+\texttt{FANOM\_BONUS} when \texttt{pat\_count} $\geq$ \texttt{FLOOD\_THRESHOLD},
+modeling ACP-RISK-2.0 $F_{\text{anom}}$ Rule~3 (rapid-fire anomaly accumulation).
+\texttt{FloodActive(a)} additionally overrides the decision to \texttt{DENIED} regardless
+of the resulting risk score, ensuring the flood enforcement cannot be bypassed by
+capability/resource combinations with inherently low base scores.
+Denial counts increment only for RS-based \texttt{DENIED} decisions---not for cooldown-forced
+or flood-forced denials---consistent with ACP-RISK-2.0~\S4 (\texttt{AddDenial} fires on
+real denials only).
+The delegation chain is a static 2-hop sequence; dynamic chain mutation is outside the
+scope of the bounded model (planned for v1.21).
+The \textit{CooldownExpires} and \textit{EventuallyRejected} liveness properties are
+conditioned on the relevant state being reachable within the time horizon; the
+unconditional forms hold in the unbounded specification.
+
+\noindent\textbf{Framing.}
+Sprint~J2 extends formal coverage from cooldown enforcement to flood-based
+$F_{\text{anom}}$ enforcement: the model now verifies not only that individual denials
+are correct (\textit{Safety}, \textit{CooldownEnforced}) but also that sustained abusive
+behavior is blocked within the bounded model under the stated assumptions
+(\textit{NoInfiniteExecutionUnderAbuse}).
+The \textit{AnomalyDeterminism} invariant formalizes the key correctness property of
+ACP's stateful risk engine: the admission decision is fully reproducible given the same
+capability, resource, and per-agent request history, enabling independent audit without
+proprietary infrastructure.
+The phrase ``formally verified'' is deliberately avoided; the correct claim is:
+\emph{model checking of selected safety and liveness properties under a bounded state model,
+under the stated assumptions of monotonic time progression, weak fairness in request
+processing, and consistent atomic state updates.}
+
+\noindent\textbf{Model simplifications.}
+The TLA+ model uses \texttt{ComputeRiskWithAnom(cap,\,res,\,pat\_count)} in place of the
+full ACP-RISK-2.0 formula, which additionally includes $F_{\text{ctx}}$ (context factors)
+and $F_{\text{hist}}$ (history factors).
+$F_{\text{anom}}$ is modeled as a frequency-based accumulation plus a direct override
+(\texttt{FloodActive}); semantic payload analysis is out of scope.
+This abstraction is intentional: it captures a fundamental class of abuse patterns
+(sustained high-frequency interaction from the same agent) while enabling tractable
+formal verification.
+The key contribution is not the detection signal itself, but the verifiable enforcement
+guarantee---the formal proof that, given a deterministic accumulation function with
+defined thresholds, the protocol enforces correct admission decisions under stateful
+conditions, produces auditable execution traces, and allows independent reproduction
+by third parties.
+This distinguishes ACP from conventional rate limiters, which lack formal specification,
+execution contracts, and external verifiability.
+\texttt{pattern\_count} is monotone within a bounded trace (no per-window decay),
+approximating the time-windowed behavior of ACP-RISK-2.0 $F_{\text{anom}}$ Rule~3.
+The model verifies properties for representative parameter values
+(\texttt{FLOOD\_THRESHOLD}$=4$, \texttt{FANOM\_BONUS}$=25$);
+complete generalization to arbitrary parameter values is not claimed.
+Full determinism under $F_{\text{hist}}$ is validated empirically via the ACR-1.0
+compliance runner and the adversarial evaluation in Section~\ref{sec:adversarial}.
+These simplifications are deliberate: the model is intended to verify structural
+safety and liveness properties, not to replicate the full engine.
+
+\noindent\textbf{Limitations of the formal evaluation.}
+The formal verification is performed over a bounded model with a finite time horizon
+and a limited number of agents.
+As such:
+\begin{itemize}[noitemsep]
+  \item The results do not constitute a proof of correctness for unbounded executions.
+  \item Liveness guarantees rely on assumptions of monotonic time progression and weak
+        fairness in request evaluation.
+  \item A supplementary two-agent safety check (J2c) confirms per-agent enforcement
+        isolation across 1,650,024 distinct states with 0 violations; temporal liveness
+        properties are verified only in the single-agent configuration with calibrated
+        bounds. Full multi-agent contention under adversarial coordination is not modeled.
+  \item The state space is constrained by bounded parameters (time horizon, ledger size),
+        which may not capture all possible long-horizon behaviors.
+\end{itemize}
+These constraints define the scope of the guarantees provided by the model and should
+be considered when interpreting the results.
 
 % ============================================================
 \section*{Acknowledgements}
