@@ -1,0 +1,318 @@
+% ============================================================
+% ACP arXiv — Bibliography
+% ============================================================
+
+@techreport{rfc8785,
+  author       = {Rundgren, Anders and Jordan, Bret and Erdtman, Samuel},
+  title        = {{JSON} Canonicalization Scheme ({JCS})},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {8785},
+  year         = {2020},
+  month        = jun,
+  url          = {https://www.rfc-editor.org/rfc/rfc8785},
+  note         = {IETF RFC 8785}
+}
+
+@techreport{rfc8032,
+  author       = {Josefsson, Simon and Liusvaara, Ilari},
+  title        = {Edwards-Curve Digital Signature Algorithm ({EdDSA})},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {8032},
+  year         = {2017},
+  month        = jan,
+  url          = {https://www.rfc-editor.org/rfc/rfc8032},
+  note         = {IETF RFC 8032}
+}
+
+@techreport{rfc6749,
+  author       = {Hardt, Dick},
+  title        = {The {OAuth} 2.0 Authorization Framework},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {6749},
+  year         = {2012},
+  month        = oct,
+  url          = {https://www.rfc-editor.org/rfc/rfc6749},
+  note         = {IETF RFC 6749}
+}
+
+@techreport{rfc7519,
+  author       = {Jones, Michael B. and Bradley, John and Sakimura, Nat},
+  title        = {{JSON} Web Token ({JWT})},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {7519},
+  year         = {2015},
+  month        = may,
+  url          = {https://www.rfc-editor.org/rfc/rfc7519},
+  note         = {IETF RFC 7519}
+}
+
+@techreport{rfc8037,
+  author       = {Liusvaara, Ilari},
+  title        = {{CFRG} Elliptic Curves for {JOSE}},
+  institution  = {Internet Engineering Task Force},
+  type         = {RFC},
+  number       = {8037},
+  year         = {2017},
+  month        = jan,
+  url          = {https://www.rfc-editor.org/rfc/rfc8037},
+  note         = {IETF RFC 8037. RFC 8037 Test Key A used for conformance test vectors.}
+}
+
+@misc{opa,
+  author       = {{Open Policy Agent Contributors}},
+  title        = {Open Policy Agent},
+  year         = {2024},
+  url          = {https://www.openpolicyagent.org},
+  note         = {Policy evaluation engine. ACP-RISK-1.0 Step~3 is compatible with OPA as backend.}
+}
+
+@misc{spiffe,
+  author       = {{SPIFFE Project}},
+  title        = {{SPIFFE} / {SPIRE}: Secure Production Identity Framework For Everyone},
+  year         = {2024},
+  url          = {https://spiffe.io},
+  note         = {Cryptographic workload identity. ACP builds on SPIFFE identity to add capability scoping.}
+}
+
+@article{saltzer1975,
+  author       = {Saltzer, Jerome H. and Schroeder, Michael D.},
+  title        = {The Protection of Information in Computer Systems},
+  journal      = {Proceedings of the IEEE},
+  volume       = {63},
+  number       = {9},
+  pages        = {1278--1308},
+  year         = {1975},
+  doi          = {10.1109/PROC.1975.9939},
+  note         = {Foundational reference for the principle of least privilege and fail-closed design.}
+}
+
+@misc{acp-spec,
+  author       = {Fernandez, Marcelo},
+  title        = {Agent Control Protocol --- Specification and Reference Implementation},
+  year         = {2026},
+  url          = {https://github.com/chelof100/acp-framework-en},
+  note         = {Complete specification (38 documents), Go reference implementation (23 packages), 138 conformance test vectors (73 signed + 65 RISK-2.0 unsigned), ACR-1.0 sequence compliance runner.}
+}
+
+@misc{acp-website,
+  author       = {Fernandez, Marcelo},
+  title        = {Agent Control Protocol --- Official Website},
+  year         = {2026},
+  url          = {https://agentcontrolprotocol.xyz}
+}
+
+@article{sandhu1996rbac,
+  author       = {Sandhu, Ravi S. and Coyne, Edward J. and Feinstein, Hal L. and Youman, Charles E.},
+  title        = {Role-Based Access Control Models},
+  journal      = {IEEE Computer},
+  volume       = {29},
+  number       = {2},
+  pages        = {38--47},
+  year         = {1996},
+  doi          = {10.1109/2.485845}
+}
+
+@techreport{hu2015abac,
+  author       = {Hu, Vincent C. and Ferraiolo, David and Kuhn, Rick and Schnitzer, Adam and Sandlin, Kenneth and Miller, Robert and Scarfone, Karen},
+  title        = {Guide to Attribute Based Access Control ({ABAC}) Definition and Considerations},
+  institution  = {National Institute of Standards and Technology},
+  number       = {SP 800-162},
+  year         = {2014},
+  url          = {https://doi.org/10.6028/NIST.SP.800-162}
+}
+
+@techreport{oasis2013xacml,
+  author       = {{OASIS}},
+  title        = {e{X}tensible Access Control Markup Language ({XACML}) Version 3.0},
+  institution  = {OASIS Standard},
+  year         = {2013},
+  url          = {https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html}
+}
+
+@misc{cedar,
+  author       = {{Amazon Web Services}},
+  title        = {Cedar Policy Language},
+  year         = {2023},
+  url          = {https://www.cedarpolicy.com},
+  note         = {Open-source policy language for authorization.}
+}
+
+@misc{mcp,
+  author       = {{Anthropic}},
+  title        = {Model Context Protocol},
+  year         = {2024},
+  url          = {https://modelcontextprotocol.io},
+  note         = {Protocol for structured tool access between LLM applications and services.}
+}
+
+@misc{a2a,
+  author       = {{Google}},
+  title        = {Agent-to-Agent ({A2A}) Protocol},
+  year         = {2025},
+  url          = {https://google.github.io/A2A},
+  note         = {Protocol for agent communication and task delegation.}
+}
+
+@article{schneier1999secure,
+  author       = {Schneier, Bruce and Kelsey, John},
+  title        = {Secure Audit Logs to Support Computer Forensics},
+  journal      = {ACM Transactions on Information and System Security},
+  volume       = {2},
+  number       = {2},
+  pages        = {159--176},
+  year         = {1999},
+  doi          = {10.1145/317087.317089}
+}
+
+@misc{fowler2005event,
+  author       = {Fowler, Martin},
+  title        = {Event Sourcing},
+  year         = {2005},
+  url          = {https://martinfowler.com/eaaDev/EventSourcing.html}
+}
+
+@book{lamport2002specifying,
+  author       = {Lamport, Leslie},
+  title        = {Specifying Systems: The {TLA+} Language and Tools for Hardware and Software Engineers},
+  publisher    = {Addison-Wesley},
+  year         = {2002},
+  isbn         = {032114306X}
+}
+
+@article{schneider2000enforceable,
+  author    = {Schneider, Fred B.},
+  title     = {Enforceable Security Policies},
+  journal   = {ACM Transactions on Information and System Security},
+  volume    = {3},
+  number    = {1},
+  pages     = {30--50},
+  year      = {2000},
+  doi       = {10.1145/353323.353382},
+  note      = {Formal characterization of which security properties can be enforced through execution monitoring (safety automata / security automata). Establishes the theoretical boundary between verifiable and enforceable properties.}
+}
+
+@article{falcone2012runtime,
+  author    = {Falcone, Yli{\`e}s and Fernandez, Jean-Claude and Mounier, Laurent},
+  title     = {What Can You Verify and Enforce at Runtime?},
+  journal   = {International Journal on Software Tools for Technology Transfer},
+  volume    = {14},
+  number    = {3},
+  pages     = {349--382},
+  year      = {2012},
+  doi       = {10.1007/s10009-011-0196-8},
+  note      = {Systematic framework for runtime enforcement monitors. Distinguishes enforceable properties (safety, co-safety, guarantee, persistence) and characterizes the enforcement mechanisms required for each class.}
+}
+
+@techreport{anderson1972planning,
+  author      = {Anderson, James P.},
+  title       = {Computer Security Technology Planning Study},
+  institution = {Deputy for Command and Management Systems, HQ Electronic Systems Division (AFSC)},
+  type        = {Technical Report},
+  number      = {ESD-TR-73-51},
+  year        = {1972},
+  note        = {Foundational reference monitor concept: a component that mediates all access to protected resources, is always invoked, tamper-resistant, and verifiable. ACP extends this concept to decentralized multi-organizational agent environments.}
+}
+
+@techreport{nist2024fips204,
+  author       = {{National Institute of Standards and Technology}},
+  title        = {Module-Lattice-Based Digital Signature Standard ({ML-DSA})},
+  institution  = {National Institute of Standards and Technology},
+  type         = {Federal Information Processing Standard},
+  number       = {204},
+  year         = {2024},
+  month        = aug,
+  url          = {https://doi.org/10.6028/NIST.FIPS.204},
+  note         = {NIST FIPS 204. Standardizes ML-DSA-44, ML-DSA-65, and ML-DSA-87 (formerly Dilithium2, Dilithium3, Dilithium5).}
+}
+
+@misc{cloudflare-circl,
+  author       = {{Cloudflare, Inc.}},
+  title        = {{CIRCL}: Cloudflare Interoperable Reusable Cryptographic Library},
+  year         = {2024},
+  url          = {https://github.com/cloudflare/circl},
+  note         = {Go library providing post-quantum cryptographic primitives including ML-DSA (Dilithium) and ECDH. Used in ACP \texttt{pkg/sign2} for ML-DSA-65 hybrid signatures.}
+}
+
+@misc{redis,
+  author       = {{Redis Ltd.}},
+  title        = {Redis: The Real-Time Data Platform},
+  year         = {2024},
+  url          = {https://redis.io},
+  note         = {In-memory data structure store. Used as ACP persistent state backend in \texttt{RedisQuerier} and \texttt{RedisPipelinedQuerier}.}
+}
+
+@misc{go-language,
+  author       = {{Go Authors}},
+  title        = {The {Go} Programming Language},
+  year         = {2024},
+  url          = {https://golang.org},
+  note         = {ACP reference implementation written in Go 1.22. All packages verified with \texttt{go test ./...}.}
+}
+
+@misc{kubernetes-admission,
+  author       = {{Kubernetes Contributors}},
+  title        = {Admission Controllers Reference},
+  year         = {2024},
+  url          = {https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/},
+  note         = {Kubernetes admission control architecture that inspired the ACP admission flow model.}
+}
+
+@inproceedings{capability-security,
+  author       = {Miller, Mark S. and Shapiro, Jonathan S.},
+  title        = {Paradigm Regained: Abstraction Mechanisms for Access Control},
+  booktitle    = {Advances in Computing Science --- {ASIAN} 2003},
+  series       = {Lecture Notes in Computer Science},
+  volume       = {2896},
+  pages        = {224--242},
+  publisher    = {Springer},
+  year         = {2003},
+  note         = {Foundational reference for capability-based security, which underlies ACP Capability Tokens.}
+}
+
+@misc{syros2025saga,
+  author        = {Syros, Georgios and Suri, Anshuman and Ginesin, Jacob and Nita-Rotaru, Cristina and Oprea, Alina},
+  title         = {{SAGA}: A Security Architecture for Governing {AI} Agentic Systems},
+  year          = {2025},
+  eprint        = {2504.21034},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CR},
+  note          = {arXiv:2504.21034 [cs.CR]}
+}
+
+@inproceedings{tsai2025contextual,
+  author    = {Tsai, Lillian and Bagdasarian, Eugene},
+  title     = {Contextual Agent Security: {A} Policy for Every Purpose},
+  booktitle = {Proceedings of the 20th Workshop on Hot Topics in Operating Systems ({HotOS})},
+  year      = {2025},
+  url       = {https://sigops.org/s/conferences/hotos/2025/papers/hotos25-100.pdf},
+  note      = {HotOS 2025}
+}
+@inproceedings{birgisson2014macaroons,
+  author    = {Birgisson, Arnar and Politz, Joe Gibbs and Erlingsson, \'{U}lfar and Taly, Ankur and Vrable, Michael and Lentczner, Mark},
+  title     = {Macaroons: Cookies with Contextual Caveats for Decentralized Authorization in the Cloud},
+  booktitle = {Proceedings of the Network and Distributed System Security Symposium (NDSS)},
+  year      = {2014},
+  publisher = {Internet Society}
+}
+
+@misc{zcapld,
+  author       = {Sporny, Manu and Longley, Dave and Zaremba, Chris},
+  title        = {{ZCAP-LD}: Authorization Capabilities for Linked Data},
+  year         = {2022},
+  howpublished = {W3C Community Group Report},
+  url          = {https://w3c-ccg.github.io/zcap-spec/}
+}
+
+@techreport{rfc9449,
+  author      = {Fett, Daniel and Campbell, Brian and Bradley, John and Lodderstedt, Torsten and Jones, Michael B. and Waite, David},
+  title       = {{OAuth} 2.0 Demonstrating Proof of Possession ({DPoP})},
+  institution = {Internet Engineering Task Force},
+  type        = {Request for Comments},
+  number      = {9449},
+  year        = {2023},
+  url         = {https://www.rfc-editor.org/rfc/rfc9449}
+}
