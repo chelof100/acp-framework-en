@@ -35,7 +35,7 @@ Output: `main.pdf` (~18-20 pages)
    - **Authors**: Marcelo Fernandez (TraslaIA)
    - **Primary category**: cs.CR (Cryptography and Security)
    - **Secondary category**: cs.AI (Artificial Intelligence)
-   - **Comments**: 20 pages. DOI: 10.5281/zenodo.XXXXXXX (update after Zenodo v1.22 upload). Specification repository: https://github.com/chelof100/acp-framework-en
+   - **Comments**: 20 pages. DOI: 10.5281/zenodo.19357022. Specification repository: https://github.com/chelof100/acp-framework-en
    - **MSC class**: (leave blank for cs papers)
    - **Report number**: TraslaIA-ACP-2026-001 (optional)
 
