@@ -395,7 +395,7 @@ Recent work has begun to address security governance for LLM-based agentic syste
 Syros et al.~\cite{syros2025saga} propose SAGA, a security architecture that provides
 user-controlled access policies and cryptographic mediation for agent-to-agent tool use
 and inter-agent communication.
-Unlike SAGA, which focuses on high-level governance architecture and inter-agent
+While SAGA focuses on high-level governance architecture and inter-agent
 communication policies, ACP enforces admission constraints at the execution layer:
 every action request passes through a stateful risk evaluation with deterministic
 outcomes, a verifiable execution contract (ACR-1.0), and a tamper-evident ledger---
@@ -3376,7 +3376,7 @@ $F_{\text{anom}}$ is modeled as a frequency-based accumulation plus a direct ove
 (\texttt{FloodActive}); semantic payload analysis is out of scope.
 This abstraction is intentional: it captures a fundamental class of abuse patterns
 (sustained high-frequency interaction from the same agent) while enabling tractable
-formal verification.
+model checking.
 The key contribution is not the detection signal itself, but the verifiable enforcement
 guarantee---the formal proof that, given a deterministic accumulation function with
 defined thresholds, the protocol enforces correct admission decisions under stateful
@@ -3395,7 +3395,7 @@ These simplifications are deliberate: the model is intended to verify structural
 safety and liveness properties, not to replicate the full engine.
 
 \noindent\textbf{Limitations of the formal evaluation.}
-The formal verification is performed over a bounded model with a finite time horizon
+The model checking is performed over a bounded model with a finite time horizon
 and a limited number of agents.
 As such:
 \begin{itemize}[noitemsep]
