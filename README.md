@@ -15,9 +15,9 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19339805](https://doi.org/10.5281/zenodo.19339805) — Zenodo (v1.21)
+DOI: [10.5281/zenodo.19357022](https://doi.org/10.5281/zenodo.19357022) — Zenodo (v1.22)
 
-arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v6 (v1.21)
+arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v7 (v1.22)
 
 ---
 
@@ -87,7 +87,7 @@ agent intent
     ↓
 [2] Capability check     →  pkg/ct + pkg/dcma         (ACP-CT-1.0, ACP-DCMA-1.0)
     ↓
-[3] Policy check         →  pkg/risk + pkg/psn        (ACP-RISK-2.0, ACP-PSN-1.0)
+[3] Policy check         →  pkg/risk + pkg/psn        (ACP-RISK-3.0, ACP-PSN-1.0)
     ↓
 [4] ADMIT / DENY / ESCALATE
     ↓  (if ADMIT)
@@ -110,7 +110,7 @@ Every interaction passes through six structured stages:
 
 1. **Identity verification** — confirm who the agent is (`ACP-AGENT-1.0`, `ACP-HP-1.0`)
 2. **Capability validation** — confirm what the agent is authorized to do (`ACP-CT-1.0`, `ACP-DCMA-1.0`)
-3. **Policy authorization** — confirm the action is permitted under current policy (`ACP-RISK-2.0`, `ACP-PSN-1.0`)
+3. **Policy authorization** — confirm the action is permitted under current policy (`ACP-RISK-3.0`, `ACP-PSN-1.0`)
 4. **Deterministic execution** — execute exactly what was authorized, nothing more (`ACP-EXEC-1.0`)
 5. **Verifiable recording** — produce cryptographic proof of what occurred (`ACP-LEDGER-1.3`, `ACP-PROVENANCE-1.0`)
 6. **Trust update** — update reputation and attestation state based on the interaction (`ACP-REP-1.2`, `ACP-LIA-1.0`)
@@ -401,7 +401,7 @@ Current active version per specification. This table is the authoritative refere
 | ACP-HP | 1.0 | L1 |
 | ACP-DCMA | 1.0 | L1 |
 | ACP-MESSAGES | 1.0 | L1 |
-| ACP-RISK | **2.0** | L2 |
+| ACP-RISK | **3.0** | L2 |
 | ACP-REV | 1.0 | L2 |
 | ACP-ITA | 1.1 | L2/L4 |
 | ACP-API | 1.0 | L3 |
@@ -468,6 +468,7 @@ Full normative requirements per level:
 
 ### L2 · Trust Layer
 - [ACP-RISK-2.0](spec/security/ACP-RISK-2.0.md) — deterministic risk engine, Risk Score RS (0–100), `F_anom` + cooldown
+- [ACP-RISK-3.0](spec/security/ACP-RISK-2.0.md) — context-scoped anomaly enforcement; Rule 1 keyed by `PatternKey(agentID, cap, res)`, eliminates cross-context state-mixing
 - [ACP-REV-1.0](spec/security/ACP-REV-1.0.md) — revocation protocol, endpoint and CRL
 - [ACP-ITA-1.0](spec/security/ACP-ITA-1.0.md) — Institutional Trust Anchor, centralized model
 - [ACP-ITA-1.1](spec/security/ACP-ITA-1.1.md) — Trust Anchor Governance, distributed BFT model
@@ -542,7 +543,7 @@ acp-framework/
 cd impl/go
 docker compose up
 
-# Option 6: ACR-1.0 sequence compliance runner — validate ACP-RISK-2.0 stateful behavior
+# Option 6: ACR-1.0 sequence compliance runner — validate ACP-RISK-3.0 stateful behavior
 cd compliance/runner
 go run . --mode library --dir ../test-vectors/sequence --strict
 # PASS 5/5 — SEQ-BENIGN-001 SEQ-BOUNDARY-001 SEQ-PRIVJUMP-001 SEQ-FANOM-RULE3-001 SEQ-COOLDOWN-001
@@ -602,6 +603,7 @@ curl http://localhost:8080/acp/v1/health
 | `pkg/psn` policy snapshot | ✅ Complete — atomic transitions, single ACTIVE snapshot |
 | Python SDK — `ACPAdmissionGuard` + `@acp_tool` (LangChain) | ✅ Complete — `impl/python/` |
 | ACP-RISK-2.0 — `F_anom` + Cooldown + `pkg/risk` | ✅ Complete — deterministic, sub-µs, 65 vectors |
+| ACP-RISK-3.0 — context-scoped Rule 1 (`pkg/risk/engine.go`) | ✅ Complete — v1.22 · `CountPattern(ctxKey, 60s)` replaces `CountRequests(agentID)` · cross-context state-mixing eliminated |
 | Payment-agent demo (`examples/payment-agent/`) | ✅ Complete — v1.16 |
 | ACP-SIGN-2.0 — Post-quantum hybrid (Ed25519 + ML-DSA-65) | ✅ Complete — spec v1.16; real ML-DSA-65 via `cloudflare/circl` `pkg/sign2/` v1.20 |
 | ACR-1.0 sequence compliance runner (`compliance/runner/`) | ✅ Complete — v1.17 · library + HTTP mode · 5/5 PASS |
@@ -615,6 +617,7 @@ curl http://localhost:8080/acp/v1/health
 | Stateless vs. stateful experiment (Exp 5, `pkg/risk/stateless_comparison_test.go`) | ✅ Complete — v1.21 · 500 req · stateless 500/500 vs ACP 2/500 (0.4%) · detection latency 11 actions |
 | State-mixing vulnerability test (Exp 6, `pkg/risk/statemixing_test.go`) | ✅ Complete — v1.21 · cross-context Rule 1 contamination · RS +20 · ESCALATED→DENIED after 11 data.read |
 | State-mixing attack analysis (paper §State-Mixing Vulnerability) | ✅ Complete — v1.21 · formal characterization · Exp 6 numbers · ACP-RISK-3.0 mitigation path |
+| State-mixing fix (Exp 7, `pkg/risk/statemixing_fix_test.go`) | ✅ Complete — v1.22 · RISK-3.0 · 3 scenarios · clean RS=50 ESCALATED · contaminated RS=50 ESCALATED · same-context burst RS=85 DENIED |
 | ITA trust model (paper §Trust Model and Failure Modes) | ✅ Complete — v1.20 · bootstrap / compromise window / revocation authority — semi-formal claims |
 | TypeScript SDK (`impl/typescript/`) | ✅ Complete — v1.4.0 · zero-deps · 68 tests |
 | Rust SDK (`impl/rust/`) | ✅ Complete — v1.4.0 · ed25519-dalek v2 · 43 tests |
