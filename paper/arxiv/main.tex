@@ -337,6 +337,11 @@ This paper makes the following contributions:
     A three-layer pipeline---73~signed conformance test vectors, TLC-checked
     TLA+ model, and ACR-1.0 runtime sequence runner---enables independent
     validation of both specification and reference implementation.
+  \item \textbf{Context-scoped anomaly model eliminating cross-context interference.}
+    We introduce ACP-RISK-3.0, which redefines Rule~1 to use context-scoped
+    pattern counts, eliminating cross-context state-mixing while preserving
+    enforcement against repeated behavior within a given interaction context
+    (Experiment~7, Section~\ref{sec:exp7}).
 \end{itemize}
 
 % ============================================================
@@ -1328,6 +1333,7 @@ New in v1.18: performance benchmarks (latency, throughput, state contention), fo
 New in v1.19: adversarial evaluation (cooldown evasion, distributed multi-agent attack, state backend stress with Redis backend, \texttt{compliance/adversarial/}).
 New in v1.20: token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation, bounded replay resistance); Deployment Considerations section (\S\ref{sec:deployment}); Redis pipelining (\texttt{RedisPipelinedQuerier}, 2~RTTs/request, $\sim$1.7$\times$ vs unpipelined Redis, Experiment~3 updated with 3 backends); ML-DSA-65 (Dilithium mode3) real implementation via Cloudflare CIRCL (\texttt{pkg/sign2/}); ML-DSA-65 signing and verification benchmarks ($\sim$100--130\,\textmu s sign, $\sim$81\,\textmu s verify, Intel Core i7-8665U).
 New in v1.21: stateless vs.\ stateful admission experiment (Experiment~5, \texttt{NullQuerier} + \texttt{StatelessEngine}, 0.4\% vs.~100\% autonomous execution rate, detection latency 11~actions); state-mixing vulnerability characterization (Experiment~6, cross-context Rule~1 contamination, \texttt{ESCALATED}$\to$\texttt{DENIED} after 11 \texttt{data.read} requests); NDSS-oriented reframing: falsifiable thesis, abstract rewritten, contributions as measurable claims; Distributed Attack Surface limitation + mitigation (\S\ref{sec:limitations}); related work: Macaroons, ZCAP-LD, DPoP; TLA+ coverage table + RiskDeterminism non-triviality (Appendix); structural fixes: latency range 767--921\,ns, Experiment~4 case ordering, Table~2 external verifiability note; State-Mixing Vulnerability (ACP v1.21) renamed with Experiment~6 cross-reference.
+New in v1.22: ACP-RISK-3.0 implemented --- Rule~1 redefined to use context-scoped \texttt{CountPattern(ctxKey, 60s)} instead of \texttt{CountRequests(agentID, 60s)}, eliminating cross-context state-mixing (Experiment~6 fix); Experiment~7 (\texttt{TestStateMixingFixed}, 3 scenarios: clean RS=50 ESCALATED, state-mixing attack RS=50 ESCALATED, same-context burst RS=85 DENIED); ACP-RISK-3.0 $F_{\text{anom}}$ formal definition (\S\ref{sec:limitations}); Bounded Distributed Evasion limitation; new Contributions bullet; \texttt{engine\_v2\_test.go} updated for context-scoped Rule~1.
 Superseded versions (CONF-1.0, CONF-1.1, LEDGER-1.2, REP-1.1, AGENT-SPEC-0.3, DCMA-1.0, CROSS-ORG-1.0, REP-PORTABILITY-1.0) archived in \texttt{archive/specs/}.}
 \end{table}
 
@@ -2144,8 +2150,58 @@ This constitutes an explicit design boundary rather than an implementation
 defect; context isolation of Rule~1 requires per-capability request tracking
 (e.g., keying \texttt{CountRequests} by \texttt{(agentID, capability)}) at the
 cost of increased storage and reduced cross-context abuse detection.
-The trade-off and a candidate fix are discussed in~\S\ref{sec:limitations}
+The trade-off and the implemented fix are discussed in~\S\ref{sec:limitations}
 (\emph{State-Mixing Vulnerability}).
+
+\subsubsection*{Experiment 7: Context-Scoped Anomaly Fix (ACP-RISK-3.0)}
+\label{sec:exp7}
+
+\textbf{Hypothesis.}
+Scoping rate-based anomaly signals to interaction context eliminates
+cross-context interference while preserving detection of repeated behavior
+within each context.
+
+\textbf{Setup.}
+We reproduce the state-mixing scenario from Experiment~6 under identical
+conditions, comparing ACP-RISK-2.0 and ACP-RISK-3.0\@. The workload consists
+of two phases: (1)~a priming phase with 11 repeated low-risk requests in one
+context, and (2)~a high-value request in a distinct context.
+
+\textbf{Results.}
+
+\begin{table}[h]
+\centering
+\caption{Experiment~7 --- Context-Scoped Anomaly Enforcement}
+\label{tab:exp7}
+\begin{tabular}{lccc}
+\toprule
+Scenario & Model & RS & Decision \\
+\midrule
+Clean context & RISK-2.0 & 50 & \texttt{ESCALATED} \\
+Clean context & RISK-3.0 & 50 & \texttt{ESCALATED} \\
+\midrule
+State-mixing attack & RISK-2.0 & 70 & \texttt{DENIED} \\
+State-mixing attack & RISK-3.0 & 50 & \texttt{ESCALATED} \\
+\midrule
+Repeated single-context (11 req) & RISK-2.0 & 85 & \texttt{DENIED} \\
+Repeated single-context (11 req) & RISK-3.0 & 85 & \texttt{DENIED} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Analysis.}
+ACP-RISK-2.0 exhibits cross-context interference: activity in one context
+elevates risk in unrelated contexts via agent-level aggregation, producing
+a false denial in a legitimate context (RS~$50 \to 70$). ACP-RISK-3.0
+eliminates this effect by scoping rate signals to the interaction context.
+
+Repeated behavior within a single context continues to trigger denial after
+the same threshold (11~requests, RS~$= 85$), demonstrating that enforcement
+strength is preserved.
+
+\textbf{Conclusion.}
+Context-scoped anomaly aggregation removes unintended cross-context coupling
+without weakening enforcement against repeated or high-frequency behavior.
 
 \subsubsection*{Security Properties Under Adversarial Stress}
 
@@ -2228,7 +2284,7 @@ L1 enforces temporal validity (\texttt{TimestampDrift}); L2 adds anomaly accumul
 Strict cryptographic nonce-based prevention is identified as a future specification
 extension, motivated by the ACP-LEDGER-1.0 hash-chained log work item.
 
-\textbf{State-Mixing Vulnerability (ACP v1.21).}
+\textbf{State-Mixing Vulnerability (ACP v1.21--v1.22).}
 \label{sec:state-mixing}
 ACP-RISK-2.0 aggregates anomaly signals at the agent level:
 F\_anom Rules~1 and~2 are computed via \texttt{CountRequests(agentID)}
@@ -2338,9 +2394,40 @@ $\texttt{SHA-256}(\textit{agentID} \parallel \textit{capability} \parallel \text
 Cooldown granularity should similarly be evaluated per context for independent capabilities.
 This aligns the anomaly accumulation granularity with the semantic unit of the request,
 at the cost of requiring finer-grained ledger storage.
-This is identified as a targeted extension designated for ACP-RISK-3.0.
+This fix is implemented in ACP-RISK-3.0 and empirically validated in Experiment~7
+(Section~\ref{sec:exp7}).
 Deployments relying on heterogeneous capability usage within a single agent identity
-should be aware of this limitation.
+should upgrade to ACP-RISK-3.0.
+
+\emph{ACP-RISK-3.0 definition.}
+ACP-RISK-3.0 refines anomaly aggregation by scoping rate-based signals to
+interaction context while preserving global denial history. Rule~1 is redefined
+to use context-scoped pattern counts:
+
+\begin{equation}
+F_{\text{anom}} =
+\begin{cases}
++20 & \text{if } \mathrm{CountPattern}(k,\,60\,\text{s}) > N \\
++15 & \text{if } \mathrm{CountDenials}(a,\,24\,\text{h}) \geq X \\
++15 & \text{if } \mathrm{CountPattern}(k,\,5\,\text{min}) \geq Y
+\end{cases}
+\label{eq:fanom-30}
+\end{equation}
+
+where $a$ is the agent identifier and $k = H(a \parallel \mathit{cap} \parallel
+\mathit{res})$ is the context key derived from agent, capability, and resource.
+Rule~2 (denial history) remains agent-scoped: cross-context denial history is a
+valid enforcement signal. Rule~3 is unchanged; it was already context-scoped.
+No changes to the \texttt{LedgerQuerier} interface are required.
+
+\paragraph{Bounded Distributed Evasion.}
+ACP-RISK-3.0 does not enforce global rate limits across heterogeneous
+contexts. An adversary distributing requests across multiple contexts
+below the contextual rate threshold will trigger escalation via Rule~3
+(after three repetitions per context) but not immediate denial. This
+behavior reflects the design objective of preventing autonomous execution
+rather than enforcing universal blocking: any repeated behavior in any
+context requires human oversight before proceeding.
 
 \textbf{Distributed Attack Surface.}
 \label{sec:distributed-attack-surface}

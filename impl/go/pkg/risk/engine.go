@@ -4,6 +4,8 @@
 // v2.0 API (Evaluate/EvalRequest/EvalResult) adds F_anom (3 deterministic rules),
 // Cooldown mechanism, LedgerQuerier interface, and full factor breakdown per
 // ACP-RISK-2.0 specification.
+// v3.0 (ACP-RISK-3.0): Rule 1 redefined to use context-scoped CountPattern,
+// eliminating cross-context state-mixing vulnerability.
 package risk
 
 import (
@@ -194,7 +196,7 @@ type PolicyConfig struct {
 	AutonomyLevel          int    // 0–4
 	ApprovedMax            int    // RS ≤ ApprovedMax → APPROVED
 	EscalatedMax           int    // RS ≤ EscalatedMax → ESCALATED; else DENIED
-	AnomalyRule1ThresholdN int    // Rule 1: request count in 60s > N → +20
+	AnomalyRule1ThresholdN int    // Rule 1 (RISK-3.0): context-scoped pattern count in 60s > N → +20
 	AnomalyRule2ThresholdX int    // Rule 2: denial count in 24h ≥ X → +15
 	AnomalyRule3ThresholdY int    // Rule 3: pattern count in 5min ≥ Y → +15
 	CooldownTriggerDenials int    // Denials in 10min to trigger cooldown
@@ -367,8 +369,15 @@ func anomalyScore(req EvalRequest, querier LedgerQuerier) (int, AnomalyDetail, e
 	detail := AnomalyDetail{}
 	score := 0
 
-	// Rule 1: high request rate — count(requests[agentID], sliding 60s) > N → +20
-	count1, err := querier.CountRequests(req.AgentID, 60*time.Second, now)
+	// ACP-RISK-3.0: context key precomputed — shared by Rule 1 and Rule 3.
+	// Rule 1 is redefined to operate over context-scoped pattern counts,
+	// eliminating cross-context state-mixing (see §state-mixing).
+	// Global denial history (Rule 2) remains agent-scoped.
+	patKey := PatternKey(req.AgentID, req.Capability, req.Resource)
+
+	// Rule 1: context-scoped rate — count(pattern_key, sliding 60s) > N → +20
+	// ACP-RISK-3.0: scoped to interaction context, not agent-global.
+	count1, err := querier.CountPattern(patKey, now.Add(-60*time.Second))
 	if err != nil {
 		return 0, AnomalyDetail{}, fmt.Errorf("RISK-008: Rule1 query failed: %w", err)
 	}
@@ -378,6 +387,7 @@ func anomalyScore(req EvalRequest, querier LedgerQuerier) (int, AnomalyDetail, e
 	}
 
 	// Rule 2: recent denials — count(DENIED[agentID], last 24h) ≥ X → +15
+	// Global (agent-scoped): cross-context denial history is a valid signal.
 	count2, err := querier.CountDenials(req.AgentID, now.Add(-24*time.Hour))
 	if err != nil {
 		return 0, AnomalyDetail{}, fmt.Errorf("RISK-008: Rule2 query failed: %w", err)
@@ -388,7 +398,7 @@ func anomalyScore(req EvalRequest, querier LedgerQuerier) (int, AnomalyDetail, e
 	}
 
 	// Rule 3: repeated pattern — count(pattern_key, last 5min) ≥ Y → +15
-	patKey := PatternKey(req.AgentID, req.Capability, req.Resource)
+	// Unchanged: already context-scoped via PatternKey.
 	count3, err := querier.CountPattern(patKey, now.Add(-5*time.Minute))
 	if err != nil {
 		return 0, AnomalyDetail{}, fmt.Errorf("RISK-008: Rule3 query failed: %w", err)

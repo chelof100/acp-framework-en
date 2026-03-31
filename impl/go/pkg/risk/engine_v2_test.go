@@ -38,9 +38,10 @@ func TestPatternKey_Uniqueness(t *testing.T) {
 
 func TestRule1_Triggered(t *testing.T) {
 	q := NewInMemoryQuerier()
-	// Add N+1 = 11 requests in the last 60s.
+	// RISK-3.0: Rule 1 uses CountPattern(ctxKey, 60s). Add N+1 = 11 patterns.
+	patKey := PatternKey("agent-A", "acp:cap:data.read", "org/r")
 	for i := 0; i < 11; i++ {
-		q.AddRequest("agent-A", t0.Add(-time.Duration(i)*time.Second))
+		q.AddPattern(patKey, t0.Add(-time.Duration(i)*time.Second))
 	}
 	res, err := Evaluate(EvalRequest{
 		AgentID: "agent-A", Capability: "acp:cap:data.read",
@@ -155,15 +156,14 @@ func TestRule3_NotTriggered(t *testing.T) {
 
 func TestAllRulesTriggered_MaxAnomaly(t *testing.T) {
 	q := NewInMemoryQuerier()
+	// RISK-3.0: Rule 1 uses CountPattern(ctxKey, 60s). Add N+1 = 11 patterns within 60s.
+	// These also satisfy Rule 3 (≥ Y=3 in 5min).
+	key := PatternKey("agent-A", "acp:cap:financial.payment", "org/acc")
 	for i := 0; i < 11; i++ {
-		q.AddRequest("agent-A", t0.Add(-time.Duration(i)*time.Second))
+		q.AddPattern(key, t0.Add(-time.Duration(i)*time.Second))
 	}
 	for i := 0; i < 3; i++ {
 		q.AddDenial("agent-A", t0.Add(-time.Duration(i)*time.Hour))
-	}
-	key := PatternKey("agent-A", "acp:cap:financial.payment", "org/acc")
-	for i := 0; i < 3; i++ {
-		q.AddPattern(key, t0.Add(-time.Duration(i)*time.Minute))
 	}
 	res, err := Evaluate(EvalRequest{
 		AgentID: "agent-A", Capability: "acp:cap:financial.payment",

@@ -31,6 +31,7 @@ import (
 // vs CountPattern, and the contamination effect requires running the engine
 // across two distinct capability contexts.
 func TestStateMixing(t *testing.T) {
+	t.Skip("documents RISK-2.0 state-mixing vulnerability — superseded by TestStateMixingFixed (RISK-3.0)")
 	policy := DefaultPolicyConfig()
 	baseNow := time.Now() // fixed once — never advanced
 
