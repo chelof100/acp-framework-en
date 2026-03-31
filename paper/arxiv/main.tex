@@ -130,9 +130,14 @@ signals (anomaly accumulation, cooldown) through a \texttt{LedgerQuerier}
 abstraction separating decision logic from state management.
 We demonstrate that this structural separation has measurable security
 consequences: under a 500-request workload where every request is individually
-valid, a stateless engine with identical scoring approves all 500~requests, while
-ACP limits autonomous execution to 2~out of 500 (0.4\%), with a detection
-latency of 11~actions and an early signal at 3~actions.
+valid (RS=35), a stateless engine with identical scoring approves all 500~requests, while
+ACP limits autonomous execution to 2~out of 500 (0.4\%), escalating after
+3~actions and enforcing denial after 11---isolating the structural gap between
+stateless and stateful admission.
+We further characterize a bounded state-mixing vulnerability: agents executing
+high-frequency benign operations in one context can inadvertently elevate risk
+scores in unrelated high-value contexts due to partial state aggregation, a
+property that stateless engines neither expose nor mitigate.
 Decision evaluation runs at 767--921\,ns (p50; Table~\ref{tab:benchmarks});
 throughput reaches 920{,}000~req/s under moderate concurrency, degrading
 predictably with backend latency without protocol changes.
