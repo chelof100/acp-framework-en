@@ -1,6 +1,6 @@
 ﻿% ============================================================
 % Agent Control Protocol — arXiv Submission
-% ACP v1.21 — Admission Control for Agent Actions
+% ACP v1.22 — Admission Control for Agent Actions
 % Marcelo Fernandez, TraslaIA, March 2026
 % Categories: cs.CR (primary), cs.AI (secondary)
 % ============================================================
@@ -67,7 +67,7 @@
   citecolor=blue!70!black,
   pdftitle={Agent Control Protocol: Admission Control for Agent Actions},
   pdfauthor={Marcelo Fernandez},
-  pdfsubject={Formal protocol for governance of autonomous agents. v1.21. arXiv:2603.18829},
+  pdfsubject={Formal protocol for governance of autonomous agents. v1.22. arXiv:2603.18829},
   pdfkeywords={autonomous agents, admission control, capability tokens, cryptographic governance, agent authorization, audit ledger}
 }
 
@@ -102,7 +102,7 @@
 
 \title{%
   \textbf{Agent Control Protocol}\\[0.4em]
-  \large ACP v1.21: Admission Control for Agent Actions\\[0.3em]
+  \large ACP v1.22: Admission Control for Agent Actions\\[0.3em]
   \normalsize Technical Specification and Reference Implementation%
 }
 
@@ -134,10 +134,16 @@ valid (RS=35), a stateless engine with identical scoring approves all 500~reques
 ACP limits autonomous execution to 2~out of 500 (0.4\%), escalating after
 3~actions and enforcing denial after 11---isolating the structural gap between
 stateless and stateful admission.
-We further characterize a bounded state-mixing vulnerability: agents executing
-high-frequency benign operations in one context can inadvertently elevate risk
-scores in unrelated high-value contexts due to partial state aggregation, a
-property that stateless engines neither expose nor mitigate.
+We identify a bounded state-mixing vulnerability in ACP-RISK-2.0: agents
+executing high-frequency benign operations in one context can inadvertently
+elevate risk scores in unrelated high-value contexts due to agent-level
+rate aggregation---producing false denials that a stateless engine would
+never generate (Experiment~6).
+We introduce ACP-RISK-3.0, which eliminates this cross-context interference
+by scoping rate-based anomaly signals to the interaction context via
+\texttt{PatternKey(agentID, capability, resource)}, while preserving
+enforcement: repeated behavior within a single context continues to trigger
+denial at the same threshold (Experiment~7).
 Decision evaluation runs at 767--921\,ns (p50; Table~\ref{tab:benchmarks});
 throughput reaches 920{,}000~req/s under moderate concurrency, degrading
 predictably with backend latency without protocol changes.
@@ -1272,10 +1278,10 @@ The ledger provides the forensic record needed for post-incident analysis.
 \section{Specification and Implementation Status}
 % ============================================================
 
-ACP v1.21 is a complete Draft Standard specification with a full Go reference implementation
+ACP v1.22 is a complete Draft Standard specification with a full Go reference implementation
 and external verifiability through a TLC-checked formal model and an ACR-1.0 sequence compliance runner.
 
-\subsection{Active Specifications --- v1.21 (38 documents)}
+\subsection{Active Specifications --- v1.22 (38 documents)}
 
 \begin{table}[h!]
 \centering
@@ -1325,7 +1331,7 @@ Gov. & RFC-REGISTRY & Specification Registry \\
 Gov. & ACP-CR-1.0 & Change Request Process \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.21 active specification documents by conformance level (38 primary documents shown).
+\caption{ACP v1.22 active specification documents by conformance level (38 primary documents shown).
 The remaining 3 documents are the ACP-D decentralized suite (L5, design phase) not yet published.
 New in v1.16: ACP-RISK-2.0 (L2, deterministic engine v2 with F\_anom + Cooldown), ACP-SIGN-2.0 (L1, PQC hybrid spec).
 New in v1.17: ACR-1.0 sequence compliance runner, TLA+ formal model, ACP-SIGN-2.0 HYBRID stub (\texttt{pkg/sign2/}).
@@ -1482,7 +1488,7 @@ and (iv)~robustness of per-agent admission control under adversarial attack patt
 
 \subsection{Experimental Setup}
 
-All experiments use the Go reference implementation (v1.21) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22~\cite{go-language}, \texttt{GOMAXPROCS=8}).
+All experiments use the Go reference implementation (v1.22) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22~\cite{go-language}, \texttt{GOMAXPROCS=8}).
 The evaluation uses three components:
 the stateless evaluation function (\texttt{pkg/risk.Evaluate}),
 an in-memory state backend (\texttt{InMemoryQuerier}),
@@ -2469,7 +2475,7 @@ high-concurrency legitimate workloads. It also reduces isolation between indepen
 agents and shifts part of the enforcement logic to the policy or orchestration layer.
 
 \emph{Scope.}
-ACP v1.21 enforces guarantees at the per-agent level. Cross-agent coordination is
+ACP v1.22 enforces guarantees at the per-agent level. Cross-agent coordination is
 intentionally outside the scope of the core protocol and is expected to be implemented
 at the policy or orchestration layer when required by the deployment context.
 
@@ -2513,12 +2519,17 @@ Token replay adversarial evaluation (Experiment~4, F\_anom Rule~3 escalation) & 
 Deployment Considerations section (state backend selection, cross-agent boundary, policy tuning) & v1.20 Complete \\
 Redis pipelining (\texttt{RedisPipelinedQuerier}, 2 RTTs, $\sim$1.7$\times$ vs unpipelined) & v1.20 Complete \\
 Post-quantum Go implementation (Dilithium, circl) & v1.20 Complete \\
+\texttt{NullQuerier} + \texttt{StatelessEngine} (stateless comparison baseline) & v1.21 Complete \\
+Experiment~5: Stateless vs.\ ACP (0.4\% vs.\ 100\% autonomous execution rate) & v1.21 Complete \\
+Experiment~6: State-Mixing Vulnerability (cross-context Rule~1 contamination) & v1.21 Complete \\
+ACP-RISK-3.0: context-scoped Rule~1 (\texttt{CountPattern} replaces \texttt{CountRequests}) & v1.22 Complete \\
+Experiment~7: Context-Scoped Anomaly Fix (state-mixing eliminated, enforcement preserved) & v1.22 Complete \\
 ACP-LEDGER-1.0 (tamper-evident hash-chained audit log for state backend integrity) & Future work \\
 L5 Decentralized (ACP-D) & Specification in design (v2.0) \\
 IETF RFC submission & After L5 stabilization \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.21 development roadmap.}
+\caption{ACP v1.22 development roadmap.}
 \end{table}
 
 % ============================================================
@@ -2608,7 +2619,7 @@ request abstraction:
 \label{sec:e2e-verifiability}
 % ============================================================
 
-ACP~v1.21 enables end-to-end verifiability by aligning formal specification,
+ACP~v1.22 enables end-to-end verifiability by aligning formal specification,
 test vectors, and runtime validation through a shared request abstraction.
 Invariants proven in TLA+ are instantiated as concrete test vectors
 and validated empirically by the compliance runner.
@@ -2645,7 +2656,7 @@ and validated empirically by the compliance runner.
 
 \noindent What is model-checked in TLA+ over a bounded state space is instantiated
 as concrete test vectors and validated empirically by the compliance runner.
-This is the connection across the three layers of the v1.20 verifiability stack:
+This is the connection across the three layers of the v1.22 verifiability stack:
 formal $\to$ data $\to$ runtime.
 The TLA+ model verifies selected safety and liveness properties; the compliance
 runner validates the reference implementation against those properties.
@@ -2977,7 +2988,7 @@ What it provides is a structured, auditable, and formally specified model for
 admission control, delegation, revocation, and cross-organization interaction---
 the layer that existing identity and policy frameworks leave unaddressed.
 
-The v1.21 specification is complete.
+The v1.22 specification is complete.
 A full Go reference implementation (23 packages, L1--L4), 73 signed + 65 unsigned RISK-2.0 conformance test vectors,
 5 stateful sequence test vectors (ACR-1.0 compliance runner),
 a TLC-runnable TLA+ formal model (base: 3~invariants; extended v1.20: 9~invariants + 4~temporal properties, 5,684,342~states generated, 3,147,864~distinct, graph depth~15, 0~violations within the bounded state space),
@@ -2985,7 +2996,10 @@ a real ML-DSA-65 (Dilithium mode3) hybrid implementation via Cloudflare CIRCL (\
 an executable multi-organization interoperability demo (\texttt{examples/multi-org-demo/}),
 a payment-agent killer demo (\texttt{examples/payment-agent/}),
 an extended OpenAPI 3.1.0 specification (18 endpoints),
-and adversarial evaluation across four attack scenarios including token replay (Experiment~4)
+adversarial evaluation across four attack scenarios including token replay (Experiment~4),
+a stateless vs.\ stateful comparison experiment (Experiment~5),
+a state-mixing vulnerability characterization (Experiment~6),
+and a context-scoped anomaly fix under ACP-RISK-3.0 (Experiment~7)
 are publicly available at \url{https://github.com/chelof100/acp-framework-en}.\\
 \textbf{Preprint:} \url{https://arxiv.org/abs/2603.18829} \quad \textbf{Zenodo:} \href{https://doi.org/10.5281/zenodo.19339805}{10.5281/zenodo.19339805}\\
 The specification and implementation are open for technical review, pilot implementation, and formal standardization.
