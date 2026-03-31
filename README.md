@@ -15,9 +15,9 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19284473](https://doi.org/10.5281/zenodo.19284473) — Zenodo (v1.20)
+DOI: [10.5281/zenodo.19339805](https://doi.org/10.5281/zenodo.19339805) — Zenodo (v1.21)
 
-arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v5 (v1.19)
+arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v6 (v1.21)
 
 ---
 
@@ -611,7 +611,10 @@ curl http://localhost:8080/acp/v1/health
 | Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.20 · 4 experiments · real benchmark numbers |
 | Redis pipelining (`compliance/adversarial/redis_pipelined.go`) | ✅ Complete — v1.20 · 2 RTTs/request · ~1.7× speedup |
 | ML-DSA-65 benchmarks (`pkg/sign2/sign2_bench_test.go`) | ✅ Complete — v1.20 · Ed25519 ~25 µs sign / ~56 µs verify · ML-DSA-65 ~100–130 µs sign / ~81 µs verify |
-| State-mixing attack analysis (paper §State-Mixing and Context Fragmentation) | ✅ Complete — v1.20 · formal counterexample · ContextIsolation property · mitigation path |
+| NullQuerier + StatelessEngine (`pkg/risk/null_querier.go`, `stateless_engine.go`) | ✅ Complete — v1.21 · zero-state LedgerQuerier baseline for stateless/stateful comparison |
+| Stateless vs. stateful experiment (Exp 5, `pkg/risk/stateless_comparison_test.go`) | ✅ Complete — v1.21 · 500 req · stateless 500/500 vs ACP 2/500 (0.4%) · detection latency 11 actions |
+| State-mixing vulnerability test (Exp 6, `pkg/risk/statemixing_test.go`) | ✅ Complete — v1.21 · cross-context Rule 1 contamination · RS +20 · ESCALATED→DENIED after 11 data.read |
+| State-mixing attack analysis (paper §State-Mixing Vulnerability) | ✅ Complete — v1.21 · formal characterization · Exp 6 numbers · ACP-RISK-3.0 mitigation path |
 | ITA trust model (paper §Trust Model and Failure Modes) | ✅ Complete — v1.20 · bootstrap / compromise window / revocation authority — semi-formal claims |
 | TypeScript / Rust SDKs | 🔜 On roadmap |
 | v1.x | Core protocol and reference implementation — active |
