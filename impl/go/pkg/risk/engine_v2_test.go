@@ -61,9 +61,10 @@ func TestRule1_Triggered(t *testing.T) {
 
 func TestRule1_NotTriggered_BoundaryExact(t *testing.T) {
 	q := NewInMemoryQuerier()
-	// Exactly N = 10 requests — not triggered (> N required).
+	// RISK-3.0: Rule 1 uses CountPattern(ctxKey, 60s). Exactly N = 10 patterns — not triggered (> N required).
+	patKey := PatternKey("agent-A", "acp:cap:data.read", "org/r")
 	for i := 0; i < 10; i++ {
-		q.AddRequest("agent-A", t0.Add(-time.Duration(i)*time.Second))
+		q.AddPattern(patKey, t0.Add(-time.Duration(i)*time.Second))
 	}
 	res, err := Evaluate(EvalRequest{
 		AgentID: "agent-A", Capability: "acp:cap:data.read",
