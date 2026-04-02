@@ -17,7 +17,7 @@ Marcelo Fernandez (TraslaIA), 2026
 
 DOI: [10.5281/zenodo.19357022](https://doi.org/10.5281/zenodo.19357022) — Zenodo (v1.22)
 
-arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v7 (v1.22)
+arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v6 (v1.22)
 
 ---
 
@@ -610,14 +610,15 @@ curl http://localhost:8080/acp/v1/health
 | Sequence test vectors (`compliance/test-vectors/sequence/`) | ✅ Complete — v1.17 · 5 stateful scenarios |
 | TLA+ base model (`tla/ACP.tla`) | ✅ Complete — v1.17 · 3 invariants · 0 violations |
 | TLA+ extended model (`tla/ACP_Extended.tla`) | ✅ Complete — v1.20 · 9 invariants + 4 temporal properties · 5,684,342 states · 0 violations |
-| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.20 · 4 experiments · real benchmark numbers |
-| Redis pipelining (`compliance/adversarial/redis_pipelined.go`) | ✅ Complete — v1.20 · 2 RTTs/request · ~1.7× speedup |
+| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.23 · 8 experiments · real benchmark numbers (N=5 runs, mean±std) |
+| Redis pipelining (`compliance/adversarial/redis_pipelined.go`) | ✅ Complete — v1.20 · 2 RTTs/request · ~1.8× speedup |
 | ML-DSA-65 benchmarks (`pkg/sign2/sign2_bench_test.go`) | ✅ Complete — v1.20 · Ed25519 ~25 µs sign / ~56 µs verify · ML-DSA-65 ~100–130 µs sign / ~81 µs verify |
 | NullQuerier + StatelessEngine (`pkg/risk/null_querier.go`, `stateless_engine.go`) | ✅ Complete — v1.21 · zero-state LedgerQuerier baseline for stateless/stateful comparison |
-| Stateless vs. stateful experiment (Exp 5, `pkg/risk/stateless_comparison_test.go`) | ✅ Complete — v1.21 · 500 req · stateless 500/500 vs ACP 2/500 (0.4%) · detection latency 11 actions |
-| State-mixing vulnerability test (Exp 6, `pkg/risk/statemixing_test.go`) | ✅ Complete — v1.21 · cross-context Rule 1 contamination · RS +20 · ESCALATED→DENIED after 11 data.read |
-| State-mixing attack analysis (paper §State-Mixing Vulnerability) | ✅ Complete — v1.21 · formal characterization · Exp 6 numbers · ACP-RISK-3.0 mitigation path |
-| State-mixing fix (Exp 7, `pkg/risk/statemixing_fix_test.go`) | ✅ Complete — v1.22 · RISK-3.0 · 3 scenarios · clean RS=50 ESCALATED · contaminated RS=50 ESCALATED · same-context burst RS=85 DENIED |
+| Stateless vs. stateful experiment (Exp 6, `pkg/risk/stateless_comparison_test.go`) | ✅ Complete — v1.21 · 500 req · stateless 500/500 vs ACP 2/500 (0.4%) · detection latency 11 actions |
+| State-mixing vulnerability test (Exp 7, `pkg/risk/statemixing_test.go`) | ✅ Complete — v1.21 · cross-context Rule 1 contamination · RS +20 · ESCALATED→DENIED after 11 data.read |
+| State-mixing attack analysis (paper §State-Mixing Vulnerability) | ✅ Complete — v1.21 · formal characterization · Exp 7 numbers · ACP-RISK-3.0 mitigation path |
+| State-mixing fix (Exp 8, `pkg/risk/statemixing_fix_test.go`) | ✅ Complete — v1.22 · RISK-3.0 · 3 scenarios · clean RS=50 ESCALATED · contaminated RS=50 ESCALATED · same-context burst RS=85 DENIED |
+| Paper v1.23 — Sprint fixes | ✅ Complete — v1.23 · §RISK-3.0 in §Technical Mechanisms · contrafactual thesis · 767--921 ns unified · Exp 3b→Exp 4 renumbered · Exp 3 N=5 · all 7 cross-check fixes |
 | ITA trust model (paper §Trust Model and Failure Modes) | ✅ Complete — v1.20 · bootstrap / compromise window / revocation authority — semi-formal claims |
 | TypeScript SDK (`impl/typescript/`) | ✅ Complete — v1.4.0 · zero-deps · 68 tests |
 | Rust SDK (`impl/rust/`) | ✅ Complete — v1.4.0 · ed25519-dalek v2 · 43 tests |
