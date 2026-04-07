@@ -7,6 +7,69 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.25.0] — v1.25 — 2026-04-07
+
+### Added
+
+#### Sprint A — Phase D Drift Simulation (`compliance/adversarial/`)
+- `exp_deviation_collapse.go` — Phase D added to Experiment 9: progressive drift simulation across 5 batches × 20 cases.
+  - Sanitization rate increases 0% → 20% → 40% → 60% → 80% per batch (boundary-activating DENIED cases removed first).
+  - Window = 40 (two full batches); BAR tracked per batch; ΔBAR trend detection fires early warning at batch 3 (before threshold).
+  - Results: Batch 1 BAR=0.70 → Batch 3 BAR=0.50 (ΔBAR early-warning fires) → Batch 5 BAR=0.00 (threshold alert).
+  - Design: `sanitizeFrom := len(dataset) - nSanitized` — targets DENIED cases first, ensuring meaningful BAR degradation per batch.
+
+#### Sprint A — `computeTrend()` Ring Buffer Bug Fix (`impl/go/pkg/barmonitor/monitor.go`)
+- **Critical fix:** When ring buffer is full (`fill == WindowSize`), ΔBAR was reading oldest/newest halves in reversed order.
+  - Root cause: `ring[0..pos-1]` contains the NEWEST entries when full; reading `ring[0..half-1]` as "first half (older)" was wrong.
+  - Fix: When full, start reading from `m.pos` (oldest slot) and iterate with `(start+i) % WindowSize`. When not full, `start=0` is correct.
+  - All 18 existing `barmonitor` tests confirm no regression.
+
+#### Sprint B — TLA+ Structural Invariants (`tla/ACP_Extended.tla`, `tla/ACP_Extended.cfg`)
+- Added `FailureConditionPreservation`: structural capacity to produce DENIED must always exist regardless of history state.
+  - Formally: `∃ cap ∈ Capabilities, res ∈ Resources: Decide(ComputeRiskWithAnom(cap, res, 0)) = "DENIED"`
+- Added `NoDegenerateAdmissibility`: high-risk (admin/financial × sensitive) requests must never be APPROVED.
+  - Formally: `∀i: (capability ∈ {admin,financial} ∧ resource = sensitive) ⟹ decision ≠ APPROVED`
+- Added `BARMonitorLiveness` as documented comment (not TLC-submitted — 2^N state explosion); validated empirically via Phase D.
+- Updated INVARIANTS in `ACP_Extended.cfg`: 9 → 11 invariants.
+- TLC v1.25 run: 5,684,342 states generated, 3,147,864 distinct, 0 violations, 34min 52s. State space identical to v1.20.
+
+#### Sprint C — `POST /acp/v1/counterfactual` HTTP Endpoint (`impl/go/cmd/acp-server/`)
+- `main.go` — `handleCounterfactual()`: parses `{base, mutations}`, calls `risk.EvaluateCounterfactual`, returns `{bar, results}`.
+  - Structural and behavioral mutations supported via HTTP; temporal mutations are library-only (LedgerSetup not serializable).
+  - Unknown resource class defaults to PUBLIC (fail-safe).
+- `main_test.go` — 7 integration tests:
+  - `TestServer_Counterfactual_StructuralMutation` — BAR=1.0, DENIED
+  - `TestServer_Counterfactual_MultiMutation` — 2 mutations, all DENIED
+  - `TestServer_Counterfactual_NilMutation` — BAR=0.0, APPROVED
+  - `TestServer_Counterfactual_MissingBase` — 400
+  - `TestServer_Counterfactual_EmptyMutations` — 400
+  - `TestServer_Counterfactual_Labels` — label order preserved
+  - `TestServer_Counterfactual_UnknownResourceClass` — defaults PUBLIC → APPROVED
+
+#### Paper — v1.25
+- Phase D results table (`tab:exp9-phased`) and prose in §Experiment 9 and §Boundary Activation Monitoring.
+- TLA+ structural invariants subsection: FailureConditionPreservation + NoDegenerateAdmissibility formally stated; BARMonitorLiveness scope note.
+- `\subsection{Counterfactual Evaluation Endpoint}` in §How to Implement ACP: structural + behavioral via HTTP, temporal via library.
+- §Roadmap: 3 new rows (Phase D drift, TLA+ 11 invariants, counterfactual HTTP endpoint).
+- §Contributions: 2 new bullets → 11 total.
+- TLA+ invariant count updated 9 → 11 throughout (abstract, conclusion, formal verification section).
+- Graham framework edits (3 surgical inserts):
+  - §The Structural Gap: "Admissibility is resolved at execution time, but it is not memoryless."
+  - End of §The Structural Gap: 3-layer governance paragraph (boundary → stateful → failure condition preservation).
+  - End of §Conclusion: closing 2-sentence paragraph on what effective governance means.
+
+### Fixed
+- `computeTrend()` ring buffer temporal order (see Sprint A above) — ΔBAR direction was inverted after buffer wrapped.
+
+### Key results
+| Component | Tests | Status |
+|-----------|-------|--------|
+| `pkg/barmonitor` | 18/18 | ✅ PASS (ring buffer fix verified) |
+| `cmd/acp-server` counterfactual | 7/7 | ✅ PASS |
+| TLA+ extended model | 11 invariants | ✅ 0 violations · 5,684,342 states |
+
+---
+
 ## [1.24.0] — v1.24 — 2026-04-07
 
 ### Added

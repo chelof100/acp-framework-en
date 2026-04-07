@@ -522,7 +522,7 @@ acp-framework/
 ├── tla/
 │   ├── ACP.tla                   ← base formal model — Safety · LedgerAppendOnly · RiskDeterminism (v1.17)
 │   ├── ACP.cfg                   ← TLC configuration for ACP.tla
-│   ├── ACP_Extended.tla          ← extended model — F_anom · cooldown · liveness · 9 invariants + 4 temporal (Sprint J2)
+│   ├── ACP_Extended.tla          ← extended model — F_anom · cooldown · liveness · 11 invariants + 4 temporal (v1.25)
 │   ├── ACP_Extended.cfg          ← single-agent config — 5,684,342 states · 3,147,864 distinct · depth 15 · 0 violations
 │   └── ACP_Extended_2agents.cfg  ← two-agent config — multi-agent isolation check (Sprint J2c)
 ├── archive/
@@ -609,8 +609,8 @@ curl http://localhost:8080/acp/v1/health
 | ACR-1.0 sequence compliance runner (`compliance/runner/`) | ✅ Complete — v1.17 · library + HTTP mode · 5/5 PASS |
 | Sequence test vectors (`compliance/test-vectors/sequence/`) | ✅ Complete — v1.17 · 5 stateful scenarios |
 | TLA+ base model (`tla/ACP.tla`) | ✅ Complete — v1.17 · 3 invariants · 0 violations |
-| TLA+ extended model (`tla/ACP_Extended.tla`) | ✅ Complete — v1.20 · 9 invariants + 4 temporal properties · 5,684,342 states · 0 violations |
-| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.23 · 8 experiments · real benchmark numbers (N=5 runs, mean±std) |
+| TLA+ extended model (`tla/ACP_Extended.tla`) | ✅ Complete — v1.25 · 11 invariants + 4 temporal properties · 5,684,342 states · 0 violations |
+| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.25 · 9 experiments · real benchmark numbers (N=5 runs, mean±std) |
 | Redis pipelining (`compliance/adversarial/redis_pipelined.go`) | ✅ Complete — v1.20 · 2 RTTs/request · ~1.8× speedup |
 | ML-DSA-65 benchmarks (`pkg/sign2/sign2_bench_test.go`) | ✅ Complete — v1.20 · Ed25519 ~25 µs sign / ~56 µs verify · ML-DSA-65 ~100–130 µs sign / ~81 µs verify |
 | NullQuerier + StatelessEngine (`pkg/risk/null_querier.go`, `stateless_engine.go`) | ✅ Complete — v1.21 · zero-state LedgerQuerier baseline for stateless/stateful comparison |
@@ -619,10 +619,16 @@ curl http://localhost:8080/acp/v1/health
 | State-mixing attack analysis (paper §State-Mixing Vulnerability) | ✅ Complete — v1.21 · formal characterization · Exp 7 numbers · ACP-RISK-3.0 mitigation path |
 | State-mixing fix (Exp 8, `pkg/risk/statemixing_fix_test.go`) | ✅ Complete — v1.22 · RISK-3.0 · 3 scenarios · clean RS=50 ESCALATED · contaminated RS=50 ESCALATED · same-context burst RS=85 DENIED |
 | Paper v1.23 — Sprint fixes | ✅ Complete — v1.23 · §RISK-3.0 in §Technical Mechanisms · contrafactual thesis · 767--921 ns unified · Exp 3b→Exp 4 renumbered · Exp 3 N=5 · all 7 cross-check fixes |
-| Deviation collapse (Exp 9, `compliance/adversarial/exp_deviation_collapse.go`) | ✅ Complete — v1.23 · BAR metric · 3-phase: baseline BAR=0.70 → collapse BAR=0.00 → counterfactual BAR=1.00 · §Limits of Execution-Only Governance |
+| Deviation collapse (Exp 9, `compliance/adversarial/exp_deviation_collapse.go`) | ✅ Complete — v1.23 · 3-phase: baseline BAR=0.70 → collapse BAR=0.00 → counterfactual BAR=1.00 |
+| Phase D drift simulation (Exp 9 extension) | ✅ Complete — v1.25 · 5 batches × 20 cases · 0%→80% sanitization · ΔBAR early-warning fires at batch 3 before threshold |
 | ITA trust model (paper §Trust Model and Failure Modes) | ✅ Complete — v1.20 · bootstrap / compromise window / revocation authority — semi-formal claims |
 | TypeScript SDK (`impl/typescript/`) | ✅ Complete — v1.4.0 · zero-deps · 68 tests |
 | Rust SDK (`impl/rust/`) | ✅ Complete — v1.4.0 · ed25519-dalek v2 · 43 tests |
+| `pkg/barmonitor` — BAR-Monitor with ΔBAR trend detection (`impl/go/pkg/barmonitor/`) | ✅ Complete — v1.24 · 18 tests · AlertThreshold + AlertTrend (fires before threshold) · thread-safe ring buffer |
+| `EvaluateCounterfactual` API (`impl/go/pkg/risk/counterfactual.go`) | ✅ Complete — v1.24 · 14 tests · 3 mutation factories (structural/behavioral/temporal) · BAR(results) · fail-closed |
+| Phase D drift simulation (Exp 9) + `computeTrend()` ring buffer fix | ✅ Complete — v1.25 · ΔBAR early-warning before threshold · temporal order bug fixed |
+| TLA+ `FailureConditionPreservation` + `NoDegenerateAdmissibility` (11 invariants) | ✅ Complete — v1.25 · 0 violations · 5,684,342 states |
+| `POST /acp/v1/counterfactual` HTTP endpoint (`impl/go/cmd/acp-server/`) | ✅ Complete — v1.25 · 7 integration tests · structural + behavioral mutations via HTTP |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
 | future | ZK verification, decentralized governance |
