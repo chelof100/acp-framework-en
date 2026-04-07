@@ -274,3 +274,259 @@ func TestServer_AgentState_InvalidTransition(t *testing.T) {
 		t.Fatalf("invalid transition: got %d, want 400 or 409", status)
 	}
 }
+
+// ─── Counterfactual Endpoint ──────────────────────────────────────────────────
+
+// TestServer_Counterfactual_StructuralMutation verifies that a structural
+// mutation (financial.transfer + RESTRICTED) produces DENIED and BAR=1.00.
+func TestServer_Counterfactual_StructuralMutation(t *testing.T) {
+	base := startServer(t)
+
+	body := map[string]interface{}{
+		"base": map[string]interface{}{
+			"agent_id":       "cf-test-agent",
+			"capability":     "acp:cap:data.read",
+			"resource":       "metrics/public",
+			"resource_class": "PUBLIC",
+		},
+		"mutations": []interface{}{
+			map[string]interface{}{
+				"label":          "structural",
+				"capability":     "acp:cap:financial.transfer",
+				"resource":       "accounts/restricted-fund",
+				"resource_class": "RESTRICTED",
+			},
+		},
+	}
+
+	status, _, data := doJSON(t, http.MethodPost, base+"/acp/v1/counterfactual", body)
+	if status != http.StatusOK {
+		t.Fatalf("got %d, want 200", status)
+	}
+
+	bar, ok := data["bar"].(float64)
+	if !ok {
+		t.Fatalf("bar missing or not float64: %v", data)
+	}
+	if bar != 1.0 {
+		t.Fatalf("BAR=%.2f, want 1.0", bar)
+	}
+
+	results, ok := data["results"].([]interface{})
+	if !ok || len(results) != 1 {
+		t.Fatalf("results: expected 1 entry, got %v", data["results"])
+	}
+	r0 := results[0].(map[string]interface{})
+	if r0["decision"] != "DENIED" {
+		t.Fatalf("decision=%v, want DENIED", r0["decision"])
+	}
+}
+
+// TestServer_Counterfactual_MultiMutation verifies structural + behavioral mutations
+// both produce DENIED and BAR=1.00.
+func TestServer_Counterfactual_MultiMutation(t *testing.T) {
+	base := startServer(t)
+
+	body := map[string]interface{}{
+		"base": map[string]interface{}{
+			"agent_id":       "cf-multi-agent",
+			"capability":     "acp:cap:data.read",
+			"resource":       "metrics/public",
+			"resource_class": "PUBLIC",
+		},
+		"mutations": []interface{}{
+			map[string]interface{}{
+				"label":          "structural",
+				"capability":     "acp:cap:financial.transfer",
+				"resource":       "accounts/restricted-fund",
+				"resource_class": "RESTRICTED",
+			},
+			map[string]interface{}{
+				"label":          "behavioral",
+				"capability":     "acp:cap:financial.transfer",
+				"resource":       "accounts/restricted-fund",
+				"resource_class": "RESTRICTED",
+				"context": map[string]interface{}{
+					"external_ip": true,
+					"off_hours":   true,
+				},
+				"history": map[string]interface{}{
+					"recent_denial": true,
+					"freq_anomaly":  true,
+				},
+			},
+		},
+	}
+
+	status, _, data := doJSON(t, http.MethodPost, base+"/acp/v1/counterfactual", body)
+	if status != http.StatusOK {
+		t.Fatalf("got %d, want 200", status)
+	}
+
+	bar, _ := data["bar"].(float64)
+	if bar != 1.0 {
+		t.Fatalf("BAR=%.2f, want 1.0 for all-DENIED mutations", bar)
+	}
+
+	results, _ := data["results"].([]interface{})
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for i, rr := range results {
+		rm := rr.(map[string]interface{})
+		if rm["decision"] != "DENIED" {
+			t.Fatalf("result[%d]: decision=%v, want DENIED", i, rm["decision"])
+		}
+	}
+}
+
+// TestServer_Counterfactual_NilMutation verifies a nil (no-op) mutation on a
+// low-risk base produces APPROVED and BAR=0.
+func TestServer_Counterfactual_NilMutation(t *testing.T) {
+	base := startServer(t)
+
+	body := map[string]interface{}{
+		"base": map[string]interface{}{
+			"agent_id":       "cf-nil-agent",
+			"capability":     "acp:cap:data.read",
+			"resource":       "metrics/public",
+			"resource_class": "PUBLIC",
+		},
+		"mutations": []interface{}{
+			map[string]interface{}{
+				"label": "nil-mutation",
+				// all fields nil: keep base unchanged
+			},
+		},
+	}
+
+	status, _, data := doJSON(t, http.MethodPost, base+"/acp/v1/counterfactual", body)
+	if status != http.StatusOK {
+		t.Fatalf("got %d, want 200", status)
+	}
+
+	bar, _ := data["bar"].(float64)
+	if bar != 0.0 {
+		t.Fatalf("BAR=%.2f, want 0.0 for nil mutation on low-risk base", bar)
+	}
+
+	results, _ := data["results"].([]interface{})
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	r0 := results[0].(map[string]interface{})
+	if r0["decision"] != "APPROVED" {
+		t.Fatalf("decision=%v, want APPROVED for data.read+public with no overrides", r0["decision"])
+	}
+}
+
+// TestServer_Counterfactual_MissingBase validates required field checks.
+func TestServer_Counterfactual_MissingBase(t *testing.T) {
+	base := startServer(t)
+
+	body := map[string]interface{}{
+		"base": map[string]interface{}{
+			// agent_id missing
+			"capability":     "acp:cap:data.read",
+			"resource":       "metrics/public",
+			"resource_class": "PUBLIC",
+		},
+		"mutations": []interface{}{
+			map[string]interface{}{"label": "m1"},
+		},
+	}
+
+	status, _, _ := doJSON(t, http.MethodPost, base+"/acp/v1/counterfactual", body)
+	if status != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for missing agent_id", status)
+	}
+}
+
+// TestServer_Counterfactual_EmptyMutations validates that an empty mutations
+// array is rejected with 400.
+func TestServer_Counterfactual_EmptyMutations(t *testing.T) {
+	base := startServer(t)
+
+	body := map[string]interface{}{
+		"base": map[string]interface{}{
+			"agent_id":       "cf-empty-agent",
+			"capability":     "acp:cap:data.read",
+			"resource":       "metrics/public",
+			"resource_class": "PUBLIC",
+		},
+		"mutations": []interface{}{},
+	}
+
+	status, _, _ := doJSON(t, http.MethodPost, base+"/acp/v1/counterfactual", body)
+	if status != http.StatusBadRequest {
+		t.Fatalf("got %d, want 400 for empty mutations", status)
+	}
+}
+
+// TestServer_Counterfactual_Labels verifies that result labels match mutation labels.
+func TestServer_Counterfactual_Labels(t *testing.T) {
+	base := startServer(t)
+
+	labels := []string{"alpha", "beta", "gamma"}
+	mutations := make([]interface{}, len(labels))
+	for i, l := range labels {
+		mutations[i] = map[string]interface{}{"label": l}
+	}
+
+	body := map[string]interface{}{
+		"base": map[string]interface{}{
+			"agent_id":       "cf-labels-agent",
+			"capability":     "acp:cap:data.read",
+			"resource":       "metrics/public",
+			"resource_class": "PUBLIC",
+		},
+		"mutations": mutations,
+	}
+
+	status, _, data := doJSON(t, http.MethodPost, base+"/acp/v1/counterfactual", body)
+	if status != http.StatusOK {
+		t.Fatalf("got %d, want 200", status)
+	}
+
+	results, _ := data["results"].([]interface{})
+	if len(results) != len(labels) {
+		t.Fatalf("expected %d results, got %d", len(labels), len(results))
+	}
+	for i, rr := range results {
+		rm := rr.(map[string]interface{})
+		if rm["label"] != labels[i] {
+			t.Fatalf("result[%d] label=%v, want %q", i, rm["label"], labels[i])
+		}
+	}
+}
+
+// TestServer_Counterfactual_UnknownResourceClass falls back to PUBLIC for unknown values.
+func TestServer_Counterfactual_UnknownResourceClass(t *testing.T) {
+	base := startServer(t)
+	rc := "UNKNOWN_CLASS"
+	body := map[string]interface{}{
+		"base": map[string]interface{}{
+			"agent_id":       "cf-rc-agent",
+			"capability":     "acp:cap:data.read",
+			"resource":       "metrics/public",
+			"resource_class": rc, // unknown
+		},
+		"mutations": []interface{}{
+			map[string]interface{}{"label": "baseline"},
+		},
+	}
+	status, _, data := doJSON(t, http.MethodPost, base+"/acp/v1/counterfactual", body)
+	if status != http.StatusOK {
+		t.Fatalf("got %d, want 200", status)
+	}
+	// data.read + UNKNOWN (→ PUBLIC, RS=0) with nil mutation → APPROVED
+	results, _ := data["results"].([]interface{})
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result")
+	}
+	r0 := results[0].(map[string]interface{})
+	if r0["decision"] != "APPROVED" {
+		t.Fatalf("decision=%v, want APPROVED (unknown RC defaults to PUBLIC)", r0["decision"])
+	}
+	_ = strings.ToUpper(rc) // use strings package to avoid import error
+}

@@ -1,7 +1,7 @@
 ---- MODULE ACP_Extended ----
 (*
-  ACP-RISK-2.0 Extended Formal Model — TLC-checkable (v1.20, Sprint J2)
-  =====================================================================
+  ACP-RISK-2.0 Extended Formal Model — TLC-checkable (v1.25)
+  ==========================================================
   Extends ACP.tla with:
     1. Per-agent cooldown temporal state (from v1.17)
     2. Cooldown enforcement (safety) and expiration (liveness)
@@ -9,20 +9,22 @@
     4. Static delegation chain integrity
     5. [Sprint J2] F_anom flood detection: per-agent pattern accumulation,
        flood override, AnomalyDeterminism, and bounded execution guarantee
+    6. [v1.25] Structural failure condition preservation invariants:
+       FailureConditionPreservation, NoDegenerateAdmissibility
 
-  Safety invariants (8 total):
-    TypeInvariant           -- well-typed state
-    Safety                  -- APPROVED decisions had acceptable risk (RS <= 39)
-    LedgerAppendOnly        -- ledger entries are well-formed
-    RiskDeterminism         -- same (cap, res) always produces the same base RS
-    CooldownEnforced        -- active cooldown forces DENIED decision
-    CooldownImpliesThreshold -- cooldown only exists after denial threshold
-    DelegationIntegrity     -- no consecutive self-delegation in chain
-    AnomalyDeterminism      -- [Sprint J2] same (cap, res, pattern_at_eval)
-                               always produces the same risk_score;
-                               RS is a deterministic policy function of
-                               (static inputs + per-agent request history).
-    FloodEnforced           -- [Sprint J2] flood threshold forces DENIED decision
+  Safety invariants (11 total):
+    TypeInvariant               -- well-typed state
+    Safety                      -- APPROVED decisions had acceptable risk (RS <= 39)
+    LedgerAppendOnly            -- ledger entries are well-formed
+    RiskDeterminism             -- same (cap, res) always produces the same base RS
+    CooldownEnforced            -- active cooldown forces DENIED decision
+    CooldownImpliesThreshold    -- cooldown only exists after denial threshold
+    DelegationIntegrity         -- no consecutive self-delegation in chain
+    AnomalyDeterminism          -- [Sprint J2] same (cap, res, pattern_at_eval)
+                                   always produces the same risk_score
+    FloodEnforced               -- [Sprint J2] flood threshold forces DENIED decision
+    FailureConditionPreservation -- [v1.25] action space contains at least one DENIED pair
+    NoDegenerateAdmissibility   -- [v1.25] high-risk pairs never APPROVED
 
   Temporal properties (4 total):
     LedgerAppendOnlyTemporal          -- existing ledger entries are preserved
@@ -339,6 +341,75 @@ FloodEnforced ==
     \A i \in 1..Len(ledger) :
         ledger[i].pattern_at_eval >= FLOOD_THRESHOLD
         => ledger[i].decision = "DENIED"
+
+\* [v1.25] FailureConditionPreservation (I_FCP):
+\* The evaluation action space contains at least one (capability, resource) pair
+\* that produces DENIED under empty ledger state (pattern_count=0, no cooldown).
+\*
+\* This is a NECESSARY STRUCTURAL CONDITION for failure condition preservation
+\* (ACP v1.25 ss\ref{sec:deviation-collapse}): it asserts that deviation collapse
+\* cannot occur due to model structure alone -- only due to upstream filtering
+\* of such requests from the live request stream.
+\*
+\* Semantics: if no (cap, res) pair in the action space ever produces DENIED,
+\* the engine has no capacity to enforce the boundary regardless of request
+\* content -- a structurally degenerate deployment.
+\*
+\* Verified across all states: holds as a constant structural property because
+\* Capabilities, Resources, and the policy function are fixed model constants.
+\* With Capabilities = {"read","financial","admin"} and Resources = {"public","sensitive"}:
+\*   ComputeRiskWithAnom("admin", "sensitive", 0) = min(100, 60+15) = 75 >= 70 -> DENIED.
+FailureConditionPreservation ==
+    \E cap \in Capabilities, res \in Resources :
+        Decide(ComputeRiskWithAnom(cap, res, 0)) = "DENIED"
+
+\* [v1.25] NoDegenerateAdmissibility (I_NDA):
+\* High-risk capability/resource combinations are never APPROVED.
+\* Specifically: requests combining an elevated-risk capability {"admin","financial"}
+\* with the sensitive resource class must produce ESCALATED or DENIED -- never APPROVED.
+\*
+\* This asserts that the engine does not collapse the admission boundary from the
+\* bottom: high-risk requests cannot be silently admitted even in the absence of
+\* context signals or history.
+\*
+\* Verified across all ledger entries: holds because
+\*   ComputeRisk("admin",    "sensitive") = 60+15 = 75 -> DENIED   (>= 70)
+\*   ComputeRisk("financial","sensitive") = 35+15 = 50 -> ESCALATED (40-69)
+\* Both are strictly above the APPROVED threshold (RS <= 39), regardless of
+\* FANOM_BONUS (which only increases the RS further).
+NoDegenerateAdmissibility ==
+    \A i \in 1..Len(ledger) :
+        ( ledger[i].capability \in {"admin", "financial"}
+       /\ ledger[i].resource = "sensitive" )
+        => ledger[i].decision # "APPROVED"
+
+\* [v1.25] BARMonitorLiveness (stated; verified empirically in Phase D):
+\*
+\* STATEMENT: If the deployment's last N evaluation decisions are all APPROVED,
+\* BAR-Monitor eventually emits an alert (BAR_N < theta).
+\*
+\* SCOPE NOTE: This property requires explicit monitor state in the TLA+ model
+\* (a rolling window of N decisions and a threshold comparison). Adding this
+\* state would increase the TLC state space by a factor of 2^N per agent.
+\* For N=20 (Phase D batch size), this is not tractable.
+\*
+\* EMPIRICAL VERIFICATION: Experiment 9 Phase D (paper ss\ref{sec:deviation-collapse})
+\* validates this property over 5 drift batches. BAR-Monitor fires:
+\*   - AlertTrend   at Batch 2: BAR=0.57, ΔBAR=-0.25 (early warning, BAR >> theta=0.10)
+\*   - AlertTrend   at Batch 3: BAR=0.33, ΔBAR=-0.25
+\*   - AlertTrend   at Batch 4: BAR=0.10, ΔBAR=-0.20
+\*   - AlertThreshold at Batch 5: BAR=0.00 (collapse confirmed)
+\*
+\* The stated property, for reference:
+\*   BARMonitorLiveness ==
+\*     \A a \in Agents :
+\*       []( (\A i \in (Len(ledger)-N+1)..Len(ledger) :
+\*               /\ ledger[i].agent    = a
+\*               /\ ledger[i].decision = "APPROVED")
+\*           => <>(monitor_bar[a] < theta) )
+\*
+\* This definition is NOT submitted to TLC (monitor_bar and theta are not model
+\* variables). It is documented here for completeness and formal reference.
 
 (* ---- Temporal properties ------------------------------------------------- *)
 

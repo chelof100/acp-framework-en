@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/chelof100/acp-framework/acp-go/pkg/barmonitor"
 	"github.com/chelof100/acp-framework/acp-go/pkg/risk"
 )
 
@@ -70,6 +71,10 @@ func RunDeviationCollapse(_ Config) {
 	if cfResults.BAR > 0 {
 		fmt.Println("  → BOUNDARY RESTORED: failure conditions remain representable")
 	}
+
+	// ── Phase D: Drift Simulation ─────────────────────────────────────────────
+	phaseDRes := runPhaseD(agentID, policy, now)
+	printPhaseDResults(phaseDRes)
 
 	// ── Summary table ─────────────────────────────────────────────────────────
 	printSummaryTable(resultsA, resultsB, cfResults)
@@ -367,6 +372,120 @@ func evaluateCounterfactuals(cases []testCase, agentID string, policy risk.Polic
 func printPhaseResult(label string, r PhaseResult) {
 	fmt.Printf("Phase %s: total=%d  APPROVED=%d  ESCALATED=%d  DENIED=%d  BAR=%.2f\n",
 		label, r.Total, r.Approved, r.Escalated, r.Denied, r.BAR)
+}
+
+// phaseDResult holds per-batch output for the drift simulation.
+type phaseDResult struct {
+	BatchNum    int
+	DriftPct    int     // percentage of cases sanitized (0, 25, 50, 75, 100)
+	BAR         float64 // BAR after this batch is fed into the monitor
+	Trend       float64 // ΔBAR after this batch
+	Alert       *barmonitor.Alert
+	WindowFill  int
+}
+
+// runPhaseD simulates progressive upstream drift across 5 batches.
+//
+// Each batch consists of the full 20-case dataset from Phase A, but with an
+// increasing fraction of cases sanitized (stripped of all risk signals).
+// Sanitization targets boundary-activating cases first (from the end of the
+// dataset, where DENIED cases are concentrated), so BAR degrades meaningfully
+// with each batch.
+//
+// The BARMonitor uses a window of 40 (two batches), enabling ΔBAR to compare
+// the current batch against the previous one and detect inter-batch decline.
+//
+// Drift schedule (nSanitized = driftPct × 20 / 100):
+//
+//	Batch 1:  0% sanitized → all 20 baseline  → BAR≈0.70
+//	Batch 2: 25% sanitized →  5 DENIED cases sanitized → BAR≈0.45
+//	Batch 3: 50% sanitized → 10 boundary cases sanitized → BAR≈0.20
+//	Batch 4: 75% sanitized → 15 boundary cases sanitized → BAR≈0.00
+//	Batch 5:100% sanitized → all 20 sanitized → BAR=0.00
+//
+// Expected: ΔBAR alert fires at Batch 2 (BAR≈0.575 >> threshold=0.10),
+// demonstrating early-warning detection before the degenerate regime.
+// Threshold alert fires at Batch 5 (collapse confirmed).
+//
+// Alert tracking: we report the alert produced by the last decision of each
+// batch to reflect the monitor's state at batch completion, not warm-up noise.
+func runPhaseD(agentID string, policy risk.PolicyConfig, now time.Time) []phaseDResult {
+	dataset := buildDataset(agentID, policy, now)
+	sanitized := sanitizeDataset(dataset)
+	q := risk.NewInMemoryQuerier()
+
+	// Window=40 spans exactly two batches (2×20), so ΔBAR compares the current
+	// batch (second half of window) against the previous batch (first half).
+	// Threshold=0.10; TrendThreshold=-0.15.
+	m := barmonitor.New(barmonitor.Config{
+		WindowSize:     40,
+		Threshold:      0.10,
+		TrendThreshold: -0.15,
+	})
+
+	driftPcts := []int{0, 25, 50, 75, 100}
+	results := make([]phaseDResult, 0, len(driftPcts))
+
+	for batchNum, driftPct := range driftPcts {
+		// Sanitize the LAST nSanitized cases — these are DENIED and ESCALATED
+		// cases in the dataset, which are the boundary-activating requests.
+		nSanitized := (driftPct * len(dataset)) / 100 // floor division
+		batch := make([]testCase, len(dataset))
+		sanitizeFrom := len(dataset) - nSanitized
+		for i := range dataset {
+			if i >= sanitizeFrom {
+				batch[i] = sanitized[i]
+			} else {
+				batch[i] = dataset[i]
+			}
+		}
+
+		// Feed all decisions in this batch into the monitor.
+		// Capture the alert and BAR from the very last decision of the batch
+		// to report batch-completion state, not warm-up noise.
+		var finalAlert *barmonitor.Alert
+		var finalBAR float64
+		for j, c := range batch {
+			req := c.req
+			req.Now = now
+			result, err := risk.Evaluate(req, q)
+			var dec risk.Decision
+			if err != nil {
+				dec = risk.DENIED
+			} else {
+				dec = result.Decision
+			}
+			a, bar := m.Record(dec)
+			if j == len(batch)-1 {
+				finalAlert = a
+				finalBAR = bar
+			}
+		}
+
+		results = append(results, phaseDResult{
+			BatchNum:   batchNum + 1,
+			DriftPct:   driftPct,
+			BAR:        finalBAR,
+			Trend:      m.Trend(),
+			Alert:      finalAlert,
+			WindowFill: m.WindowFill(),
+		})
+	}
+	return results
+}
+
+// printPhaseDResults prints the drift simulation table.
+func printPhaseDResults(results []phaseDResult) {
+	fmt.Println("\nPhase D (Drift Simulation):")
+	fmt.Printf("  %-10s  %-6s  %-6s  %-7s  %-20s\n", "Batch", "Drift%", "BAR", "ΔBAR", "Alert")
+	for _, r := range results {
+		alertStr := "none"
+		if r.Alert != nil {
+			alertStr = string(r.Alert.Reason)
+		}
+		fmt.Printf("  Batch %-4d  %-6d  %-6.2f  %-7.2f  %s\n",
+			r.BatchNum, r.DriftPct, r.BAR, r.Trend, alertStr)
+	}
 }
 
 // printSummaryTable prints the three-phase comparison table with proportions.

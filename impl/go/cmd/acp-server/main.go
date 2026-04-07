@@ -157,6 +157,9 @@ func main() {
 	mux.HandleFunc("POST /acp/v1/authorize",                                           srv.handleAuthorize)
 	mux.HandleFunc("POST /acp/v1/authorize/escalations/{escalation_id}/resolve",       srv.handleEscalationResolve)
 
+	// ── ACP-RISK-1.0 §8: Counterfactual Evaluation ───────────────────────────
+	mux.HandleFunc("POST /acp/v1/counterfactual", srv.handleCounterfactual)
+
 	// ── ACP-API-1.0 §6: Capability Tokens (stub) ─────────────────────────────
 	mux.HandleFunc("POST /acp/v1/tokens", srv.handleTokensIssue)
 
@@ -627,6 +630,186 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[ACP/AUTH] %s agent=%s cap=%s score=%d decision=%s",
 		req.RequestID, req.AgentID, req.Capability, assessment.Score, decision)
+}
+
+// handleCounterfactual evaluates a set of structural or behavioral mutations
+// against the ACP risk engine to verify that the deployment retains the capacity
+// to produce ESCALATED or DENIED decisions (failure condition preservation).
+//
+// POST /acp/v1/counterfactual
+//
+// Body:
+//
+//	{
+//	  "base": {
+//	    "agent_id":       string,
+//	    "capability":     string,
+//	    "resource":       string,
+//	    "resource_class": "PUBLIC"|"SENSITIVE"|"RESTRICTED"
+//	  },
+//	  "mutations": [
+//	    {
+//	      "label":          string,                              // required
+//	      "capability":     string|null,                        // nil = keep base
+//	      "resource":       string|null,                        // nil = keep base
+//	      "resource_class": "PUBLIC"|"SENSITIVE"|"RESTRICTED"|null, // nil = keep base
+//	      "context": {                                          // null = keep base
+//	        "external_ip": bool, "off_hours": bool, "geo_outside": bool,
+//	        "non_business_day": bool
+//	      },
+//	      "history": {                                          // null = keep base
+//	        "recent_denial": bool, "freq_anomaly": bool
+//	      }
+//	    }
+//	  ]
+//	}
+//
+// Temporal mutations (LedgerSetup) are not supported via HTTP; use the Go API
+// directly (pkg/risk.TemporalMutation) for ledger-state injection.
+//
+// Response 200:
+//
+//	{
+//	  "bar":     float64,       // Boundary Activation Rate over all results
+//	  "results": [
+//	    {
+//	      "label":    string,
+//	      "decision": "APPROVED"|"ESCALATED"|"DENIED"|"ERROR",
+//	      "rs_final": int,
+//	      "error":    string    // present only if decision == "ERROR"
+//	    }
+//	  ]
+//	}
+func (s *server) handleCounterfactual(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Base struct {
+			AgentID       string `json:"agent_id"`
+			Capability    string `json:"capability"`
+			Resource      string `json:"resource"`
+			ResourceClass string `json:"resource_class"`
+		} `json:"base"`
+		Mutations []struct {
+			Label         string   `json:"label"`
+			Capability    *string  `json:"capability"`
+			Resource      *string  `json:"resource"`
+			ResourceClass *string  `json:"resource_class"`
+			Context       *struct {
+				ExternalIP     bool `json:"external_ip"`
+				OffHours       bool `json:"off_hours"`
+				GeoOutside     bool `json:"geo_outside"`
+				NonBusinessDay bool `json:"non_business_day"`
+			} `json:"context"`
+			History *struct {
+				RecentDenial bool `json:"recent_denial"`
+				FreqAnomaly  bool `json:"freq_anomaly"`
+			} `json:"history"`
+		} `json:"mutations"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "malformed JSON body")
+		return
+	}
+	if req.Base.AgentID == "" || req.Base.Capability == "" || req.Base.Resource == "" {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "base.agent_id, base.capability, and base.resource are required")
+		return
+	}
+	if len(req.Mutations) == 0 {
+		acpapi.WriteError(w, r, http.StatusBadRequest, acpapi.ErrSYS004, "mutations array must not be empty")
+		return
+	}
+
+	// Parse base resource class.
+	baseRC := counterfactualParseRC(req.Base.ResourceClass)
+
+	// Build base EvalRequest.
+	base := risk.EvalRequest{
+		AgentID:       req.Base.AgentID,
+		Capability:    req.Base.Capability,
+		Resource:      req.Base.Resource,
+		ResourceClass: baseRC,
+		Policy:        risk.DefaultPolicyConfig(),
+	}
+
+	// Convert HTTP mutations to risk.Mutation.
+	mutations := make([]risk.Mutation, 0, len(req.Mutations))
+	for _, m := range req.Mutations {
+		mut := risk.Mutation{Label: m.Label}
+		if m.Capability != nil {
+			c := *m.Capability
+			mut.Capability = &c
+		}
+		if m.Resource != nil {
+			r2 := *m.Resource
+			mut.Resource = &r2
+		}
+		if m.ResourceClass != nil {
+			rc := counterfactualParseRC(*m.ResourceClass)
+			mut.ResourceClass = &rc
+		}
+		if m.Context != nil {
+			ctx := risk.Context{
+				ExternalIP:     m.Context.ExternalIP,
+				OffHours:       m.Context.OffHours,
+				GeoOutside:     m.Context.GeoOutside,
+				NonBusinessDay: m.Context.NonBusinessDay,
+			}
+			mut.Context = &ctx
+		}
+		if m.History != nil {
+			hist := risk.History{
+				RecentDenial: m.History.RecentDenial,
+				FreqAnomaly:  m.History.FreqAnomaly,
+			}
+			mut.History = &hist
+		}
+		mutations = append(mutations, mut)
+	}
+
+	// Evaluate.
+	now := time.Now()
+	cfResults := risk.EvaluateCounterfactual(base, mutations, now)
+	bar := risk.BAR(cfResults)
+
+	// Build response.
+	type resultItem struct {
+		Label    string `json:"label"`
+		Decision string `json:"decision"`
+		RSFinal  int    `json:"rs_final"`
+		Error    string `json:"error,omitempty"`
+	}
+	items := make([]resultItem, len(cfResults))
+	for i, r2 := range cfResults {
+		item := resultItem{
+			Label:   r2.Label,
+			RSFinal: r2.RSFinal,
+		}
+		if r2.Err != nil {
+			item.Decision = "ERROR"
+			item.Error = r2.Err.Error()
+		} else {
+			item.Decision = string(r2.Decision)
+		}
+		items[i] = item
+	}
+
+	acpapi.WriteSuccess(w, r, http.StatusOK, map[string]interface{}{
+		"bar":     bar,
+		"results": items,
+	}, s.institutionPrivKey)
+}
+
+// counterfactualParseRC converts a resource_class string to risk.ResourceClass.
+// Unknown values default to ResourcePublic (least permissive assumption for
+// unknown input — produces lowest base RS, so mutations must explicitly elevate).
+func counterfactualParseRC(s string) risk.ResourceClass {
+	switch s {
+	case "SENSITIVE":
+		return risk.ResourceSensitive
+	case "RESTRICTED":
+		return risk.ResourceRestricted
+	default:
+		return risk.ResourcePublic
+	}
 }
 
 // handleEscalationResolve resolves an escalated authorization.

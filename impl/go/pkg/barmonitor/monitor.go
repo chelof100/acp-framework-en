@@ -202,6 +202,14 @@ func (m *BARMonitor) computeBAR() float64 {
 }
 
 // computeTrend computes ΔBAR = BAR(second half) - BAR(first half).
+// Entries are read in temporal order (oldest first, newest last) to ensure
+// ΔBAR reflects the direction of change over time.
+//
+// When the ring buffer has not yet wrapped (fill < WindowSize), temporal order
+// equals insertion order (ring[0..fill-1]). When the buffer is full, temporal
+// order starts at pos (the next write slot = the oldest existing entry) and
+// wraps around the ring.
+//
 // Returns 0 if fill < 4 (insufficient data for meaningful trend).
 // Caller must hold m.mu.
 func (m *BARMonitor) computeTrend() float64 {
@@ -209,15 +217,28 @@ func (m *BARMonitor) computeTrend() float64 {
 		return 0
 	}
 	half := m.fill / 2
-	var firstActive, secondActive int
-	for i := 0; i < half; i++ {
-		if isActive(m.ring[i]) {
-			firstActive++
-		}
+
+	// start: index of the oldest entry in the ring.
+	// When not yet full (fill < WindowSize), ring[0..fill-1] are in order and
+	// pos == fill, so starting at 0 gives correct temporal order.
+	// When full (fill == WindowSize), pos points to the next write slot which
+	// is also the oldest existing entry.
+	start := 0
+	if m.fill == m.cfg.WindowSize {
+		start = m.pos
 	}
-	for i := half; i < m.fill; i++ {
-		if isActive(m.ring[i]) {
-			secondActive++
+
+	var firstActive, secondActive int
+	for i := 0; i < m.fill; i++ {
+		idx := (start + i) % m.cfg.WindowSize
+		if i < half {
+			if isActive(m.ring[idx]) {
+				firstActive++
+			}
+		} else {
+			if isActive(m.ring[idx]) {
+				secondActive++
+			}
 		}
 	}
 	firstBAR := float64(firstActive) / float64(half)
