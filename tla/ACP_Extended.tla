@@ -77,9 +77,15 @@
     cd tla/
     java -jar tla2tools.jar -deadlock -config ACP_Extended.cfg ACP_Extended.tla
 
-  TLC result (Sprint J2 config: 1 agent, 3 caps, 2 res, LEDGER_BOUND=7,
-             FLOOD_THRESHOLD=4, FANOM_BONUS=25, MAX_TIME=7):
+  TLC result (v1.25 config: 1 agent, 3 caps, 2 res, LEDGER_BOUND=7,
+             FLOOD_THRESHOLD=4, FANOM_BONUS=25, MAX_TIME=7,
+             11 invariants + 4 temporal properties):
     Model checking completed. No error has been found.
+    5,684,342 states generated, 3,147,864 distinct states found, 0 states left on queue.
+    The depth of the complete state graph search is 15.
+    Finished in 39min 42s (TLC2, Java 26, single worker).
+    All 11 invariants and 4 temporal properties verified. 0 violations.
+    State space identical to v1.20 run: new invariants hold over existing reachable states.
     5,684,342 states generated, 3,147,864 distinct states found, 0 states left on queue.
     The depth of the complete state graph search is 15.
     Finished in 47min 30s (TLC2 v2.16, Java 1.8, single worker, 7241MB heap).
