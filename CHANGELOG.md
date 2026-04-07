@@ -7,6 +7,74 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.24.0] — v1.24 — 2026-04-07
+
+### Added
+
+#### pkg/barmonitor — Boundary Activation Monitoring
+- `impl/go/pkg/barmonitor/monitor.go` — `BARMonitor`: sliding-window BAR monitor with ΔBAR trend detection.
+  - `Config{WindowSize, Threshold, TrendThreshold}` — all validated on construction (panics on bad config).
+  - `Record(d Decision) (*Alert, float64)` — records a decision, returns current BAR and an optional alert.
+  - `AlertThreshold` fires when `BAR_N < θ` (enforcement potentially inactive).
+  - `AlertTrend` fires when `ΔBAR < δ` — early warning fires **before** BAR reaches θ (confirmed by `TestAlert_TrendFires_BeforeThreshold`: alert at BAR=0.64 > threshold=0.30).
+  - ΔBAR = BAR(second half of window) − BAR(first half of window); requires ≥4 observations.
+  - Thread-safe (`sync.Mutex`); circular ring buffer; `Reset()` clears state.
+  - `DefaultConfig()`: WindowSize=100, Threshold=0.05, TrendThreshold=-0.10.
+- `impl/go/pkg/barmonitor/monitor_test.go` — 18 tests: panic validation, BAR computation (empty/all-APPROVED/all-DENIED/Phase-A/ESCALATED-active), window saturation, threshold alert, trend alert (key test: fires before threshold), concurrent access, Reset.
+
+#### pkg/risk — EvaluateCounterfactual API
+- `impl/go/pkg/risk/counterfactual.go` — `EvaluateCounterfactual`: verifies ACP deployment retains structural capacity to enforce.
+  - `Mutation` struct: additive (only non-nil fields override base); preserves AgentID and Policy always.
+  - `CounterfactualResult{Label, Decision, RSFinal, Err}`.
+  - `BAR([]CounterfactualResult) float64` — errors count in denominator (fail-closed semantics).
+  - Each mutation evaluated independently with a fresh `InMemoryQuerier`; no cross-mutation state.
+  - Built-in factories: `StructuralMutation()` (RS=80→DENIED), `BehavioralMutation()` (RS=150→100→DENIED), `TemporalMutation(agentID)` (F_anom=+50, RS=130→100→DENIED).
+- `impl/go/pkg/risk/counterfactual_test.go` — 14 tests: BAR edge cases, all 3 factories produce DENIED, BAR=1.00 for all-3, additive semantics (nil preserves base, context-only override RS=20 APPROVED), AgentID preserved, Policy preserved, independent queriers.
+
+#### Paper — v1.24
+- `paper/arxiv/main.tex` — New `\subsection{Boundary Activation Monitoring}` (`\label{sec:bar-monitor}`) — Definition (BAR over sliding window), two-condition detection (threshold + ΔBAR trend), early-warning property, configuration parameters, implementation note (`pkg/barmonitor`).
+- §Extended Governance Objective: added "bounded operational region" framing (cooldown = upper-bound, BAR-Monitor = lower-bound; together bracket a meaningful operational envelope).
+- §Contributions: 9 bullets total (updated Exp 9 bullet with real numbers BAR_A=0.70→BAR_B=0.00; added "Failure condition preservation as a governance requirement"; added "Boundary Activation Monitoring (BAR-Monitor)").
+- §Roadmap: 2 new rows — pkg/barmonitor (ΔBAR) and EvaluateCounterfactual API, both v1.24 Complete.
+
+### Key results
+| Component | Tests | Status |
+|-----------|-------|--------|
+| `pkg/barmonitor` | 18/18 | ✅ PASS |
+| `pkg/risk/counterfactual` | 14/14 | ✅ PASS |
+
+---
+
+## [1.23.0] — v1.23 — 2026-04-06
+
+### Added
+
+#### Experiment 9 — Deviation Collapse (`compliance/adversarial/`)
+- `exp_deviation_collapse.go` — Experiment 9: tests whether ACP is structurally capable of enforcement when upstream sanitization suppresses boundary-activating requests.
+  - Phase A (baseline): 20 cases (APPROVED=6, ESCALATED=7, DENIED=7) → BAR_A = 0.70.
+  - Phase B (sanitized): dataset reset to data.read + public + empty context/history → BAR_B = 0.00 (collapse confirmed).
+  - Phase C (counterfactual): 3 mutations (structural RS=80, behavioral RS=100, temporal RS=100) evaluated against sanitized set → BAR_C = 1.00 (stronger than 0.80 estimated; all 3 mutation types guarantee DENIED under DefaultPolicyConfig).
+- `main.go` — `--exp=9` flag (`deviation-collapse`); `--exp=0` (all) includes Experiment 9.
+
+#### Paper — v1.23
+- `paper/arxiv/main.tex` — New `\section{Limits of Execution-Only Governance}` with 6 subsections: Degenerate Admissibility, Preservation of Failure Conditions at Bind, Counterfactual Evaluation, Deviation Collapse, Experiment 9 (results table + BAR-per-phase figure), Extended Governance Objective.
+  - New `\usepackage{amsthm}` + `\newtheorem{definition}{Definition}`.
+  - Abstract: 2 lines on deviation collapse.
+  - §Contributions: bullet for "Identification of deviation collapse as a degenerate regime".
+  - §Summary: transition paragraph on implicit assumption in execution-only governance.
+  - §Roadmap: Exp 9 row.
+
+### Key results (Experiment 9, Intel i7-8665U, Go 1.22)
+| Phase | Description | BAR |
+|-------|-------------|-----|
+| A — Baseline | Mixed realistic cases (n=20) | 0.70 |
+| B — Sanitized | All boundary signals removed | 0.00 |
+| C — Counterfactual | 3 synthetic mutations applied | 1.00 |
+
+**Note on BAR_C:** All 3 mutation types guarantee DENIED — structural (RS=80), behavioral (RS=150→100 capped), temporal (F_anom=50, RS=130→100 capped). Stronger than 0.80 estimated.
+
+---
+
 ## [1.20.0] — Sprint I (partial) — 2026-03-26
 
 ### Added
