@@ -15,7 +15,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `exp_deviation_collapse.go` — Phase D added to Experiment 9: progressive drift simulation across 5 batches × 20 cases.
   - Sanitization rate increases 0% → 20% → 40% → 60% → 80% per batch (boundary-activating DENIED cases removed first).
   - Window = 40 (two full batches); BAR tracked per batch; ΔBAR trend detection fires early warning at batch 3 (before threshold).
-  - Results: Batch 1 BAR=0.70 → Batch 3 BAR=0.50 (ΔBAR early-warning fires) → Batch 5 BAR=0.00 (threshold alert).
+  - Results: Batch 1 BAR=0.70 → Batch 2 BAR=0.57 (ΔBAR=−0.25, TREND early-warning fires) → Batch 5 BAR=0.00 (threshold alert).
   - Design: `sanitizeFrom := len(dataset) - nSanitized` — targets DENIED cases first, ensuring meaningful BAR degradation per batch.
 
 #### Sprint A — `computeTrend()` Ring Buffer Bug Fix (`impl/go/pkg/barmonitor/monitor.go`)

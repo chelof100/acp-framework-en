@@ -620,7 +620,7 @@ curl http://localhost:8080/acp/v1/health
 | State-mixing fix (Exp 8, `pkg/risk/statemixing_fix_test.go`) | ✅ Complete — v1.22 · RISK-3.0 · 3 scenarios · clean RS=50 ESCALATED · contaminated RS=50 ESCALATED · same-context burst RS=85 DENIED |
 | Paper v1.23 — Sprint fixes | ✅ Complete — v1.23 · §RISK-3.0 in §Technical Mechanisms · contrafactual thesis · 767--921 ns unified · Exp 3b→Exp 4 renumbered · Exp 3 N=5 · all 7 cross-check fixes |
 | Deviation collapse (Exp 9, `compliance/adversarial/exp_deviation_collapse.go`) | ✅ Complete — v1.23 · 3-phase: baseline BAR=0.70 → collapse BAR=0.00 → counterfactual BAR=1.00 |
-| Phase D drift simulation (Exp 9 extension) | ✅ Complete — v1.25 · 5 batches × 20 cases · 0%→80% sanitization · ΔBAR early-warning fires at batch 3 before threshold |
+| Phase D drift simulation (Exp 9 extension) | ✅ Complete — v1.25 · 5 batches × 20 cases · 0%→80% sanitization · ΔBAR early-warning fires at batch 2 (3 batches before collapse) |
 | ITA trust model (paper §Trust Model and Failure Modes) | ✅ Complete — v1.20 · bootstrap / compromise window / revocation authority — semi-formal claims |
 | TypeScript SDK (`impl/typescript/`) | ✅ Complete — v1.4.0 · zero-deps · 68 tests |
 | Rust SDK (`impl/rust/`) | ✅ Complete — v1.4.0 · ed25519-dalek v2 · 43 tests |
