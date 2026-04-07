@@ -10,6 +10,7 @@
 //	2: Distributed Multi-Agent Attack (100/500/1000 agents)
 //	3: State Backend Stress (InMemoryQuerier vs RedisQuerier)
 //	4: Token Replay Attack (sequential, concurrent, near-identical)
+//	9: Deviation Collapse and Restoration (BAR metric, counterfactual injection)
 //	0: All experiments (default)
 package main
 
@@ -20,7 +21,7 @@ import (
 )
 
 func main() {
-	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay")
+	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay, 9=deviation-collapse")
 	redisAddr := flag.String("redis-addr", "localhost:6379", "Redis address for experiment 3")
 	flag.Parse()
 
@@ -35,6 +36,8 @@ func main() {
 		RunBackendStress(cfg)
 		fmt.Println()
 		RunTokenReplay(cfg)
+		fmt.Println()
+		RunDeviationCollapse(cfg)
 	case 1:
 		RunCooldownEvasion(cfg)
 	case 2:
@@ -43,6 +46,8 @@ func main() {
 		RunBackendStress(cfg)
 	case 4:
 		RunTokenReplay(cfg)
+	case 9:
+		RunDeviationCollapse(cfg)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown experiment: %d\n", *exp)
 		os.Exit(1)

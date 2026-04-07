@@ -517,7 +517,7 @@ acp-framework/
 │   ├── ACP-TS-1.1.md      ← test vector format specification
 │   ├── test-vectors/      ← single-shot conformance vectors (CORE · DCMA · HP · LEDGER · EXEC · RISK-2.0)
 │   │   └── sequence/      ← stateful sequence vectors (ACR-1.0, 5 scenarios)
-│   ├── adversarial/       ← adversarial evaluation (Exp 1–4: cooldown evasion, multi-agent, backend stress, token replay)
+│   ├── adversarial/       ← adversarial evaluation (Exp 1–4 + Exp 9: cooldown evasion, multi-agent, backend stress, token replay, deviation collapse)
 │   └── runner/            ← ACR-1.0 compliance runner (library mode + HTTP mode)
 ├── tla/
 │   ├── ACP.tla                   ← base formal model — Safety · LedgerAppendOnly · RiskDeterminism (v1.17)
@@ -619,6 +619,7 @@ curl http://localhost:8080/acp/v1/health
 | State-mixing attack analysis (paper §State-Mixing Vulnerability) | ✅ Complete — v1.21 · formal characterization · Exp 7 numbers · ACP-RISK-3.0 mitigation path |
 | State-mixing fix (Exp 8, `pkg/risk/statemixing_fix_test.go`) | ✅ Complete — v1.22 · RISK-3.0 · 3 scenarios · clean RS=50 ESCALATED · contaminated RS=50 ESCALATED · same-context burst RS=85 DENIED |
 | Paper v1.23 — Sprint fixes | ✅ Complete — v1.23 · §RISK-3.0 in §Technical Mechanisms · contrafactual thesis · 767--921 ns unified · Exp 3b→Exp 4 renumbered · Exp 3 N=5 · all 7 cross-check fixes |
+| Deviation collapse (Exp 9, `compliance/adversarial/exp_deviation_collapse.go`) | ✅ Complete — v1.23 · BAR metric · 3-phase: baseline BAR=0.70 → collapse BAR=0.00 → counterfactual BAR=1.00 · §Limits of Execution-Only Governance |
 | ITA trust model (paper §Trust Model and Failure Modes) | ✅ Complete — v1.20 · bootstrap / compromise window / revocation authority — semi-formal claims |
 | TypeScript SDK (`impl/typescript/`) | ✅ Complete — v1.4.0 · zero-deps · 68 tests |
 | Rust SDK (`impl/rust/`) | ✅ Complete — v1.4.0 · ed25519-dalek v2 · 43 tests |
