@@ -12,6 +12,7 @@
 //	4:  Token Replay Attack (sequential, concurrent, near-identical)
 //	9:  Deviation Collapse and Restoration (BAR metric, counterfactual injection)
 //	10: Knowledge-Aware Adversarial Evasion (full-formula knowledge, BAR collapse, early-warning)
+//	11: Threshold Sensitivity Analysis (5 configs ±10 pts around default)
 //	0:  All experiments (default)
 package main
 
@@ -22,7 +23,7 @@ import (
 )
 
 func main() {
-	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay, 9=deviation-collapse, 10=adversarial-evasion")
+	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay, 9=deviation-collapse, 10=adversarial-evasion, 11=threshold-sensitivity")
 	redisAddr := flag.String("redis-addr", "localhost:6379", "Redis address for experiment 3")
 	flag.Parse()
 
@@ -41,6 +42,8 @@ func main() {
 		RunDeviationCollapse(cfg)
 		fmt.Println()
 		RunAdversarialEvasion(cfg)
+		fmt.Println()
+		RunThresholdSensitivity(cfg)
 	case 1:
 		RunCooldownEvasion(cfg)
 	case 2:
@@ -53,6 +56,8 @@ func main() {
 		RunDeviationCollapse(cfg)
 	case 10:
 		RunAdversarialEvasion(cfg)
+	case 11:
+		RunThresholdSensitivity(cfg)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown experiment: %d\n", *exp)
 		os.Exit(1)

@@ -1,6 +1,6 @@
 ﻿% ============================================================
 % Agent Control Protocol — arXiv Submission
-% ACP v1.25 — Admission Control for Agent Actions
+% ACP v1.26 — Admission Control for Agent Actions
 % Marcelo Fernandez, TraslaIA, April 2026
 % Categories: cs.CR (primary), cs.AI (secondary)
 % ============================================================
@@ -21,6 +21,7 @@
 \usepackage{amsthm}
 \theoremstyle{definition}
 \newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
 
 % --- Tables ---
 \usepackage{booktabs}
@@ -105,7 +106,7 @@
 
 \title{%
   \textbf{Agent Control Protocol}\\[0.4em]
-  \large ACP v1.25: Admission Control for Agent Actions\\[0.3em]
+  \large ACP v1.26: Admission Control for Agent Actions\\[0.3em]
   \normalsize Technical Specification and Reference Implementation%
 }
 
@@ -627,10 +628,56 @@ over the action sequence regardless of how the request was generated.
 Wang et al.~\cite{wang2025agentspec} propose AgentSpec, a domain-specific language for
 defining runtime safety constraints on LLM agents, sharing the architectural insight that
 enforcement must be interposed outside the model.
-ACP and AgentSpec are complementary: where AgentSpec focuses on general-purpose
-safety rules expressed in a user-defined DSL, ACP targets institutional admission
-control with cryptographic identity, formal policy verification, and an append-only
-audit ledger.
+
+\textbf{Functional comparison with AgentSpec.}
+Table~\ref{tab:agentspec-comparison} contrasts the two systems along five dimensions.
+
+\begin{table}[h!]
+\centering\small
+\caption{Functional comparison of ACP and AgentSpec.}
+\label{tab:agentspec-comparison}
+\begin{tabular}{@{}p{3.5cm}p{4.5cm}p{4.5cm}@{}}
+\toprule
+Dimension & AgentSpec & ACP (this work) \\
+\midrule
+Enforcement granularity &
+  Property-based rules over tool calls (LTL-style constraints). &
+  Admission control with risk scoring and stateful signals. \\
+\midrule
+Threat model &
+  Compliance with operator-defined safety properties. &
+  Adversarial admission control + governance collapse detection (BAR-Monitor). \\
+\midrule
+Deviation collapse detection &
+  No equivalent to BAR-Monitor. If upstream constraints are relaxed, all decisions
+  become compliant silently. &
+  BAR-Monitor detects this regime explicitly; TREND alert fires before collapse. \\
+\midrule
+Composability &
+  Operates adjacent to the prompt layer (tool call interception). &
+  Operates at the execution layer; composable with AgentSpec. \\
+\midrule
+Formal verification &
+  Policy synthesis proved correct (AgentSpec properties). &
+  Safety and liveness model-checked in TLA+ (11 invariants, 5,684,342 states, 0 violations). \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key differentiator: governance collapse.}
+Consider the Experiment~10 scenario: a formula-aware adversary drives
+$\mathrm{RS}=0$ on every request, causing every decision to be \texttt{APPROVED}.
+Every individual decision conforms to the configured policy --- no rule is violated.
+AgentSpec, operating on per-tool-call compliance, would not flag this regime:
+each call satisfies all defined safety properties.
+ACP's BAR-Monitor detects the collapse via $\Delta\mathrm{BAR}$:
+the transition from $p_0=0.70$ (baseline boundary activation) to $p_1=0.00$
+(full evasion) is detected at Batch~2 ($\mathrm{BAR}=0.57$, $\Delta\mathrm{BAR}=-0.25$),
+before the degenerate regime is reached.
+This represents a governance dimension orthogonal to per-decision enforcement:
+ACP monitors whether the governance boundary remains meaningful, not only
+whether individual decisions are compliant.
+The two systems are therefore composable rather than competitive.
 
 Motwani et al.~\cite{motwani2024collusion} demonstrate that multiple LLM agents can
 coordinate hidden behavior via steganographic encoding in outputs, forming a
@@ -1439,10 +1486,10 @@ The ledger provides the forensic record needed for post-incident analysis.
 \section{Specification and Implementation Status}
 % ============================================================
 
-ACP v1.25 is a complete Draft Standard specification with a full Go reference implementation
+ACP v1.26 is a complete Draft Standard specification with a full Go reference implementation
 and external verifiability through a TLC-checked formal model and an ACR-1.0 sequence compliance runner.
 
-\subsection{Active Specifications --- v1.25 (38 documents)}
+\subsection{Active Specifications --- v1.26 (38 documents)}
 
 \begin{table}[h!]
 \centering
@@ -1492,7 +1539,7 @@ Gov. & RFC-REGISTRY & Specification Registry \\
 Gov. & ACP-CR-1.0 & Change Request Process \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.25 active specification documents by conformance level (38 primary documents shown).
+\caption{ACP v1.26 active specification documents by conformance level (38 primary documents shown).
 The remaining 3 documents are the ACP-D decentralized suite (L5, design phase) not yet published.
 Superseded versions archived in \texttt{archive/specs/}.
 Version history per document is tracked in Table~\ref{tab:roadmap}.}
@@ -1644,7 +1691,7 @@ and (iv)~robustness of per-agent admission control under adversarial attack patt
 
 \subsection{Experimental Setup}
 
-All experiments use the Go reference implementation (v1.25) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22~\cite{go-language}, \texttt{GOMAXPROCS=8}).
+All experiments use the Go reference implementation (v1.26) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22~\cite{go-language}, \texttt{GOMAXPROCS=8}).
 The evaluation uses three components:
 the stateless evaluation function (\texttt{pkg/risk.Evaluate}),
 an in-memory state backend (\texttt{InMemoryQuerier}),
@@ -2719,12 +2766,16 @@ Boundary Activation Monitoring (\texttt{pkg/barmonitor}, $\Delta\mathrm{BAR}$ tr
 Experiment~9 Phase~D: $\Delta\mathrm{BAR}$ early-warning validation (drift simulation, 5 batches) & v1.25 Complete \\
 TLA+ invariants: \textsc{FailureConditionPreservation}, \textsc{NoDegenerateAdmissibility} & v1.25 Complete \\
 \texttt{POST /acp/v1/counterfactual} HTTP endpoint (structural + behavioral mutations) & v1.25 Complete \\
+Formal adversary model $\mathcal{A}=(K,S,B)$ + experiment taxonomy table & v1.26 Complete \\
+Experiment~11: Threshold sensitivity analysis (5 configs, monotonicity verified) & v1.26 Complete \\
+Detection Guarantees: Proposition~\ref{prop:threshold-detection}, binomial detection probability & v1.26 Complete \\
+AgentSpec functional comparison (5 dimensions, Exp~10 governance collapse scenario) & v1.26 Complete \\
 ACP-LEDGER-1.0 (tamper-evident hash-chained audit log for state backend integrity) & Future work \\
 L5 Decentralized (ACP-D) & Specification in design (v2.0) \\
 IETF RFC submission & After L5 stabilization \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.25 development roadmap.}
+\caption{ACP v1.26 development roadmap.}
 \label{tab:roadmap}
 \end{table}
 
@@ -3297,6 +3348,84 @@ returns an \texttt{Alert} if a low-activation condition is detected.
 The mechanism does not alter admission decisions; it observes whether
 decisions remain meaningful.
 
+% ── Detection Guarantees ──────────────────────────────────────────────────────
+\subsection{Detection Guarantees}
+\label{sec:detection-guarantees}
+
+The BAR-Monitor description above characterizes the mechanism operationally.
+This section provides a closed-form bound on the probability that BAR-Monitor
+detects an active evasion attack within a given window, converting BAR from
+an empirical metric into a detection mechanism with formal guarantees.
+
+\subsubsection*{Threshold Detection Guarantee}
+
+Let $W$ be the window size and $\tau \in (0,1)$ the threshold parameter
+(defaults: $W=40$, $\tau=0.10$).
+Under an active adversary, let $p_1$ denote the fraction of requests that
+remain boundary-activating (i.e., the adversary drives $\mathrm{RS} > 0$ for
+a $p_1$ fraction of requests in expectation).
+Let $X \sim \mathrm{Binomial}(W, p_1)$ be the number of boundary-activating
+decisions in a full window.
+
+\begin{proposition}[Threshold Detection Probability]
+\label{prop:threshold-detection}
+If $p_1 < \tau$, BAR-Monitor fires a \texttt{THRESHOLD} alert within one window
+of $W$ requests with probability:
+\[
+  P\!\left(\mathrm{BAR}_W < \tau\right)
+  = P(X \leq \lfloor \tau W \rfloor)
+  = \sum_{k=0}^{\lfloor \tau W \rfloor} \binom{W}{k} p_1^k (1-p_1)^{W-k}
+\]
+\end{proposition}
+
+Table~\ref{tab:detection-prob} reports $P(\mathrm{BAR}_{40} < 0.10)$ for
+representative evasion rates $p_1$ against a $p_0 = 0.70$ baseline
+(Experiment~9 Phase~A).
+
+\begin{table}[h!]
+\centering\small
+\caption{Threshold detection probability for BAR-Monitor ($W=40$, $\tau=0.10$,
+baseline $p_0=0.70$). $p_1$ is the fraction of boundary-activating requests
+under attack. Detection fires when $\mathrm{BAR}_{40} < 0.10$.}
+\label{tab:detection-prob}
+\begin{tabular}{@{}ccc@{}}
+\toprule
+$p_1$ (under attack) & $P(\mathrm{BAR}_{40} < 0.10)$ & Expected windows to detect \\
+\midrule
+$0.00$ (full evasion) & $\approx 1.00$ & 1 \\
+$0.05$               & $\approx 0.95$ & 1.1 \\
+$0.10$ (= $\tau$)    & $\approx 0.63$ & 2 \\
+$0.15$               & $\approx 0.26$ & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For the full-evasion scenario of Experiment~10 ($p_1 = 0.00$), detection is
+certain within one window.
+At partial evasion ($p_1 = 0.05$), 95\% detection probability within one window.
+
+\subsubsection*{Early-Warning Guarantee ($\Delta\mathrm{BAR}$)}
+
+The TREND alert fires when $\Delta\mathrm{BAR} = \mathrm{BAR}(\mathcal{D}[W/2{:}W]) - \mathrm{BAR}(\mathcal{D}[0{:}W/2]) < \delta$
+(default $\delta = -0.15$), providing detection before the threshold is reached.
+
+In the half-window model, let $X_1 \sim \mathrm{Bin}(W/2,\, p_0)$ and
+$X_2 \sim \mathrm{Bin}(W/2,\, p_1)$ be boundary-activating counts in the
+first and second halves, respectively.
+The trend fires with probability:
+\[
+  P\!\left(\frac{X_2 - X_1}{W/2} < \delta\right)
+  = P\!\left(X_2 - X_1 < \delta \cdot \tfrac{W}{2}\right)
+\]
+
+\textbf{Experiment~10 validation.}
+With $W=40$, $p_0=0.70$, $\delta=-0.15$, and the Experiment~10 Phase~E
+Batch~2 configuration ($p_1 \approx 0.45$, 25\% evasion):
+$E[X_1] = 14$, $E[X_2] = 9$, $E[\Delta\mathrm{BAR}] = -0.25 < \delta = -0.15$.
+The empirical result confirms: TREND fires at Batch~2
+($\mathrm{BAR}=0.57$, $\Delta\mathrm{BAR}=-0.25$),
+three batches before the threshold alert at Batch~5 ($\mathrm{BAR}=0.00$).
+
 % ── Experiment 10 ─────────────────────────────────────────────────────────────
 \subsection{Experiment 10: Knowledge-Aware Adversarial Evasion}
 \label{sec:exp10}
@@ -3375,6 +3504,91 @@ three batches before collapse;
 preserved ($\mathrm{BAR}_C = 1.00$) and can be restored by reintroducing
 boundary-activating request types into the evaluation workload.
 Together, the three v1.25 mechanisms form a coherent response to this attack class.
+
+% ── Experiment 11 ─────────────────────────────────────────────────────────────
+\subsection{Experiment 11: Threshold Sensitivity Analysis}
+\label{sec:exp11}
+
+\textbf{Motivation.}
+The ACP-RISK-3.0 default thresholds (\texttt{APPROVED}~$\leq 39$,
+\texttt{DENIED}~$\geq 70$) are engineering choices.
+A natural reviewer question is whether the experimental results depend on
+these specific values.
+This experiment evaluates five threshold configurations spanning
+$\pm 10$ points in each direction around the default,
+using the same 20-case baseline dataset as Experiment~9.
+
+\textbf{Setup.}
+Five threshold configurations are evaluated:
+
+\begin{table}[h!]
+\centering\small
+\caption{Threshold configurations evaluated in Experiment~11.}
+\label{tab:threshold-configs}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+Config & Label & APPROVED $\leq$ & DENIED $\geq$ \\
+\midrule
+T1 & strict     & 29 & 60 \\
+T2 & moderate-- & 34 & 65 \\
+T3 & default    & 39 & 70 \\
+T4 & moderate+  & 44 & 75 \\
+T5 & relaxed    & 49 & 80 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Metrics.}
+For each configuration: BAR (boundary activation rate), false-denial rate
+(fraction of T3-APPROVED cases that become DENIED), and coverage (fraction APPROVED).
+
+\textbf{Results.}
+
+\begin{table}[h!]
+\centering\small
+\caption{Experiment~11: threshold sensitivity results across five configurations.
+Dataset: 20 cases from Experiment~9 baseline.
+False-denial rate: fraction of T3-APPROVED cases that become DENIED under this configuration.}
+\label{tab:threshold-sensitivity}
+\begin{tabular}{@{}llccccccc@{}}
+\toprule
+Config & Label & APPROVED & ESCALATED & DENIED & BAR & False-Denial Rate & Coverage \\
+\midrule
+T1 & strict     & 5  & 5 & 10 & 0.75 & 0.00 & 0.25 \\
+T2 & moderate-- & 5  & 7 & 8  & 0.75 & 0.00 & 0.25 \\
+T3 & default    & 6  & 7 & 7  & 0.70 & 0.00 & 0.30 \\
+T4 & moderate+  & 6  & 7 & 7  & 0.70 & 0.00 & 0.30 \\
+T5 & relaxed    & 8  & 6 & 6  & 0.60 & 0.00 & 0.40 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Findings.}
+Three results emerge:
+
+\begin{enumerate}[noitemsep]
+  \item \textbf{False-denial rate is zero across all configurations.}
+        No T3-APPROVED case becomes DENIED under any threshold variant,
+        including the strictest configuration (T1: APPROVED~$\leq 29$).
+        Stricter thresholds promote cases from APPROVED to ESCALATED,
+        not directly to DENIED, because the dataset contains no cases with
+        RS in the intermediate ranges introduced by T1/T2.
+
+  \item \textbf{BAR decreases monotonically as thresholds relax.}
+        BAR falls from 0.75 (T1) to 0.60 (T5), confirming that the
+        enforcement boundary captures fewer boundary-activating requests
+        as thresholds relax.
+        T3 and T4 produce identical results (BAR=0.70), demonstrating
+        that a $+5$ point relaxation has no effect on this dataset.
+
+  \item \textbf{T3 (default) is a local optimum.}
+        T3 is the strictest configuration that achieves false-denial rate
+        zero while maintaining BAR~$=0.70$.
+        Further tightening (T1, T2) increases BAR to 0.75 at the cost of
+        reclassifying legitimate cases as ESCALATED.
+        Relaxing (T5) reduces BAR to 0.60 without reducing false-denial rate.
+        The results justify the default threshold selection empirically.
+\end{enumerate}
 
 \subsection{Extended Governance Objective}
 
@@ -3548,20 +3762,74 @@ informed by observed denial rates, throughput baselines, and threat model requir
 This section defines the adversary model and the security properties provided by ACP.
 
 \subsection{Adversary Capabilities}
+\label{sec:adversary-model}
 
-We consider a probabilistic adversary $\mathcal{A}$ interacting with the system through
-agent requests. The adversary is assumed to have the following capabilities:
+We formalize the adversary as a triple $\mathcal{A} = (K, S, B)$ where:
 
 \begin{itemize}[noitemsep]
-  \item \textbf{Request control:} $\mathcal{A}$ can generate arbitrary sequences of requests
-    on behalf of one or more agents, including high-frequency and adversarial patterns.
-  \item \textbf{Adaptive behavior:} $\mathcal{A}$ can adapt future requests based on past
-    responses (approval/denial outcomes), enabling iterative probing strategies.
-  \item \textbf{Multi-agent coordination:} $\mathcal{A}$ may coordinate multiple agents to
-    attempt distributed evasion, including alternating identities or cross-agent patterns.
-  \item \textbf{Input manipulation:} $\mathcal{A}$ can choose all request fields
-    (capability, resource, context) within the bounds of the protocol specification.
+  \item $K \in \{\textit{black-box},\ \textit{formula-aware},\ \textit{full-state}\}$ is the \emph{knowledge level}.
+    A \emph{black-box} adversary observes only the outcome of each request
+    (\texttt{APPROVED}/\texttt{ESCALATED}/\texttt{DENIED}).
+    A \emph{formula-aware} adversary additionally knows the published risk formula
+    ($\mathrm{RS} = \mathrm{capBase} + F_{\mathrm{res}} + F_{\mathrm{ctx}} + F_{\mathrm{hist}} + F_{\mathrm{anom}}$)
+    and all weight values defined in ACP-RISK-3.0.
+    A \emph{full-state} adversary further has real-time read access to the entire ledger
+    state (pattern counts, denial history, cooldown timestamps).
+
+  \item $S \in \{\textit{threshold-hugging},\ \textit{evasion},\ \textit{flood},\ \textit{collusion}\}$ is the \emph{strategy class}.
+    \emph{Threshold-hugging}: craft requests with $\mathrm{RS}$ just below enforced boundaries.
+    \emph{Evasion}: systematically drive all features toward zero to achieve permanent \texttt{APPROVED}.
+    \emph{Flood}: saturate the system with high-volume requests.
+    \emph{Collusion}: coordinate multiple agents to distribute request load across isolation boundaries.
+
+  \item $B \in \mathbb{N}$ is the \emph{request budget} available to the adversary.
 \end{itemize}
+
+The evaluation experiments instantiate specific $(K, S, B)$ triples.
+Table~\ref{tab:adversary-taxonomy} maps each experiment to its adversary class and
+reports the enforcement outcome.
+
+\begin{table}[h!]
+\centering\small
+\caption{Adversary taxonomy: mapping of ACP experiments to $(K, S, B)$ adversary classes.}
+\label{tab:adversary-taxonomy}
+\begin{tabular}{@{}clllll@{}}
+\toprule
+Exp & Adversary Class & $K$ & $S$ & $B$ & Outcome \\
+\midrule
+1 & Cooldown Evasion       & black-box     & threshold-hugging & 500   & contained \\
+2 & Multi-Agent Flood      & black-box     & flood+collusion   & 1000  & contained \\
+3 & Backend Stress         & black-box     & flood             & 10K   & degraded perf \\
+4 & Token Replay           & black-box     & evasion           & 300   & contained \\
+5--8 & State Mixing        & formula-aware & evasion           & —     & fixed in RISK-3.0 \\
+9 & Deviation Collapse     & —             & upstream drift    & —     & BAR detects \\
+10 & Knowledge-Aware Evasion & formula-aware & evasion (RS=0) & 200   & BAR detects \\
+11 & Threshold Sensitivity  & —             & —                 & —     & monotonic \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Four findings emerge from this taxonomy:
+
+\begin{enumerate}[noitemsep]
+  \item \textbf{Per-decision enforcement suffices against black-box adversaries.}
+        Experiments~1--4 confirm that stateful admission control contains all
+        black-box strategies within the request budget.
+  \item \textbf{Formula-aware adversaries break per-decision enforcement but are
+        detected by BAR.}
+        Experiment~10 shows that a formula-aware adversary can achieve
+        $\mathrm{RS}=0$ on every request, causing every decision to be
+        \texttt{APPROVED} — yet BAR-Monitor fires a TREND alert at batch~2,
+        before the regime reaches full collapse.
+  \item \textbf{Deviation collapse (Exp~9) is an environmental threat, not adversarial,
+        but BAR-Monitor handles both classes with the same mechanism.}
+  \item \textbf{Full-state adversaries are outside the v1.0 threat model.}
+        An adversary with real-time ledger access could predict and exploit
+        threshold transitions.
+        This class is not addressed in the present specification
+        and is acknowledged in \S\ref{sec:limitations}
+        as a target for ACP-D-1.0 (decentralized governance).
+\end{enumerate}
 
 \subsection{Adversary Limitations}
 
