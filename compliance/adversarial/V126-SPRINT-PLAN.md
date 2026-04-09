@@ -350,22 +350,22 @@ Batch 5: 100% evasion, BAR=0.00, ΔBAR=+0.00, THRESHOLD
 - Cualquier cambio de código va a AMBOS repos en el mismo commit o inmediatamente después
 
 ### DOI actual
+Zenodo v1.26: 10.5281/zenodo.19482968
 Zenodo v1.25: 10.5281/zenodo.19473832
 arXiv: 2603.18829 (v8 pendiente — submit después de v1.26)
 
 ---
 
-## ESTADO
+## ESTADO — 2026-04-08
 
-- [ ] O2: exp_threshold_sensitivity.go + --exp=11
-- [ ] O2: Capturar números reales (go run . --exp=11)
-- [ ] O1: §Adversary Model en main.tex
-- [ ] O2: §Threshold Sensitivity (Exp 11) en main.tex
-- [ ] O4: §Detection Guarantees en main.tex
-- [ ] O3: §AgentSpec Comparison en main.tex
-- [ ] Recompilar PDF (pdflatex × 3 + bibtex)
-- [ ] Commit + push EN (main.tex + exp_threshold_sensitivity.go + main.go)
-- [ ] Commit + push ES (exp_threshold_sensitivity.go + main.go solamente)
-- [ ] Actualizar ACP-ROADMAP.md con v1.26 entrada
+- [x] O2: exp_threshold_sensitivity.go + --exp=11
+- [x] O2: Capturar números reales (go run . --exp=11) → BAR monotónico (0.75→0.60), false-denial=0.00
+- [x] O1: §Adversary Model en main.tex — A=(K,S,B) + tabla experimentos + 4 findings
+- [x] O2: §Threshold Sensitivity (Exp 11) en main.tex — tabla resultados + 3 findings
+- [x] O4: §Detection Guarantees en main.tex — Proposition binomial + ΔBAR early-warning
+- [x] O3: §AgentSpec Comparison en main.tex — tabla 5 dimensiones + Exp 10 scenario
+- [x] Recompilar PDF — 76 páginas, sin errores
+- [x] Commit + push EN (commit bec1c5b)
+- [x] Commit + push ES (commit 9e6219b)
 - [ ] Submit arXiv v8 (v1.25+v1.26 combinados — primera submission desde v7)
 - [ ] Deploy web (specification.html + specification-es.html a Hostinger)
