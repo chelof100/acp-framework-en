@@ -15,9 +15,9 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19473832](https://doi.org/10.5281/zenodo.19473832) — Zenodo (v1.25)
+DOI: [10.5281/zenodo.19485201](https://doi.org/10.5281/zenodo.19485201) — Zenodo (v1.27)
 
-arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v7 (v1.23)
+arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v8 (v1.27)
 
 ---
 
@@ -517,7 +517,7 @@ acp-framework/
 │   ├── ACP-TS-1.1.md      ← test vector format specification
 │   ├── test-vectors/      ← single-shot conformance vectors (CORE · DCMA · HP · LEDGER · EXEC · RISK-2.0)
 │   │   └── sequence/      ← stateful sequence vectors (ACR-1.0, 5 scenarios)
-│   ├── adversarial/       ← adversarial evaluation (Exp 1–4 + Exp 9: cooldown evasion, multi-agent, backend stress, token replay, deviation collapse)
+│   ├── adversarial/       ← adversarial evaluation (Exp 1–12: cooldown evasion, multi-agent, backend stress, token replay, deviation collapse, threshold sensitivity, multi-tool IPI)
 │   └── runner/            ← ACR-1.0 compliance runner (library mode + HTTP mode)
 ├── tla/
 │   ├── ACP.tla                   ← base formal model — Safety · LedgerAppendOnly · RiskDeterminism (v1.17)
@@ -567,6 +567,12 @@ python examples/langchain_agent_demo.py
 pip install langchain langchain-openai
 export OPENAI_API_KEY=sk-...
 python examples/langchain_agent_demo.py --with-llm
+
+# Option 7: Real-LLM IPI demo (Ollama + DeepSeek-R1:8b) — ACP blocks IPI-induced fund_transfer
+# Requires: ollama serve && ollama pull deepseek-r1:8b
+cd demos/ollama-agent
+python agent_demo.py
+# ACP denies every IPI-induced fund_transfer (RS=80); cooldown activates after 3 denials
 ```
 
 Health check:
@@ -629,6 +635,14 @@ curl http://localhost:8080/acp/v1/health
 | Phase D drift simulation (Exp 9) + `computeTrend()` ring buffer fix | ✅ Complete — v1.25 · ΔBAR early-warning before threshold · temporal order bug fixed |
 | TLA+ `FailureConditionPreservation` + `NoDegenerateAdmissibility` (11 invariants) | ✅ Complete — v1.25 · 0 violations · 5,684,342 states |
 | `POST /acp/v1/counterfactual` HTTP endpoint (`impl/go/cmd/acp-server/`) | ✅ Complete — v1.25 · 7 integration tests · structural + behavioral mutations via HTTP |
+| Formal adversary model A=(K,S,B) + experiment taxonomy (Exp 1–11) | ✅ Complete — v1.26 · black-box / formula-aware / full-state · all experiments mapped |
+| Threshold sensitivity analysis (Exp 11, 5 configs ±10 pts) | ✅ Complete — v1.26 · false-denial rate 0.00 all configs · BAR monotone 0.75→0.60 · T3 local optimum |
+| Detection guarantees — Proposition + binomial P(detect) | ✅ Complete — v1.26 · W=40 τ=0.10 · P=1.00 at p₁=0.00 · P=0.95 at p₁=0.05 |
+| AgentSpec functional comparison (5 dimensions) | ✅ Complete — v1.26 · composable, not competitive · governance collapse detection differentiator |
+| Exp 12: Multi-tool IPI admission control (`compliance/adversarial/exp_agent_multitool.go`) | ✅ Complete — v1.27 · 4 tools · 3 phases · BAR A=0.30/B=1.00/C=0.30 · stateful F_anom 24h persistence |
+| Real-LLM IPI demo (`demos/ollama-agent/agent_demo.py`) | ✅ Complete — v1.27 · DeepSeek-R1:8b · 5 turns · IPI blocked · cooldown activated |
+| False-denial rate analysis (§False-Denial Rate Analysis) | ✅ Complete — v1.27 · 0.00 clean-state (Exp 11) · 0.00 post-attack low-risk (Exp 12 Phase C) |
+| Deployment maturity model (Tier 1/2/3) + PolicyConfig profiles (Low/Medium/High/Critical) | ✅ Complete — v1.27 · BAR baseline per profile · migration guide RISK-2.0→RISK-3.0 |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
 | future | ZK verification, decentralized governance |
