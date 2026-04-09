@@ -54,7 +54,11 @@ func makeLowRiskReq(agentID string, policy risk.PolicyConfig) risk.EvalRequest {
 //  4. ShouldEnterCooldown         — only on real DENIED
 //  5. SetCooldown(now + period)   — only if ShouldEnterCooldown returns true
 func runRequest(q LedgerMutator, req risk.EvalRequest, policy risk.PolicyConfig) *risk.EvalResult {
-	now := time.Now()
+	// Use req.Now if already set (e.g. by time-controlled experiments); otherwise wall clock.
+	now := req.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
 	req.Now = now
 
 	result, err := risk.Evaluate(req, q)

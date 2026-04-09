@@ -13,6 +13,7 @@
 //	9:  Deviation Collapse and Restoration (BAR metric, counterfactual injection)
 //	10: Knowledge-Aware Adversarial Evasion (full-formula knowledge, BAR collapse, early-warning)
 //	11: Threshold Sensitivity Analysis (5 configs ±10 pts around default)
+//	12: Multi-Tool Agent Admission Control (IPI chain, cooldown, stateful F_anom persistence)
 //	0:  All experiments (default)
 package main
 
@@ -23,7 +24,7 @@ import (
 )
 
 func main() {
-	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay, 9=deviation-collapse, 10=adversarial-evasion, 11=threshold-sensitivity")
+	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay, 9=deviation-collapse, 10=adversarial-evasion, 11=threshold-sensitivity, 12=agent-multitool")
 	redisAddr := flag.String("redis-addr", "localhost:6379", "Redis address for experiment 3")
 	flag.Parse()
 
@@ -44,6 +45,8 @@ func main() {
 		RunAdversarialEvasion(cfg)
 		fmt.Println()
 		RunThresholdSensitivity(cfg)
+		fmt.Println()
+		RunAgentMultitool(cfg)
 	case 1:
 		RunCooldownEvasion(cfg)
 	case 2:
@@ -58,6 +61,8 @@ func main() {
 		RunAdversarialEvasion(cfg)
 	case 11:
 		RunThresholdSensitivity(cfg)
+	case 12:
+		RunAgentMultitool(cfg)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown experiment: %d\n", *exp)
 		os.Exit(1)
