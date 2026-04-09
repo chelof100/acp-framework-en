@@ -345,8 +345,8 @@ temperature=0, seed=42 for reproducibility."
 
 10. Commit + push EN y ES (código Go)
 
-11. Submit arXiv v8 — primera submission desde v6 (v7 = ?)
-    Nota: verificar cuál fue el último arXiv submit real
+11. Submit arXiv v8 — primera submission desde v7 (= v1.23, 7 Apr 2026)
+    Salta v1.24/v1.25/v1.26 — normal, arXiv no espeja Zenodo
 ```
 
 ---
@@ -386,10 +386,17 @@ Phase B (8 req, BAR=1.00) → THRESHOLD alert inmediato en batch B
 - Código Go → ambos repos
 - demos/ → solo EN repo
 
-### DOIs
-- v1.26 Zenodo: 10.5281/zenodo.19482968
-- v1.27 Zenodo: TBD (después de completar v1.27)
-- arXiv: 2603.18829 (v8 pendiente — submit con v1.27)
+### Historial de versiones (EXACTO)
+| Versión | Zenodo | arXiv |
+|---------|--------|-------|
+| v1.27 | TBD | v8 ← próximo submit |
+| v1.26 | 10.5281/zenodo.19482968 | — (nunca subida a arXiv) |
+| v1.25 | 10.5281/zenodo.19473832 | — (nunca subida a arXiv) |
+| v1.24 | — (nunca publicada, fusionada en v1.25) | — |
+| v1.23 | 10.5281/zenodo.19449650 | v7 ← ÚLTIMO SUBMIT (7 Apr 2026) |
+| v1.22 | 10.5281/zenodo.19357022 | v6 |
+
+REGLA: arXiv v8 = v1.27. Saltar v1.24/v1.25/v1.26 en arXiv es correcto.
 
 ### Ollama setup (para C.4)
 - ollama pull llama3.2        # 3B, rápido, local
