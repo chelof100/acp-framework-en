@@ -425,8 +425,8 @@ REGLA: arXiv v8 = v1.27. Saltar v1.24/v1.25/v1.26 en arXiv es correcto.
 
 ## ESTADO
 
-- [ ] A: §Limitations IPI scope en main.tex
-- [ ] B: §LLM Agent Integration en §Deployment main.tex
+- [x] A: §Limitations IPI scope en main.tex — citas agentdojo+injecagent, composability paragraph
+- [x] B: §LLM Agent Integration en §Deployment main.tex — lstlisting Python, Ollama note, cita ollama2024
 - [ ] C.1: Verificar RecentDenial en engine.go (antes de implementar)
 - [ ] C.2: exp_agent_multitool.go + --exp=12
 - [ ] C.3: go run . --exp=12 (capturar números reales)
