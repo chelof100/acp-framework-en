@@ -1,0 +1,166 @@
+=== Experiment 14: OPA vs ACP — Stateless vs Stateful Admission Control ===
+
+Framing: capability comparison (not performance).
+Central claim: stateless engines cannot enforce history-dependent constraints
+without externalizing state. ACP enforces them natively.
+
+Setup   : acp:cap:financial.transfer / accounts/shared-ops (public)
+Baseline: B=35 + F_res=0 = RS 35 → APPROVED (ApprovedMax=39)
+Rule3(Y=2): count(patKey,5min) ≥ 2 → +15 → RS 50 ESCALATED
+Rule1(N=2): count(patKey,60s)  > 2 → +20 → RS 70 DENIED
+
+─── Scenario A: Single Request (Stateless Admissibility) ───
+
+  ACP stateful   : RS=35 → APPROVED
+  ACP stateless  : RS=35 → APPROVED
+  OPA (pure)     : allow=true
+
+  Result: all three agree — no state required for single-request decisions.
+
+─── Scenario B: Frequency Accumulation (10 requests, same agent) ───
+
+  Req#  ACP Stateful        ACP Stateless       OPA (pure)  
+  ----  ------------        -------------       ----------  
+  1     APPROVED            APPROVED            allow=true  
+  2     APPROVED            APPROVED            allow=true  
+  3     ESCALATED           APPROVED            allow=true  
+  4     DENIED              APPROVED            allow=true  
+  5     DENIED              APPROVED            allow=true  
+  6     DENIED              APPROVED            allow=true  
+  7     COOLDOWN_ACTIVE     APPROVED            allow=true  
+  8     COOLDOWN_ACTIVE     APPROVED            allow=true  
+  9     COOLDOWN_ACTIVE     APPROVED            allow=true  
+  10    COOLDOWN_ACTIVE     APPROVED            allow=true  
+
+  ACP stateful  : 2 APPROVED / 1 ESCALATED / 7 DENIED
+  ACP stateless : 10 APPROVED / 0 ESCALATED / 0 DENIED (F_anom=0)
+  OPA (pure)    : 10 allow=true / 0 allow=false
+
+  ACP first ESCALATED : request #3
+  ACP first DENIED    : request #4
+
+  Key result: ACP transitions APPROVED→ESCALATED→DENIED via pattern
+  accumulation. Stateless engine and OPA approve all 10 requests —
+  they cannot observe the behavioral trace.
+
+  OPA with injected history (Scenario B variant):
+  req_count   OPA (injected)  Note
+  ---------   --------------  ----
+  0           true            below threshold
+  1           true            below threshold
+  2           true            below threshold
+  3           false           threshold reached → deny
+  4           false           threshold reached → deny
+
+  Observation: OPA can deny when request_count is injected.
+  However, the caller must maintain and increment the counter externally.
+  ACP maintains this counter natively (PatternKey ledger).
+
+─── Scenario C: Cooldown Enforcement ───
+
+  Setup: financial.transfer / restricted-fund → RS=80 → DENIED always
+  Cooldown triggers after 3 denials
+
+  Req#  ACP Stateful            ACP Stateless     
+  ----  ------------            -------------     
+  1     DENIED                  DENIED            
+  2     DENIED                  DENIED            
+  3     DENIED                  DENIED            
+  4     COOLDOWN_ACTIVE         DENIED            
+  5     COOLDOWN_ACTIVE         DENIED            
+  6     COOLDOWN_ACTIVE         DENIED            
+
+  ACP: transitions to COOLDOWN_ACTIVE after 3 denials — blocks further
+  requests without re-evaluation. Stateless engine re-evaluates every
+  request independently and never enters cooldown.
+
+  OPA with injected cooldown (Scenario C variant):
+  cooldown_active=false  OPA: allow=true   (no cooldown)
+  cooldown_active=true   OPA: allow=false  (cooldown injected)
+
+  Observation: OPA can enforce cooldown IF cooldown_active is injected.
+  The cooldown timer must be managed externally. ACP manages it natively.
+
+─── Latency Comparison (supporting data) ───
+
+  ACP Evaluate()  : 852 ns/op  (50000 iterations)
+  Note: latency from established benchmark (TestLatencyPercentiles): ~739 ns p50
+
+  OPA bench (opa bench -d policy.rego -i input.json 'data.acp.allow'):
+  ┌───────────────────────────────────────────┬────────┐
+  │ samples                                   │  68835 │
+  │ ns/op                                     │  16222 │
+  │ B/op                                      │   3849 │
+  │ allocs/op                                 │     64 │
+  │ histogram_timer_rego_query_eval_ns_75%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_90%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_95%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_99%    │ 536793 │
+  │ histogram_timer_rego_query_eval_ns_99.9%  │ 650096 │
+  │ histogram_timer_rego_query_eval_ns_99.99% │ 652300 │
+  │ histogram_timer_rego_query_eval_ns_count  │  68835 │
+  │ histogram_timer_rego_query_eval_ns_max    │ 652300 │
+  │ histogram_timer_rego_query_eval_ns_mean   │  12401 │
+  │ histogram_timer_rego_query_eval_ns_median │      0 │
+  │ histogram_timer_rego_query_eval_ns_min    │      0 │
+  │ histogram_timer_rego_query_eval_ns_stddev │  80486 │
+  └───────────────────────────────────────────┴────────┘
+  ┌───────────────────────────────────────────┬────────┐
+  │ samples                                   │  69238 │
+  │ ns/op                                     │  16141 │
+  │ B/op                                      │   3848 │
+  │ allocs/op                                 │     64 │
+  │ histogram_timer_rego_query_eval_ns_75%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_90%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_95%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_99%    │ 528195 │
+  │ histogram_timer_rego_query_eval_ns_99.9%  │ 620356 │
+  │ histogram_timer_rego_query_eval_ns_99.99% │ 621000 │
+  │ histogram_timer_rego_query_eval_ns_count  │  69238 │
+  │ histogram_timer_rego_query_eval_ns_max    │ 621000 │
+  │ histogram_timer_rego_query_eval_ns_mean   │   9318 │
+  │ histogram_timer_rego_query_eval_ns_median │      0 │
+  │ histogram_timer_rego_query_eval_ns_min    │      0 │
+  │ histogram_timer_rego_query_eval_ns_stddev │  70015 │
+  └───────────────────────────────────────────┴────────┘
+  ┌───────────────────────────────────────────┬────────┐
+  │ samples                                   │  75490 │
+  │ ns/op                                     │  15851 │
+  │ B/op                                      │   3849 │
+  │ allocs/op                                 │     64 │
+  │ histogram_timer_rego_query_eval_ns_75%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_90%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_95%    │      0 │
+  │ histogram_timer_rego_query_eval_ns_99%    │ 526075 │
+  │ histogram_timer_rego_query_eval_ns_99.9%  │ 705497 │
+  │ histogram_timer_rego_query_eval_ns_99.99% │ 708800 │
+  │ histogram_timer_rego_query_eval_ns_count  │  75490 │
+  │ histogram_timer_rego_query_eval_ns_max    │ 708800 │
+  │ histogram_timer_rego_query_eval_ns_mean   │   9492 │
+  │ histogram_timer_rego_query_eval_ns_median │      0 │
+  │ histogram_timer_rego_query_eval_ns_min    │      0 │
+  │ histogram_timer_rego_query_eval_ns_stddev │  71356 │
+  └───────────────────────────────────────────┴────────┘
+
+
+  IMPORTANT: latency gap reflects evaluation model difference (Go native vs
+  Rego interpreter), not algorithmic complexity. The architectural claim is
+  expressibility, not speed.
+
+─── Summary: Capability Matrix ───
+
+  Scenario                            ACP Stateful    ACP Stateless   OPA (pure)    
+  ---------------------------------   ------------    -------------   ----------    
+  A: Single request                   ✓ APPROVED      ✓ APPROVED      ✓ allow=true  
+  B: Frequency limit (N requests)     ✓ DENIED        ✗ APPROVED      ✗ allow=true  
+  C: Cooldown (temporal block)        ✓ COOLDOWN      ✗ DENIED/loop   ✗ allow=true  
+
+  ✓ = correct enforcement  ✗ = cannot enforce without external state
+
+  OPA + external state can approximate B and C, but requires:
+    - External counter/timer (Redis, DB, or in-memory map)
+    - Caller responsibility to inject current state into every request
+    - Additional infrastructure not present in OPA itself
+
+  ACP enforces B and C natively via PatternKey ledger and CooldownActive()
+  as part of the execution contract (evaluate-then-mutate, §4).

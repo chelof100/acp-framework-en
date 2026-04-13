@@ -15,6 +15,7 @@
 //	11: Threshold Sensitivity Analysis (5 configs ±10 pts around default)
 //	12: Multi-Tool Agent Admission Control (IPI chain, cooldown, stateful F_anom persistence)
 //	13: Bounded Coordination Window (N agents, per-agent vs resource-level bounds)
+//	14: OPA vs ACP — Stateless vs Stateful Admission Control (capability comparison)
 //	0:  All experiments (default)
 package main
 
@@ -25,7 +26,7 @@ import (
 )
 
 func main() {
-	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay, 9=deviation-collapse, 10=adversarial-evasion, 11=threshold-sensitivity, 12=agent-multitool, 13=coordination-window")
+	exp := flag.Int("exp", 0, "experiment: 0=all, 1=cooldown-evasion, 2=multi-agent, 3=backend-stress, 4=token-replay, 9=deviation-collapse, 10=adversarial-evasion, 11=threshold-sensitivity, 12=agent-multitool, 13=coordination-window, 14=opa-benchmark")
 	redisAddr := flag.String("redis-addr", "localhost:6379", "Redis address for experiment 3")
 	flag.Parse()
 
@@ -50,6 +51,8 @@ func main() {
 		RunAgentMultitool(cfg)
 		fmt.Println()
 		RunCoordinationWindow(cfg)
+		fmt.Println()
+		RunOPABenchmark(cfg)
 	case 1:
 		RunCooldownEvasion(cfg)
 	case 2:
@@ -68,6 +71,8 @@ func main() {
 		RunAgentMultitool(cfg)
 	case 13:
 		RunCoordinationWindow(cfg)
+	case 14:
+		RunOPABenchmark(cfg)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown experiment: %d\n", *exp)
 		os.Exit(1)
