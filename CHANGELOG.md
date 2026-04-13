@@ -7,6 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.28.0] — v1.28 — 2026-04-13
+
+### Added
+
+#### Experiment 13 — Bounded Coordination Window (`compliance/adversarial/exp_coordination_window.go`)
+- `RunCoordinationWindow`: evaluates how N coordinated agents accumulate risk independently under ACP-RISK-3.0.
+- Variants: V1 sequential (N=1), V2 round-robin (N=2,3,5), V3 burst (N=5).
+- Result: `CW_approved = 2N` with zero deviation — exact linearity confirmed.
+- Key insight: evaluate-then-mutate execution contract guarantees k₀=2 approved actions per agent before escalation and denial, a bound determined by execution semantics.
+- Formulas verified: `CW_total = 3N`, `TTB_rr = 3N+1`, `TTB_burst = 4` (fixed).
+- Claim: coordinated activity scales exactly O(N); superlinear amplification structurally prevented.
+
+#### Paper — v1.28
+- §Experiment 13: full section with table, linearity analysis, evaluate-then-mutate explanation, round-robin vs burst distinction, trilogía connection (Exp 9 + TLA+ + Exp 13).
+- LLM Agent Integration subsection moved from §Deployment Considerations to §Technical Mechanisms (after §Deterministic Risk Evaluation).
+- Related Work: added 2-sentence OPA framing ("without external state integration" qualifier).
+- Adversary taxonomy table: Exp 13 row added; 6th finding added.
+- Roadmap table: Exp 13 entry added.
+- Abstract: Exp 13 + trilogía closing paragraph added.
+- All version strings updated to v1.28; Zenodo DOI updated to 10.5281/zenodo.19559764.
+
+---
+
 ## [1.25.0] — v1.25 — 2026-04-07
 
 ### Added

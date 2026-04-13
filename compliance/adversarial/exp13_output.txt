@@ -1,0 +1,56 @@
+=== Experiment 13: Bounded Coordination Window ===
+
+Scenario : acp:cap:financial.transfer / accounts/shared-ops (public)
+Baseline : B=35 + F_res=0 = RS 35 → APPROVED (ApprovedMax=39)
+Escalation: +Rule3(≥2/5min)→RS=50 ESCALATED  +Rule1(>2/60s)→RS=70 DENIED
+Per-agent: req#1=APPROVED  req#2=ESCALATED  req#3=DENIED  (k₀=3)
+
+  Variant                       N       CW_appr     CW_total    TTB_reqs  
+  -------                       -       -------     --------    --------  
+  V1 — Sequential               1       2           3           4         
+  V2 — Round-robin (2 agents)   2       4           6           7         
+  V2 — Round-robin (3 agents)   3       6           9           10        
+  V2 — Round-robin (5 agents)   5       10          15          16        
+  V3 — Burst (5 agents)         5       10          15          4         
+
+--- Per-agent contribution (V2, N=3) ---
+  Agent       Approved    Escalated     Outcome   
+  -----       --------    ---------     -------   
+  agent-01    2           1             DENIED
+  agent-02    2           1             DENIED
+  agent-03    2           1             DENIED
+
+--- Boundary Activation Point (V2, N=5) ---
+  Req#    Agent       RS      Decision    Anomaly     
+  ----    -----       --      --------    -------     
+  1       agent-01    35      APPROVED    —           
+  2       agent-02    35      APPROVED    —           
+  3       agent-03    35      APPROVED    —           
+  4       agent-04    35      APPROVED    —           
+  5       agent-05    35      APPROVED    —           
+  6       agent-01    35      APPROVED    —           
+  7       agent-02    35      APPROVED    —           
+  8       agent-03    35      APPROVED    —           
+  9       agent-04    35      APPROVED    —           
+  10      agent-05    35      APPROVED    —           
+  11      agent-01    50      ESCALATED   R3          
+  12      agent-02    50      ESCALATED   R3          
+  13      agent-03    50      ESCALATED   R3          
+  14      agent-04    50      ESCALATED   R3          
+  15      agent-05    50      ESCALATED   R3          
+  16      agent-01    70      DENIED      R1 R3       
+
+=== Findings ===
+CW_approved = N × k₀  (linear): each agent independently contributes
+k₀=1 approved op before anomaly escalates (Rule3) then blocks (Rule1).
+
+TTB_reqs    = N×(k₀-1)+1 (round-robin): more agents delay the first
+block in total-request count, but do not reduce per-agent exposure.
+
+Design boundary: PatternKey = SHA-256(agentID | cap | res) ensures
+per-agent scope. N agents targeting the same resource accumulate risk
+independently. Total approved operations = N × k₀ (linear in N).
+
+ACP bounds coordination per-agent. Resource-level attribution against
+coordinated access requires an additional mechanism beyond RISK-3.0
+per-agent admission control (identified as future work).
