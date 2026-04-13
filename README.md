@@ -616,7 +616,7 @@ curl http://localhost:8080/acp/v1/health
 | Sequence test vectors (`compliance/test-vectors/sequence/`) | ✅ Complete — v1.17 · 5 stateful scenarios |
 | TLA+ base model (`tla/ACP.tla`) | ✅ Complete — v1.17 · 3 invariants · 0 violations |
 | TLA+ extended model (`tla/ACP_Extended.tla`) | ✅ Complete — v1.28 · 11 invariants + 4 temporal properties · single-agent: 5,684,342 states · two-agent LB=11: 4,294,930,695 distinct states · 0 violations |
-| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.28 · 13 experiments · real benchmark numbers (N=5 runs, mean±std) |
+| Adversarial evaluation (`compliance/adversarial/`) | ✅ Complete — v1.29 · 14 experiments · real benchmark numbers (N=5 runs, mean±std) |
 | Redis pipelining (`compliance/adversarial/redis_pipelined.go`) | ✅ Complete — v1.20 · 2 RTTs/request · ~1.8× speedup |
 | ML-DSA-65 benchmarks (`pkg/sign2/sign2_bench_test.go`) | ✅ Complete — v1.20 · Ed25519 ~25 µs sign / ~56 µs verify · ML-DSA-65 ~100–130 µs sign / ~81 µs verify |
 | NullQuerier + StatelessEngine (`pkg/risk/null_querier.go`, `stateless_engine.go`) | ✅ Complete — v1.21 · zero-state LedgerQuerier baseline for stateless/stateful comparison |
@@ -635,7 +635,7 @@ curl http://localhost:8080/acp/v1/health
 | Phase D drift simulation (Exp 9) + `computeTrend()` ring buffer fix | ✅ Complete — v1.25 · ΔBAR early-warning before threshold · temporal order bug fixed |
 | TLA+ `FailureConditionPreservation` + `NoDegenerateAdmissibility` (11 invariants) | ✅ Complete — v1.27 · 0 violations · 4,294,930,695 distinct states (two-agent LB=11, 10.5h) |
 | `POST /acp/v1/counterfactual` HTTP endpoint (`impl/go/cmd/acp-server/`) | ✅ Complete — v1.25 · 7 integration tests · structural + behavioral mutations via HTTP |
-| Formal adversary model A=(K,S,B) + experiment taxonomy (Exp 1–13) | ✅ Complete — v1.28 · black-box / formula-aware / full-state · all experiments mapped |
+| Formal adversary model A=(K,S,B) + experiment taxonomy (Exp 1–14) | ✅ Complete — v1.29 · black-box / formula-aware / full-state · all experiments mapped |
 | Threshold sensitivity analysis (Exp 11, 5 configs ±10 pts) | ✅ Complete — v1.26 · false-denial rate 0.00 all configs · BAR monotone 0.75→0.60 · T3 local optimum |
 | Detection guarantees — Proposition + binomial P(detect) | ✅ Complete — v1.26 · W=40 τ=0.10 · P=1.00 at p₁=0.00 · P=0.95 at p₁=0.05 |
 | AgentSpec functional comparison (5 dimensions) | ✅ Complete — v1.26 · composable, not competitive · governance collapse detection differentiator |
@@ -645,6 +645,8 @@ curl http://localhost:8080/acp/v1/health
 | Deployment maturity model (Tier 1/2/3) + PolicyConfig profiles (Low/Medium/High/Critical) | ✅ Complete — v1.27 · BAR baseline per profile · migration guide RISK-2.0→RISK-3.0 |
 | Exp 13: Bounded coordination window (`compliance/adversarial/exp_coordination_window.go`) | ✅ Complete — v1.28 · CW=2N exact linearity · evaluate-then-mutate semantics · k₀=2 per agent · O(N) bound |
 | LLM Agent Integration subsection moved to §Technical Mechanisms | ✅ Complete — v1.28 · after §Deterministic Risk Evaluation · composable with IPI prompt filters |
+| Exp 14: OPA vs ACP capability comparison (`compliance/adversarial/exp_opa_benchmark.go`) | ✅ Complete — v1.29 · 3 scenarios · stateless engines cannot enforce frequency/cooldown without external state · ACP enforces natively · ~852 ns/op ACP vs ~16,000 ns/op OPA |
+| §Related Work — Formal Verification and Runtime Enforcement (expanded) | ✅ Complete — v1.29 · OPA expressiveness boundary · Schneider security automaton alignment · Exp 14 cross-reference |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
 | future | ZK verification, decentralized governance |

@@ -7,6 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.29.0] — v1.29 — 2026-04-13
+
+### Added
+
+#### Experiment 14 — OPA vs ACP Capability Comparison (`compliance/adversarial/exp_opa_benchmark.go`)
+- `RunOPABenchmark`: compares enforcement capability of ACP (stateful) vs ACP StatelessEngine vs OPA (Open Policy Agent v1.15.2, Rego v1).
+- Central framing: expressiveness comparison, not performance. Stateless policy engines cannot enforce history-dependent constraints without external state; ACP enforces them natively.
+- 3 scenarios: A (single request — all three agree), B (frequency accumulation — 10 requests), C (cooldown enforcement).
+- Scenario B results: ACP stateful APPROVED×2→ESCALATED×1→DENIED×3→COOLDOWN_ACTIVE×4; ACP stateless APPROVED×10; OPA pure allow=true×10. First ESCALATED: request #3; first DENIED: request #4.
+- Scenario C results: ACP stateful DENIED×3→COOLDOWN_ACTIVE×3; ACP stateless DENIED×6 (loop, no cooldown concept); OPA pure N/A (no cooldown mechanism).
+- OPA+external state variants: correctly enforce B/C when caller injects `request_count` or `cooldown_active` — demonstrating stateful enforcement must be engineered around OPA.
+- Latency (supporting data): ACP ~852 ns/op (50,000 iterations); OPA ~16,000 ns/op. Gap reflects model difference (Go native vs Rego interpreter), not algorithmic complexity.
+- OPA invoked via `os/exec` (`opa eval` + `opa bench`) — no `go.mod` changes.
+
+#### Paper — v1.29
+- §Related Work — Formal Verification and Runtime Enforcement: expanded from 2 sentences to full subsection covering OPA expressiveness boundary, agentic systems distinction, OPA+external state reviewer argument, Schneider security automaton alignment, cross-reference to §Experiment 14.
+- §Experiment 14: new section with motivation, 3-scenario setup, per-scenario results, capability matrix table, latency note, and summary.
+- Adversary taxonomy table: Exp 14 row added (stateless engine / stateless eval / 0 enforced).
+- Roadmap table: Exp 14 entry added.
+- All version strings updated to v1.29.
+
+---
+
 ## [1.28.0] — v1.28 — 2026-04-13
 
 ### Added
