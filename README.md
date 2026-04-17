@@ -15,9 +15,9 @@ https://agentcontrolprotocol.xyz
 **Agent Control Protocol: Admission Control for Agent Actions**
 Marcelo Fernandez (TraslaIA), 2026
 
-DOI: [10.5281/zenodo.19561638](https://doi.org/10.5281/zenodo.19561638) — Zenodo (v1.29)
+DOI: [10.5281/zenodo.19561638](https://doi.org/10.5281/zenodo.19561638) — Zenodo (v1.29 · v1.30 pending upload)
 
-arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v8 (v1.28 — arXiv v9 pending)
+arXiv: [2603.18829](https://arxiv.org/abs/2603.18829) — v8 (v1.28 · v1.30 pending — skipping v1.29)
 
 ---
 
@@ -663,6 +663,7 @@ curl http://localhost:8080/acp/v1/health
 | LLM Agent Integration subsection moved to §Technical Mechanisms | ✅ Complete — v1.28 · after §Deterministic Risk Evaluation · composable with IPI prompt filters |
 | Exp 14: OPA vs ACP capability comparison (`compliance/adversarial/exp_opa_benchmark.go`) | ✅ Complete — v1.29 · 3 scenarios · stateless engines cannot enforce frequency/cooldown without external state · ACP enforces natively · ~852 ns/op ACP vs ~16,000 ns/op OPA |
 | §Related Work — Formal Verification and Runtime Enforcement (expanded) | ✅ Complete — v1.29 · OPA expressiveness boundary · Schneider security automaton alignment · Exp 14 cross-reference |
+| Governance series integration: Papers 3–4 cited in §15; `fernandez2026comp` bib entry | ✅ Complete — v1.30 |
 | v1.x | Core protocol and reference implementation — active |
 | v2.0 | Decentralized ACP (ACP-D) — in design |
 | future | ZK verification, decentralized governance |
