@@ -23,3 +23,16 @@ node_modules/
 
 # TLC model-checker artifacts (state dumps, run logs)
 tla/states/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.pdf

@@ -1,0 +1,5 @@
+@echo off
+set ACP_INSTITUTION_PUBLIC_KEY=5Hp41BSnYcpih3-VIp1iPOhi0roGDnZW3C-E2c00Nqc
+set ACP_INSTITUTION_PRIVATE_KEY=mgOqL7DOKoRwws_LrwnxGfCrb4Kvly_xLW26VXsZapbkenjUFKdhymKHf5UinWI86GLSugYOdlbcL4TZzTQ2pw
+set ACP_ADDR=:8081
+acp-server.exe

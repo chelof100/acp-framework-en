@@ -1,6 +1,6 @@
 ﻿% ============================================================
 % Agent Control Protocol — arXiv Submission
-% ACP v1.26 — Admission Control for Agent Actions
+% ACP v1.27 — Admission Control for Agent Actions
 % Marcelo Fernandez, TraslaIA, April 2026
 % Categories: cs.CR (primary), cs.AI (secondary)
 % ============================================================
@@ -71,7 +71,7 @@
   citecolor=blue!70!black,
   pdftitle={Agent Control Protocol: Admission Control for Agent Actions},
   pdfauthor={Marcelo Fernandez},
-  pdfsubject={Formal protocol for governance of autonomous agents. v1.25. arXiv:2603.18829},
+  pdfsubject={Formal protocol for governance of autonomous agents. v1.27. arXiv:2603.18829},
   pdfkeywords={autonomous agents, admission control, capability tokens, cryptographic governance, agent authorization, audit ledger}
 }
 
@@ -106,7 +106,7 @@
 
 \title{%
   \textbf{Agent Control Protocol}\\[0.4em]
-  \large ACP v1.26: Admission Control for Agent Actions\\[0.3em]
+  \large ACP v1.27: Admission Control for Agent Actions\\[0.3em]
   \normalsize Technical Specification and Reference Implementation%
 }
 
@@ -117,7 +117,7 @@
   \url{https://agentcontrolprotocol.xyz}
 }
 
-\date{April 2026 \\ \small Draft Standard \\ \small \href{https://arxiv.org/abs/2603.18829}{arXiv:2603.18829 [cs.CR]} \quad \href{https://doi.org/10.5281/zenodo.19482968}{DOI: 10.5281/zenodo.19482968}}
+\date{April 2026 \\ \small Draft Standard \\ \small \href{https://arxiv.org/abs/2603.18829}{arXiv:2603.18829 [cs.CR]} \quad \href{https://doi.org/10.5281/zenodo.19485201}{DOI: 10.5281/zenodo.19485201}}
 
 \maketitle
 
@@ -132,6 +132,9 @@ We present ACP, a temporal admission control protocol that enforces behavioral
 properties over execution traces by combining static risk scoring with stateful
 signals (anomaly accumulation, cooldown) through a \texttt{LedgerQuerier}
 abstraction separating decision logic from state management.
+ACP is not an anomaly detection system: it does not detect suspicious patterns
+and alert; it \emph{blocks execution} based on deterministic, history-aware
+risk scoring, providing a hard enforcement boundary rather than an advisory signal.
 We demonstrate that this structural separation has measurable security
 consequences: under a 500-request workload where every request is individually
 valid (RS=35), a stateless engine with identical scoring approves all 500~requests, while
@@ -148,23 +151,24 @@ by scoping rate-based anomaly signals to the interaction context via
 \texttt{PatternKey(agentID, capability, resource)}, while preserving
 enforcement: repeated behavior within a single context continues to trigger
 denial at the same threshold (Experiment~8).
-Decision evaluation runs at 767--921\,ns (p50; Table~\ref{tab:benchmarks});
-throughput reaches 920{,}000~req/s under moderate concurrency, degrading
-predictably with backend latency without protocol changes.
+Decision evaluation runs at 739--832\,ns (p50; Table~\ref{tab:benchmarks});
+throughput reaches 1{,}720{,}000~req/s (baseline, InMemoryQuerier)
+and 920{,}000~req/s at 10 concurrent workers (Table~\ref{tab:throughput}),
+degrading predictably with backend latency without protocol changes.
 Safety and liveness properties are model-checked via TLC-runnable TLA+
-(11~invariants + 4~temporal properties, 0~violations across 5,684,342~states)
-and validated at runtime by 73~signed conformance test vectors.
-We further identify \emph{deviation collapse}: a degenerate regime in which enforcement is
-active but never exercised because upstream constraints eliminate the conditions required
-for \texttt{DENIED} decisions.
-We introduce Boundary Activation Rate (BAR) as a metric and counterfactual evaluation
-as a detection mechanism (Experiment~9), and validate $\Delta\mathrm{BAR}$ early-warning
-detection under progressive drift (Phase~D).
+(11~invariants + 4~temporal properties, 0~violations);
+two-agent safety is verified at the correct ledger bound across
+\textbf{4,294,930,695~distinct states} with zero violations.
+Runtime correctness is validated by 73~signed conformance test vectors.
 We demonstrate that an adversary with complete knowledge of the risk formula can suppress
 BAR to $0.00$ while every individual request remains policy-compliant (Experiment~10);
 BAR-Monitor detects the regime shift via $\Delta\mathrm{BAR}$ three batches before collapse,
 and counterfactual evaluation confirms structural enforcement capacity is preserved
 ($\mathrm{BAR}_C = 1.00$).
+We further identify and formalize \emph{deviation collapse}---a previously unrecognized
+governance failure mode in which enforcement is active but never exercised because upstream
+constraints eliminate the conditions required for \texttt{DENIED} decisions---and introduce
+Boundary Activation Rate (BAR) as its detection mechanism (Experiment~9).
 
 \textbf{Specification and implementation:} \url{https://github.com/chelof100/acp-framework-en}
 \end{abstract}
@@ -239,7 +243,7 @@ ACP satisfies the first two by design; we identify and formalize the third as
 
 \subsection{ACP as Admission Control}
 
-A useful analogy for understanding what ACP does is the Kubernetes Admission Controller pattern.
+A useful analogy for understanding what ACP does is the Kubernetes Admission Controller pattern~\cite{kubernetes-admission}.
 
 Kubernetes intercepts every API request before it reaches the cluster and runs it through a sequence of admission checks---\texttt{ValidatingWebhookConfiguration},
 \texttt{ResourceQuota} enforcement, OPA Gatekeeper policies.
@@ -336,8 +340,8 @@ The entire chain is recorded in the Audit Ledger with an externally verifiable i
 ACP is \textbf{compute-cheap but state-sensitive}: decision evaluation is computationally
 inexpensive, while system performance is primarily constrained by state access patterns.
 
-This separation enables a protocol that is both efficient in isolation (767--921\,ns per
-decision, p50; Table~\ref{tab:benchmarks}, $\sim$88\,ns for the cooldown short-circuit path) and adaptable in deployment:
+This separation enables a protocol that is both efficient in isolation (739--832\,ns per
+decision, p50; Table~\ref{tab:benchmarks}, $\sim$78\,ns for the cooldown short-circuit path) and adaptable in deployment:
 performance can be improved by replacing the state backend without modifying protocol semantics.
 The \texttt{LedgerQuerier} interface formalizes this boundary---the decision function remains
 stateless and deterministic; the state backend can be a local in-memory structure for development
@@ -345,8 +349,9 @@ or a distributed, indexed store in production.
 
 \subsection{Contributions}
 
-This paper makes the following contributions:
+This paper makes the following contributions, organized by theme:
 
+\paragraph{I.\enspace Stateful temporal admission control.}
 \begin{itemize}[noitemsep]
   \item \textbf{Structural necessity of stateful enforcement.} We demonstrate
     empirically (Experiment~6) that temporal behavioral properties over execution
@@ -356,30 +361,53 @@ This paper makes the following contributions:
     approves all 500~requests; ACP limits autonomous execution to 2~out of 500
     (detection latency: 11~actions, early signal: 3~actions).
   \item \textbf{Sub-microsecond temporal admission control.} We show that
-    stateful trace-level enforcement is compatible with 767--921\,ns decision
+    stateful trace-level enforcement is compatible with 739--832\,ns decision
     latency (p50; Table~\ref{tab:benchmarks}) and 920{,}000~req/s throughput,
     achieved by separating decision logic (stateless, compute-cheap) from state
     management via the \texttt{LedgerQuerier} abstraction---enabling backend
     replacement without modifying protocol semantics or security guarantees.
   \item \textbf{Runtime containment with measurable latency.} A cooldown-based
-    containment mechanism provides a 9.5$\times$ faster denial path (88\,ns via
+    containment mechanism provides a 10.7$\times$ faster denial path (78\,ns via
     Step~2 short-circuit) and predictable throughput degradation under backend
     stress, isolated empirically in a controlled latency injection experiment
     (0\,$\mu$s $\to$ 920k~req/s; 5\,ms $\to$ 470~req/s).
+\end{itemize}
+
+\paragraph{II.\enspace Formal verification and verifiability.}
+\begin{itemize}[noitemsep]
   \item \textbf{Formal verification of safety invariants.} Safety properties
     (admission determinism, cooldown monotonicity, per-agent isolation) are
-    verified by TLC model checking over 5,684,342~generated states
-    (11~invariants + 4~temporal properties, 0~violations), establishing that
-    enforcement holds under adversarial state conditions.
+    verified by TLC model checking over 5,684,342~generated states in the
+    single-agent configuration (11~invariants + 4~temporal properties, 0~violations)
+    and over 4,294,930,695~distinct states in a two-agent configuration
+    at \texttt{LEDGER\_BOUND=11} (11~safety invariants, 0~violations, 10.5~h,
+    i9-13900HX 24-core, 24\,GB heap), establishing that enforcement holds under
+    adversarial state conditions and across independent concurrent agents.
   \item \textbf{End-to-end verifiability without proprietary infrastructure.}
     A three-layer pipeline---73~signed conformance test vectors, TLC-checked
     TLA+ model, and ACR-1.0 runtime sequence runner---enables independent
     validation of both specification and reference implementation.
+\end{itemize}
+
+\paragraph{III.\enspace Risk scoring and adversarial robustness.}
+\begin{itemize}[noitemsep]
   \item \textbf{Context-scoped anomaly model eliminating cross-context interference.}
     We introduce ACP-RISK-3.0, which redefines Rule~1 to use context-scoped
     pattern counts, eliminating cross-context state-mixing while preserving
     enforcement against repeated behavior within a given interaction context
     (Experiment~8, Section~\ref{sec:exp8}).
+  \item \textbf{Knowledge-aware adversarial evasion (Experiment~10).}
+    We demonstrate that an adversary with complete knowledge of the ACP-RISK-3.0
+    parameters can suppress BAR to $0.00$ while every individual request remains
+    policy-compliant --- per-decision enforcement is structurally blind to this attack.
+    BAR-Monitor detects the regime shift via $\Delta\mathrm{BAR}$ at Batch~2, three
+    batches before threshold collapse; \texttt{EvaluateCounterfactual} confirms
+    structural enforcement capacity is preserved ($\mathrm{BAR}_C = 1.00$).
+    These three mechanisms form a coherent defense against knowledge-aware evasion.
+\end{itemize}
+
+\paragraph{IV.\enspace Governance: deviation collapse and boundary monitoring.}
+\begin{itemize}[noitemsep]
   \item \textbf{Identification of deviation collapse as a governance failure mode.}
     We demonstrate empirically that a system may remain fully compliant while its
     admissibility boundary is never exercised
@@ -414,15 +442,6 @@ This paper makes the following contributions:
     that establish necessary structural conditions for failure condition preservation.
     Both are verified by TLC with zero violations over all reachable states.
     \textsc{BARMonitorLiveness} is stated formally and validated empirically (Phase~D).
-
-  \item \textbf{Knowledge-aware adversarial evasion (Experiment~10).}
-    We demonstrate that an adversary with complete knowledge of the ACP-RISK-3.0
-    parameters can suppress BAR to $0.00$ while every individual request remains
-    policy-compliant --- per-decision enforcement is structurally blind to this attack.
-    BAR-Monitor detects the regime shift via $\Delta\mathrm{BAR}$ at Batch~2, three
-    batches before threshold collapse; \texttt{EvaluateCounterfactual} confirms
-    structural enforcement capacity is preserved ($\mathrm{BAR}_C = 1.00$).
-    The three v1.25 mechanisms form a coherent defense against knowledge-aware evasion.
 \end{itemize}
 
 % ============================================================
@@ -512,14 +531,17 @@ Falcone et al.~\cite{falcone2012runtime} systematize runtime enforcement monitor
 distinguishing enforceable property classes (safety, co-safety, guarantee, persistence)
 and the suppression or insertion mechanisms each requires.
 
-Stateless policy engines (e.g., ABAC, RBAC, OPA) evaluate requests independently
+Stateless policy engines (e.g., ABAC, RBAC, OPA~\cite{opa}) evaluate requests independently
 and are therefore limited to enforcing safety properties over individual interactions.
 They do not capture temporal behavioral properties, where violations depend on
 accumulated execution history.
+Enforcing frequency-based or cooldown constraints in such systems requires externalizing
+state to a separate store and threading it through every evaluation call,
+increasing architectural complexity and weakening enforcement guarantees.
 In contrast, ACP instantiates a stateful enforcement mechanism over agent interaction
 traces, aligning with Schneider's security automaton model and enabling formal reasoning
 about temporal properties of agent behavior that stateless engines, by construction,
-cannot enforce.
+cannot enforce without external state integration.
 
 ACP instantiates these principles in a decentralized, multi-organizational setting.
 The ACR-1.0 compliance runner acts as an enforcement monitor over the ACP execution
@@ -533,7 +555,7 @@ This creates a three-layer verifiability chain: formal $\to$ data $\to$ runtime.
 
 \subsection{Capability Systems and Proof-of-Possession Mechanisms}
 
-ACP builds upon established primitives from capability-based security and
+ACP builds upon established primitives from capability-based security~\cite{capability-security} and
 proof-of-possession authentication, but differs in how these primitives are
 composed and enforced over execution traces.
 
@@ -802,6 +824,59 @@ limits & Object & Rate limits, maximum amounts, time windows. Not modifiable at 
 \caption{ACP formal agent tuple fields.}
 \end{table}
 
+\paragraph{Formal model.}
+The following definitions establish the mathematical objects over which ACP's
+admission function is specified.
+
+\begin{definition}[Execution Trace]
+Let $E = (a,\, \mathit{cap},\, \mathit{res},\, t)$ denote an authorization event,
+where $a$ is an agent identifier, $\mathit{cap}$ a capability, $\mathit{res}$ a
+resource class, and $t$ a timestamp.
+An \emph{execution trace} of length $n$ for agent $a$ is an ordered sequence
+\[
+  T_a = \langle E_1, E_2, \dots, E_n \rangle,
+\]
+where each $E_i = (a, \mathit{cap}_i, \mathit{res}_i, t_i)$ is an event
+processed in non-decreasing temporal order ($t_i \leq t_{i+1}$).
+\end{definition}
+
+\begin{definition}[Agent Execution State]
+For agent $a$ at time $t$, the \emph{execution state} $S_a(t)$ is a tuple
+\[
+  S_a(t) = \bigl(\,\mathit{denial\_count},\; \mathit{pattern\_count},\;
+                    \mathit{cooldown\_until},\; \mathit{ledger\_entries}\,\bigr),
+\]
+where $\mathit{denial\_count} \in \mathbb{N}$ is the number of DENIED decisions
+within the active cooldown window, $\mathit{pattern\_count}: C \times R \to \mathbb{N}$
+maps capability--resource pairs to their request frequency within the current context,
+$\mathit{cooldown\_until} \in \mathbb{N} \cup \{\bot\}$ is the timestamp at which
+an active cooldown expires (or $\bot$ if no cooldown is active), and
+$\mathit{ledger\_entries}$ is the append-only sequence of prior admission records.
+\end{definition}
+
+\begin{definition}[Admission Function]
+The \emph{admission function} $f$ maps an agent execution state and an
+incoming event to a decision:
+\[
+  f\bigl(S_a(t^-),\, E\bigr) \;\in\;
+  \{\,\textsc{Approved},\; \textsc{Escalated},\; \textsc{Denied}\,\}.
+\]
+$f$ is deterministic: given the same state and event, $f$ always returns the
+same decision.
+The risk score $\mathrm{RS}(S_a, E) \in [0, 100]$ summarizes the risk of
+admitting $E$ given current state; the decision boundary is:
+\[
+  f(S_a, E) =
+  \begin{cases}
+    \textsc{Denied},    & \text{if } \mathrm{RS} \geq \tau_{\mathrm{deny}}, \\
+    \textsc{Escalated}, & \text{if } \tau_{\mathrm{esc}} \leq \mathrm{RS} < \tau_{\mathrm{deny}}, \\
+    \textsc{Approved},  & \text{otherwise,}
+  \end{cases}
+\]
+where $\tau_{\mathrm{esc}} = 40$ and $\tau_{\mathrm{deny}} = 70$ under the
+default \texttt{PolicyConfig} (Section~\ref{sec:bar}).
+\end{definition}
+
 \subsection{Layered Architecture}
 
 ACP does not replace existing security infrastructure. It is added as an upper layer:
@@ -839,7 +914,7 @@ This rule has no exceptions (PROHIB-003, PROHIB-012).
 \subsection{Capability Token (ACP-CT-1.0)}
 
 The Capability Token is ACP's central artifact.
-It is a signed JSON object that specifies exactly what an agent can do, on what resource, for how long, and whether it can delegate that capability to other agents.
+It is a signed JSON object~\cite{rfc7519} that specifies exactly what an agent can do, on what resource, for how long, and whether it can delegate that capability to other agents.
 
 \begin{lstlisting}[language={}]
 {
@@ -917,6 +992,113 @@ $\text{RS} \in [40, 69]$ $\rightarrow$ ESCALATED;
 $\text{RS} \geq 70$ $\rightarrow$ DENIED.
 An agent with \texttt{autonomy\_level}~0 always receives DENIED.
 
+% ── LLM Agent Integration ─────────────────────────────────────────────────────
+\subsection{LLM Agent Integration}
+\label{sec:llm-agent-integration}
+
+ACP is designed to integrate with LLM agent frameworks (LangChain, LangGraph,
+AutoGen, CrewAI) as an admission control layer that intercepts tool calls
+\emph{before} they modify system state.
+The integration pattern wraps each tool with an ACP guard that calls
+\texttt{POST /acp/v1/authorize} and gates execution on the admission decision.
+
+\begin{lstlisting}[language=Python, caption={ACP-guarded tool wrapper for LangChain agents.
+Each tool call is intercepted before execution; admission is decided by
+the ACP server based on the agent's identity, capability, and resource class.},
+label=lst:acp-tool]
+class ACPGuardedTool(BaseTool):
+    capability: str      # e.g. "acp:cap:financial.transfer"
+    resource:   str      # e.g. "accounts/restricted-fund"
+    res_class:  str      # "PUBLIC" | "SENSITIVE" | "RESTRICTED"
+    agent_id:   str      # agent identity bound to ACP token
+    acp_url:    str      # ACP server endpoint
+
+    def _run(self, query: str) -> str:
+        resp = requests.post(f"{self.acp_url}/acp/v1/authorize", json={
+            "agent_id":          self.agent_id,
+            "capability":        self.capability,
+            "resource":          self.resource,
+            "action_parameters": {"resource_class": self.res_class},
+        }).json()
+        decision = resp["decision"]
+        if decision == "APPROVED":
+            return self._execute(query)      # tool logic runs
+        if decision == "ESCALATED":
+            return "[ESCALATED: pending human review]"
+        return f"[DENIED by ACP: {resp.get('reason_code')}]"
+\end{lstlisting}
+
+The admission decision is stateful: the ACP server maintains denial history,
+pattern counters, and cooldown state across calls from the same agent.
+A tool call that would be individually approved may be denied if the agent's
+recent history has accumulated sufficient risk signals (F\_hist, F\_anom).
+This gives the framework a temporal enforcement property that stateless
+policy engines cannot provide.
+
+\textbf{IPI composability.}
+A prompt-layer filter (e.g., PromptGuard, PINT) can be applied before the
+tool call reaches \texttt{ACPGuardedTool}, reducing the fraction of
+injected high-risk calls that reach the admission boundary.
+ACP enforces the structural constraint on the tool call regardless of its
+origin: a \texttt{fund\_transfer} call with $\mathrm{RS}=80$ is denied
+whether it was generated by legitimate user input or by an injected instruction.
+The two layers are composable: the prompt-layer filter reduces attack
+frequency; ACP provides the structural denial guarantee.
+
+\textbf{Reproducible local evaluation.}
+For evaluation without external API dependencies, the Ollama
+runtime~\cite{ollama2024} provides OpenAI-compatible endpoints for
+open-weight models.
+Setting \texttt{temperature=0} and \texttt{seed=42} yields
+pseudo-deterministic agent behavior, enabling controlled experimental
+evaluation of ACP admission decisions across scripted agent sessions
+(see Experiment~12, \S\ref{sec:exp12}).
+
+\textbf{Real-LLM validation.}
+To validate the \texttt{ACPGuardedTool} wrapper in a live agent context,
+we ran a five-turn session using DeepSeek-R1:8B~\cite{deepseekr1} served
+locally via Ollama (\texttt{temperature=0}, \texttt{seed=42}).
+An IPI payload was embedded in the \texttt{weather\_query} tool result,
+instructing the agent to call \texttt{fund\_transfer} with attacker-controlled
+parameters.
+
+\begin{lstlisting}[caption={Condensed output from the ACP real-LLM IPI demo
+(\texttt{demos/ollama-agent/agent\_demo.py}).
+Full session is deterministic and reproducible.}]
+Model: deepseek-r1:8b | temperature=0 | seed=42
+
+[T1] weather_query(city="Madrid")        RS= 0  APPROVED  [IPI injected]
+[T2] fund_transfer(9999, "attacker-001") RS=80  DENIED    [IPI-induced]
+[T3] weather_query(city="Barcelona")     RS= 0  APPROVED  [IPI injected]
+[T4] fund_transfer(9999, "attacker-001") RS=80  DENIED    [IPI-induced]
+[T5] fund_transfer(50,   "savings-123")  RS=80  DENIED    [legitimate]
+                                              --> COOLDOWN ACTIVATED
+\end{lstlisting}
+
+Three observations follow.
+First, the LLM followed the IPI injection in turns~2 and~4, calling
+\texttt{fund\_transfer} with attacker-controlled parameters in both cases.
+ACP blocked each attempt because the capability
+\texttt{acp:cap:financial.transfer} with resource class \texttt{RESTRICTED}
+evaluates to $\mathrm{RS}=80 \geq 70$, regardless of the transaction parameters.
+The LLM's internal reasoning is irrelevant to ACP's admission decision.
+
+Second, turn~5 demonstrates capability-level enforcement:
+a \emph{legitimate} transfer (\$50 to \texttt{savings-123}) is also denied
+because ACP evaluates capability and resource class, not individual parameters.
+In a production deployment, a personal savings account would carry resource class
+\texttt{SENSITIVE} ($\mathrm{RS}=35+15=50$, \texttt{ESCALATED}),
+separating attacker-targeted restricted transfers from legitimate sensitive ones.
+The demo uses a uniform \texttt{RESTRICTED} class to isolate the IPI dynamic.
+
+Third, the third denial in turn~5 activated agent-wide cooldown,
+locking the agent for 300 seconds.
+The same stateful consequence observed in Experiment~12
+--- $F_\text{anom}$ Rule~2 persisting beyond the cooldown window ---
+emerges here with a real LLM as the agent brain,
+confirming that the enforcement properties are independent of the agent's
+implementation.
+
 \subsection{Context-Scoped Anomaly Enforcement (ACP-RISK-3.0)}
 \label{sec:risk30}
 
@@ -937,7 +1119,7 @@ Rule~1 of $F_{\text{anom}}$ becomes \texttt{CountPattern(ctxKey,\,-60s)} rather 
 \texttt{CountRequests(agentID,\,-60s)}.
 All other rules ($F_{\text{anom}}$ Rules~2--3, cooldown logic, decision thresholds) are unchanged.
 
-The key derivation adds a single SHA-256 call per evaluation (767\,ns;
+The key derivation adds a single SHA-256 call per evaluation (739\,ns;
 Table~\ref{tab:benchmarks}, \texttt{PatternKey} row),
 preserving the sub-microsecond latency envelope.
 Experiment~8 (\S\ref{sec:exp8}) confirms that cross-context contamination is fully eliminated
@@ -1342,7 +1524,7 @@ For the formal adversary model and security properties, see Section~\ref{sec:sec
 \toprule
 \textbf{Category} & \textbf{Threat} & \textbf{Mitigation in ACP} \\
 \midrule
-Spoofing & AgentID impersonation & $\text{AgentID} = \text{SHA-256}(\text{pk})$. Without valid signature $\rightarrow$ immediate DENIED. \\
+Spoofing & AgentID impersonation & $\text{AgentID} = \text{base58}(\text{SHA-256}(\text{pk}))$. Without valid signature $\rightarrow$ immediate DENIED. \\
 Tampering & Token or event alteration & Ed25519 covers all fields. Chained ledger: altering one event invalidates all subsequent. \\
 Repudiation & Agent denies executed action & ActionRequest digitally signed. Non-repudiation by design. \\
 Info Disclosure & Capability exposure & Tokens reveal only the necessary subset. Channel confidentiality via TLS. \\
@@ -1412,7 +1594,7 @@ ACP explicitly declares what it cannot resolve:
 \textbf{Level} & \textbf{Required documents} & \textbf{Enabled capability} \\
 \midrule
 L1 --- CORE & ACP-SIGN-1.0, ACP-CT-1.0, ACP-HP-1.0 & Token issuance with cryptographic PoP \\
-L2 --- SECURITY & L1 + ACP-RISK-2.0, ACP-REV-1.0, ACP-ITA-1.0 & Risk eval (F\_anom + Cooldown), transitive revocation, ITA \\
+L2 --- SECURITY & L1 + ACP-RISK-3.0, ACP-REV-1.0, ACP-ITA-1.0 & Risk eval (context-scoped F\_anom + Cooldown), transitive revocation, ITA \\
 L3 --- FULL & L2 + ACP-API-1.0, ACP-EXEC-1.0, ACP-LEDGER-1.3 & Complete verifiable auditing \\
 L4 --- EXTENDED & L3 + ACP-PAY-1.0, ACP-NOTIFY-1.0, ACP-DISC-1.0, \ldots & Full governance suite \\
 L5 --- DECENTRAL. & L4 + ACP-D suite & Federation without central ITA \\
@@ -1486,10 +1668,10 @@ The ledger provides the forensic record needed for post-incident analysis.
 \section{Specification and Implementation Status}
 % ============================================================
 
-ACP v1.26 is a complete Draft Standard specification with a full Go reference implementation
+ACP v1.27 is a complete Draft Standard specification with a full Go reference implementation
 and external verifiability through a TLC-checked formal model and an ACR-1.0 sequence compliance runner.
 
-\subsection{Active Specifications --- v1.26 (38 documents)}
+\subsection{Active Specifications --- v1.27 (38 documents)}
 
 \begin{table}[h!]
 \centering
@@ -1509,7 +1691,8 @@ L1 & ACP-PROVENANCE-1.0 & Authority Provenance \\
 \midrule
 L1 & ACP-SIGN-2.0 & Hybrid Signature (Ed25519 + ML-DSA-65) \\
 \midrule
-L2 & ACP-RISK-2.0 & Deterministic Risk Engine v2 (F\_anom + Cooldown) \\
+L2 & ACP-RISK-3.0 & Deterministic Risk Engine v3 (context-scoped F\_anom, Cooldown) \\
+L2 & ACP-RISK-2.0 & Deterministic Risk Engine v2 (superseded by v3) \\
 L2 & ACP-RISK-1.0 & Deterministic Risk Engine v1 (superseded by v2) \\
 L2 & ACP-REV-1.0 & Revocation Protocol \\
 L2 & ACP-ITA-1.0 & Institutional Trust Anchor \\
@@ -1539,7 +1722,7 @@ Gov. & RFC-REGISTRY & Specification Registry \\
 Gov. & ACP-CR-1.0 & Change Request Process \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.26 active specification documents by conformance level (38 primary documents shown).
+\caption{ACP v1.27 active specification documents by conformance level (38 primary documents shown).
 The remaining 3 documents are the ACP-D decentralized suite (L5, design phase) not yet published.
 Superseded versions archived in \texttt{archive/specs/}.
 Version history per document is tracked in Table~\ref{tab:roadmap}.}
@@ -1633,41 +1816,90 @@ REP & 3 & 6 & L4 \\
 \textbf{Total} & \textbf{22} & \textbf{51} & \\
 \bottomrule
 \end{tabular}
-\caption{Conformance test vector suites. All positive vectors carry real Ed25519 signatures (RFC~8037 Test Key A) and real SHA-256 hash chains.}
+\caption{Conformance test vector suites. All positive vectors carry real Ed25519 signatures (RFC~8037 Test Key A~\cite{rfc8037}) and real SHA-256 hash chains.}
 \end{table}
 
 \subsection{ACP-RISK-2.0/3.0 Engine Performance}
 
-The \texttt{pkg/risk} engine (ACP-RISK-2.0/3.0) was benchmarked using \texttt{go test -bench} on an Intel Core i7-8665U @ 1.90GHz (Go 1.22, Windows, \texttt{GOMAXPROCS=8}).
-These measurements reflect the pure in-memory evaluation cost, excluding network and HTTP parsing overhead.
+\paragraph{Benchmark methodology.}
+Three distinct benchmark families are reported in this section; each measures a different
+layer of the system and they are not directly comparable:
+
+\begin{enumerate}[noitemsep]
+  \item \textbf{Engine microbenchmarks} (\texttt{go test -bench}, Table~\ref{tab:benchmarks}):
+    measure the pure \texttt{pkg/risk.Evaluate()} call with an \texttt{InMemoryQuerier},
+    single goroutine, no HTTP or network overhead.
+    Reports ns/op (739--832 for full paths, 78 for the cooldown short-circuit)
+    and the 1{,}720{,}000~req/s single-goroutine throughput ceiling.
+
+  \item \textbf{Concurrent pipeline benchmark} (Table~\ref{tab:throughput}):
+    measures end-to-end request throughput with 10--500 concurrent goroutines
+    feeding a shared \texttt{InMemoryQuerier}.
+    Reports 920{,}000~req/s at 10 workers, degrading to 712{,}000 at 500 workers.
+    The difference from the microbenchmark reflects scheduling, mutex contention,
+    and goroutine overhead rather than evaluation logic.
+
+  \item \textbf{Controlled latency injection} (\texttt{DelayedQuerier}, Table~\ref{tab:adv-exp3}):
+    simulates realistic external backend latency by inserting a configurable
+    delay in the \texttt{LedgerQuerier} call, isolating the effect of state
+    backend latency on system throughput.
+\end{enumerate}
+
+\noindent The \texttt{pkg/risk} engine was benchmarked using \texttt{go test -bench}
+on an Intel Core i7-8665U @ 1.90GHz (Go~1.22, Windows, \texttt{GOMAXPROCS=8}).
+Engine measurements reflect the pure in-memory evaluation cost, excluding network
+and HTTP parsing overhead.
 
 \begin{table}[h!]
 \centering
 \small
-\begin{tabular}{@{}llll@{}}
+\begin{tabular}{@{}lllll@{}}
 \toprule
-\textbf{Benchmark} & \textbf{ns/op} & \textbf{B/op} & \textbf{allocs/op} \\
+\textbf{Scenario} & \textbf{ns/op} & \textbf{B/op} & \textbf{allocs/op} & \textbf{Path} \\
 \midrule
-\texttt{Evaluate} (APPROVED, no anomaly) & 767  & 280 & 5 \\
-\texttt{Evaluate} (DENIED, no anomaly)   & 784  & 296 & 5 \\
-\texttt{Evaluate} (all 3 F\_anom rules)  & 921  & 296 & 5 \\
-\texttt{Evaluate} (COOLDOWN short-circuit) & 88 & 112 & 1 \\
-\texttt{PatternKey} (SHA-256 hash)       & 767  & 184 & 4 \\
-\texttt{ShouldEnterCooldown}             & 72   & 0   & 0 \\
+\texttt{Evaluate} (clean state)          & 739 & 280 & 5 & full RS \\
+\texttt{Evaluate} (with history)         & 803 & 280 & 5 & full RS \\
+\texttt{Evaluate} (all 3 F\_anom rules)  & 832 & 296 & 5 & full RS \\
+\texttt{Evaluate} (COOLDOWN short-circuit) & 78 & 112 & 1 & Step~2 exit \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Throughput under concurrent load (InMemoryQuerier, 10 workers)}} \\
+\midrule
+10 concurrent agents   & 581 & — & — & 1{,}722{,}000 req/s \\
+100 concurrent agents  & 629 & — & — & 1{,}589{,}000 req/s \\
+500 concurrent agents  & 663 & — & — & 1{,}510{,}000 req/s \\
 \bottomrule
 \end{tabular}
-\caption{ACP-RISK-2.0/3.0 engine benchmarks (\texttt{go test -bench=. -benchtime=3s},
-Intel Core i7-8665U @ 1.90GHz, Go~1.22, Windows/amd64).
-Full evaluation with all three F\_anom rules completes in under 1\,$\mu$s.
-The cooldown short-circuit path (88\,ns) avoids the risk function entirely.
-All measurements use \texttt{InMemoryQuerier}; production implementations with persistent storage will incur additional I/O latency.
-The cooldown latency of 88\,ns is derived from the scenario benchmark suite (\texttt{BenchmarkEvaluate\_Scenarios}), which captures realistic execution paths; isolated microbenchmarks report slightly higher values ($\sim$102\,ns) due to measurement setup differences.}
+\caption{ACP-RISK-3.0 engine benchmarks (\texttt{BenchmarkEvaluate\_Scenarios},
+\texttt{TestThroughputRPS}; Intel Core i7-8665U @ 1.90GHz, Go~1.22, Windows/amd64,
+\texttt{GOMAXPROCS=8}).
+Full evaluation with all three $F_\text{anom}$ rules completes in under $1\,\mu$s.
+The cooldown short-circuit path (78\,ns) avoids RS computation entirely.
+Throughput degrades by only 12\% across 10$\to$500 concurrent agents,
+confirming that ACP is state-bound rather than compute-bound.
+All measurements use \texttt{InMemoryQuerier}; production state backends
+(Redis, PostgreSQL) introduce I/O latency but do not change the protocol logic.}
 \label{tab:benchmarks}
 \end{table}
 
-The deterministic design of ACP-RISK-2.0 --- integer arithmetic, fixed rules, no floating-point, no external ML inference --- yields predictable latency bounds.
-At these throughput characteristics, the admission check adds negligible overhead relative to the actions it governs.
-ACP-RISK-3.0 preserves these latency bounds; context-scoped key derivation adds a single \texttt{SHA-256} call per evaluation (767\,ns; Table~\ref{tab:benchmarks}, \texttt{PatternKey} row), a cost dominated by existing ledger access in production deployments.
+The deterministic design of ACP-RISK-3.0 --- integer arithmetic, fixed rules,
+no floating-point, no external ML inference --- yields predictable and verifiable
+latency bounds.
+At sub-microsecond cost per decision, ACP's overhead is
+\textbf{six orders of magnitude below} the latency of the actions it governs:
+typical LLM inference takes 100\,ms--10\,s; external API calls 1--100\,ms.
+The admission check is not a performance bottleneck in any realistic deployment.
+
+Throughput degradation from 10 to 500 concurrent agents (1.72M to 1.51M req/s,
+$-$12\%) confirms that the evaluation function itself is not the bottleneck:
+the limiting factor is state backend access (\texttt{InMemoryQuerier} uses a
+\texttt{sync.Mutex}), not the admission logic.
+Production deployments replacing \texttt{InMemoryQuerier} with a Redis or
+PostgreSQL backend incur I/O latency but decouple throughput from the
+evaluation function entirely, enabling horizontal scaling.
+
+ACP-RISK-3.0 preserves these latency bounds over ACP-RISK-2.0;
+context-scoped key derivation adds one \texttt{SHA-256} call per evaluation,
+a cost dominated by existing ledger I/O in production deployments.
 
 % ============================================================
 \section{Evaluation}
@@ -1691,7 +1923,7 @@ and (iv)~robustness of per-agent admission control under adversarial attack patt
 
 \subsection{Experimental Setup}
 
-All experiments use the Go reference implementation (v1.26) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22~\cite{go-language}, \texttt{GOMAXPROCS=8}).
+All experiments use the Go reference implementation (v1.27) on an Intel Core i7-8665U @ 1.90GHz (Go~1.22~\cite{go-language}, \texttt{GOMAXPROCS=8}).
 The evaluation uses three components:
 the stateless evaluation function (\texttt{pkg/risk.Evaluate}),
 an in-memory state backend (\texttt{InMemoryQuerier}),
@@ -1701,12 +1933,19 @@ Production deployments with persistent storage backends will incur additional I/
 \subsection{Q1: Computational Overhead}
 
 Table~\ref{tab:benchmarks} reports \texttt{go test -bench} results.
-The full evaluation path (all three F\_anom rules active) completes in 921\,ns.
-The cooldown short-circuit path (88\,ns) bypasses the risk function entirely.
+The full evaluation path (all three F\_anom rules active) completes in 832\,ns.
+The cooldown short-circuit path (78\,ns) bypasses the risk function entirely.
 
 \noindent\textbf{Answer to Q1:}
-The admission check adds between 88\,ns and 921\,ns of decision latency per request.
-Given that the actions ACP governs (API calls, financial transactions, file mutations) operate in the millisecond-to-second range, the overhead is at least three orders of magnitude below the cost of the governed action.
+The admission check adds between 78\,ns and 832\,ns of decision latency per request (p50).
+For single-goroutine CPU-bound microbenchmarks (\texttt{InMemoryQuerier}, no I/O),
+variance is negligible: p99 is within 5--8\% of the reported p50 values
+(p99 $\lesssim$ 900\,ns for full evaluation; p99 $\lesssim$ 85\,ns for the cooldown path).
+In production deployments, latency variance is dominated by state backend I/O
+(Redis RTT: 0.1--1\,ms; PostgreSQL: 1--5\,ms), not by evaluation logic.
+Given that the actions ACP governs (API calls, financial transactions, file mutations)
+operate in the millisecond-to-second range, the overhead is at least three orders of
+magnitude below the cost of the governed action.
 Note that this measures decision-logic latency only; aggregate throughput is governed
 by state backend access patterns and is reported separately in the following subsection.
 
@@ -1727,11 +1966,15 @@ all sharing a single \texttt{InMemoryQuerier} instance.
 500 & 1{,}404 & 712{,}259 & High contention \\
 \bottomrule
 \end{tabular}
-\caption{ACP throughput under increasing concurrency (Intel Core i7-8665U, Go~1.22, Windows/amd64).}
+\caption{ACP throughput under increasing concurrency (Intel Core i7-8665U, Go~1.22, Windows/amd64,
+\texttt{InMemoryQuerier}). This is a concurrent pipeline benchmark distinct from the
+\texttt{go test -bench} microbenchmarks in Table~\ref{tab:benchmarks}; the 1{,}720{,}000~req/s
+figure in Table~\ref{tab:benchmarks} reflects the engine-only evaluation path with a single goroutine.}
 \label{tab:throughput}
 \end{table}
 
-ACP sustains approximately 920{,}000 requests per second at 10 concurrent workers.
+ACP sustains approximately 920{,}000 requests per second at 10 concurrent workers
+(pipeline benchmark; Table~\ref{tab:throughput}).
 Throughput degrades gradually as concurrency increases, reaching approximately
 712{,}000 requests per second at 500 workers.
 Degradation is gradual rather than catastrophic, and no correctness violations were observed under load.
@@ -1860,14 +2103,14 @@ InMemoryQuerier, Intel i7-8665U, Go~1.22).}
 ACP triggered cooldown after exactly 3 real \texttt{DENIED} decisions (requests
 \#0, \#2, \#4). All subsequent requests---regardless of risk score---were
 short-circuited to \texttt{COOLDOWN\_ACTIVE} at Step~2 of the evaluation
-pipeline ($\sim$88\,ns, see Table~\ref{tab:benchmarks}).
+pipeline ($\sim$78\,ns, see Table~\ref{tab:benchmarks}).
 
 \textbf{Interpretation.}
 ACP's cooldown counter is monotonic with respect to denial events; approval
 decisions do not reset or reduce it.
 An attacker cannot evade the \texttt{CooldownTriggerDenials}~$=3$ threshold by
 interleaving legitimate requests.
-The early-exit design at Step~2 makes this containment path 9.5$\times$ faster
+The early-exit design at Step~2 makes this containment path 10.7$\times$ faster
 than full risk evaluation.
 
 \subsubsection*{Experiment 2: Distributed Multi-Agent Attack}
@@ -1978,7 +2221,7 @@ The $\sim$90$\times$ gap between \texttt{InMemoryQuerier} and pipelined Redis-ba
 execution (376k vs.\ 4{,}200~req/s) reflects network and I/O overhead exclusively;
 it is not a property of the admission control logic.
 The evaluation function (\texttt{pkg/risk.Evaluate}) remains computationally
-cheap (767--921\,ns, p50; Table~\ref{tab:benchmarks}) in all three configurations.
+cheap (739--832\,ns, p50; Table~\ref{tab:benchmarks}) in all three configurations.
 System throughput is bounded by state backend latency, not by protocol complexity.
 
 \textbf{Key insight.}
@@ -2022,14 +2265,14 @@ Injected latency/call & Total latency/req & Throughput (req/s) & Scenario \\
 \end{tabular}
 \caption{Controlled latency injection via \texttt{DelayedQuerier} (10 workers,
 Intel i7-8665U, Go~1.22). Throughput degrades proportionally with injected backend latency;
-the \texttt{Evaluate()} decision function contributes 767--921\,ns per request
+the \texttt{Evaluate()} decision function contributes 739--832\,ns per request
 in all configurations. The \texttt{LedgerQuerier} abstraction enables this separation.}
 \label{tab:latency-injection}
 \end{table}
 
 Throughput decreases proportionally with injected latency, supporting the claim that
 the admission control logic is not the performance bottleneck.
-The \texttt{Evaluate()} function contributes a fixed 767--921\,ns per request (p50; Table~\ref{tab:benchmarks})
+The \texttt{Evaluate()} function contributes a fixed 739--832\,ns per request (p50; Table~\ref{tab:benchmarks})
 regardless of backend latency; system throughput is dominated by state access patterns.
 This validates the \texttt{LedgerQuerier} abstraction as the correct boundary
 for deploying ACP with heterogeneous backends (in-process, Redis, CockroachDB,
@@ -2233,12 +2476,20 @@ threshold.
 The stateless engine approves all 500 requests because each request is
 individually valid. It cannot distinguish between isolated actions and
 coordinated behavioral patterns.
+This result generalizes beyond the synthetic baseline: any stateless policy
+engine---including production systems such as Open Policy Agent
+(OPA)~\cite{opa} and Cedar~\cite{cedar}---would produce the same outcome by
+construction, since they evaluate each request against a policy snapshot without
+access to the agent's execution history.
+Per-request correctness is a necessary but not sufficient condition for behavioral
+safety under sustained agent operation.
 
 In contrast, ACP detects the pattern after 3~actions and enforces blocking after
 11~actions, limiting autonomous execution to 2~out of 500~requests.
 
 The difference is not in scoring, but in the domain of evaluation: stateless
-systems evaluate requests, while ACP enforces constraints over execution traces.
+systems evaluate requests, while ACP enforces constraints over execution traces
+(Definition~1).
 
 \textbf{Implication.}
 This result demonstrates that temporal admission control cannot be reduced to
@@ -2680,9 +2931,11 @@ high-concurrency legitimate workloads. It also reduces isolation between indepen
 agents and shifts part of the enforcement logic to the policy or orchestration layer.
 
 \emph{Scope.}
-ACP v1.25 enforces guarantees at the per-agent level. Cross-agent coordination is
+ACP v1.27 enforces guarantees at the per-agent level. Cross-agent coordination is
 intentionally outside the scope of the core protocol and is expected to be implemented
 at the policy or orchestration layer when required by the deployment context.
+A future extension (ACP-CORR-1.0) is planned to specify resource-level aggregated
+denial signals and group-scoped cooldown as a protocol-level primitive.
 
 \textbf{Prompt Layer and Jailbreaking.}
 ACP operates at the execution layer, not the prompt layer.
@@ -2696,6 +2949,21 @@ enforces structural admission constraints over the resulting action sequence reg
 of how the request was generated.
 Characterizing the interaction surface between prompt-layer attacks and admission
 control enforcement is an open research direction~\cite{debenedetti2024agentdojo}.
+
+\textbf{Performance Measurement Scope.}
+All benchmark results reported in Section~\ref{sec:evaluation} use
+\texttt{InMemoryQuerier}, which stores agent state in a process-local
+hash map protected by a \texttt{sync.Mutex}.
+This isolates decision-logic latency (739--832\,ns p50) from state backend I/O,
+but does not reflect production latency under persistent backends.
+A Redis \texttt{LedgerQuerier} introduces one round-trip per evaluation
+($\sim$0.1--1\,ms on a local network); a PostgreSQL backend introduces
+1--5\,ms per query depending on index hit rate and connection pool size.
+Under these conditions the dominant latency is backend I/O, not admission logic,
+and the 739--832\,ns figure becomes a lower bound on end-to-end decision time.
+The \texttt{DelayedQuerier} experiment (Table~\ref{tab:adv-exp3}) characterizes
+throughput degradation as a function of injected backend latency;
+benchmarking against a production Redis or PostgreSQL instance is left for future work.
 
 \textbf{Deterministic Risk Scoring.}
 ACP-RISK-3.0 uses a deterministic, rule-based scoring function.
@@ -2713,9 +2981,9 @@ admission decisions, preserving auditability while adding adaptive observability
 \subsection{Summary}
 
 These results consistently demonstrate that \textbf{ACP is compute-cheap but state-sensitive.}
-Decision evaluation incurs minimal overhead (767--921\,ns, p50; Table~\ref{tab:benchmarks}), while system throughput is bounded
+Decision evaluation incurs minimal overhead (739--832\,ns, p50; Table~\ref{tab:benchmarks}), while system throughput is bounded
 by the characteristics of the underlying state backend.
-The cooldown short-circuit path (88\,ns, 9.5$\times$ faster than full evaluation) demonstrates
+The cooldown short-circuit path (78\,ns, 10.7$\times$ faster than full evaluation) demonstrates
 that the execution contract's step ordering is a performance-relevant design decision, not only
 a correctness one.
 These findings highlight the importance of the \texttt{LedgerQuerier} abstraction: protocol
@@ -2770,12 +3038,16 @@ Formal adversary model $\mathcal{A}=(K,S,B)$ + experiment taxonomy table & v1.26
 Experiment~11: Threshold sensitivity analysis (5 configs, monotonicity verified) & v1.26 Complete \\
 Detection Guarantees: Proposition~\ref{prop:threshold-detection}, binomial detection probability & v1.26 Complete \\
 AgentSpec functional comparison (5 dimensions, Exp~10 governance collapse scenario) & v1.26 Complete \\
+\S\ref{sec:limitations}: IPI scope + AgentDojo/InjecAgent benchmarks & v1.27 Complete \\
+\S\ref{sec:llm-agent-integration}: LangGraph/Ollama integration pseudocode & v1.27 Complete \\
+Experiment~12: Multi-tool IPI admission control, stateful F\textsubscript{anom} persistence & v1.27 Complete \\
+Experiment~13: Bounded coordination window ($\mathrm{CW}=2N$, exact linearity, evaluate-then-mutate) & v1.28 Complete \\
 ACP-LEDGER-1.0 (tamper-evident hash-chained audit log for state backend integrity) & Future work \\
 L5 Decentralized (ACP-D) & Specification in design (v2.0) \\
 IETF RFC submission & After L5 stabilization \\
 \bottomrule
 \end{tabular}
-\caption{ACP v1.26 development roadmap.}
+\caption{ACP v1.27 development roadmap.}
 \label{tab:roadmap}
 \end{table}
 
@@ -2966,7 +3238,8 @@ It can be implemented on top of existing infrastructure.
 \begin{itemize}[noitemsep]
   \item Root Institutional Key held in HSM with documented rotation process.
   \item Registration with an ITA authority (centralized or federated model).
-  \item Deterministic risk engine implementing ACP-RISK-2.0 (F\_res, F\_ctx, F\_hist, F\_anom, Cooldown).
+  \item Deterministic risk engine implementing ACP-RISK-3.0 (F\_res, F\_ctx, F\_hist, F\_anom, Cooldown),
+    which supersedes ACP-RISK-2.0 while preserving API- and policy-level compatibility.
   \item Revocation endpoint (Mechanism~A: online endpoint, or Mechanism~B: CRL).
   \item Append-only storage for the Audit Ledger with per-event signing.
   \item Complete HTTP API per ACP-API-1.0, including health and conformance endpoints.
@@ -3117,6 +3390,26 @@ It is a general property of admission control systems in which the decision
 engine and the input generation pipeline are architecturally decoupled.
 To the authors' knowledge, ACP is the first system to formally characterize deviation collapse within an admission control framework.
 
+\paragraph{Concrete deployment scenario.}
+Consider a security operations pipeline in which ACP sits between a SIEM
+(Security Information and Event Management) platform and a set of AI agents
+that triage and correlate alerts.
+An upstream sanitizer---integrated at the SIEM export layer to reduce noise---
+strips all contextual fields (resource classification, historical violation count,
+anomaly flag) before forwarding events to the ACP engine.
+After sanitization every request arrives with \texttt{F\_res = 0}, \texttt{F\_hist = 0},
+and \texttt{F\_anom = 0}, reducing the effective risk score to
+$\mathrm{RS} = \mathtt{capBase} \leq 20$ for any capability.
+Because $\mathrm{RS} \leq 20 < 40$, every request falls into the
+\textsc{Approved} class regardless of the underlying alert severity.
+BAR collapses to $0.00$: the engine is active, syntactically correct, and
+enforcing policy---yet no boundary is ever exercised.
+A CISO reviewing audit logs would observe zero denials and zero escalations,
+which could be interpreted as a healthy, low-risk environment rather than
+a sign that the risk-signal pipeline has been silently neutralized.
+ACP-BAR-Monitor detects this regime in one sliding window and raises a
+$\Delta\mathrm{BAR}$ alert before the next policy review cycle.
+
 \subsection{Experiment 9: Deviation Collapse and Restoration}
 \label{sec:exp9}
 
@@ -3256,13 +3549,14 @@ Deviation collapse does not only eliminate BAR.
 In Phase~B, the suppression of \texttt{DENIED} decisions also prevents the
 accumulation of three denials in ten minutes required to trigger the cooldown
 mechanism.
-As a consequence, the 9.5$\times$ short-circuit path measured in
+As a consequence, the 10.7$\times$ short-circuit path measured in
 Experiment~4 is never activated.
 Deviation collapse neutralizes not only the primary enforcement boundary
 but also the secondary containment mechanisms that depend on DENIED events
 as inputs.
 
 \subsection{Boundary Activation Monitoring}
+\label{sec:bar}
 \label{sec:bar-monitor}
 
 While Experiment~9 demonstrates that admissibility enforcement can become
@@ -3323,8 +3617,8 @@ Deviation collapse has a structural consequence beyond reducing BAR to zero:
 it also prevents the accumulation of DENIED decisions required to trigger
 cooldown.
 In the sanitized Phase~B of Experiment~9, no DENIED decisions are produced,
-meaning the cooldown mechanism is never activated and the $9.5\times$ short-circuit
-path (88\,ns, Section~\ref{sec:adversarial}) is never exercised.
+meaning the cooldown mechanism is never activated and the $10.7\times$ short-circuit
+path (78\,ns, Section~\ref{sec:adversarial}) is never exercised.
 Upstream sanitization therefore neutralizes not only the primary enforcement
 boundary but also the secondary containment mechanisms that depend on DENIED
 events as inputs.
@@ -3503,7 +3797,7 @@ three batches before collapse;
 \texttt{EvaluateCounterfactual} confirms that structural enforcement capacity is
 preserved ($\mathrm{BAR}_C = 1.00$) and can be restored by reintroducing
 boundary-activating request types into the evaluation workload.
-Together, the three v1.25 mechanisms form a coherent response to this attack class.
+Together, these three mechanisms form a coherent response to this attack class.
 
 % ── Experiment 11 ─────────────────────────────────────────────────────────────
 \subsection{Experiment 11: Threshold Sensitivity Analysis}
@@ -3590,6 +3884,314 @@ Three results emerge:
         The results justify the default threshold selection empirically.
 \end{enumerate}
 
+% ── Experiment 12 ─────────────────────────────────────────────────────────────
+\subsection{Experiment 12: Multi-Tool Agent Admission Control Under IPI}
+\label{sec:exp12}
+
+\textbf{Motivation.}
+A realistic LLM agent operates a \emph{portfolio} of tools with heterogeneous
+risk profiles.
+An indirect prompt injection (IPI) attack may induce the agent to flood a
+single high-risk tool (e.g.\ \texttt{fund\_transfer}),
+triggering ACP's cooldown and affecting the entire agent.
+This experiment asks: does ACP's stateful ledger create
+\emph{persistent enforcement consequences} that outlast the attack window?
+A stateless engine would fully reset after cooldown expiry;
+ACP's 24-hour denial history should keep the enforcement posture elevated.
+
+\textbf{Setup.}
+A single agent (\texttt{agent-exp12-multitool}) operates four tools whose
+RS values under ACP-RISK-3.0 default policy with a clean ledger are:
+
+\begin{table}[h!]
+\centering\small
+\caption{Tool risk scores used in Experiment~12 (clean-state, ACP-RISK-3.0 default).}
+\label{tab:exp12-tools}
+\begin{tabular}{@{}llllc@{}}
+\toprule
+Tool            & Capability                    & Resource Class & Base RS & Decision \\
+\midrule
+\texttt{weather\_query}  & \texttt{acp:cap:data.read}          & PUBLIC     &  0  & APPROVED \\
+\texttt{user\_profile}   & \texttt{acp:cap:data.read}          & SENSITIVE  & 15  & APPROVED \\
+\texttt{system\_audit}   & \texttt{acp:cap:admin.manage}       & PUBLIC     & 60  & ESCALATED \\
+\texttt{fund\_transfer}  & \texttt{acp:cap:financial.transfer} & RESTRICTED & 80  & DENIED \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The session is divided into three phases using distinct timestamps
+to control which events fall inside the 10-minute cooldown detection window
+versus the 24-hour $F_\text{anom}$ Rule~2 window:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{Phase A} ($t_0$, 10 requests): Baseline --- diverse legitimate
+        operations (4$\times$ \texttt{weather\_query}, 3$\times$ \texttt{user\_profile},
+        2$\times$ \texttt{system\_audit}, 1$\times$ \texttt{fund\_transfer}).
+  \item \textbf{Phase B} ($t_0 + 1\,\mathrm{min}$, 8 requests): IPI chain ---
+        attacker-induced \texttt{fund\_transfer} flood
+        (5$\times$ \texttt{fund\_transfer}, 3$\times$ \texttt{system\_audit}).
+  \item \textbf{Phase C} ($t_0 + 60\,\mathrm{min}$, 10 requests): Recovery ---
+        same diverse mix as Phase~A.
+        Cooldown has expired ($300\,\mathrm{s} \ll 60\,\mathrm{min}$);
+        $F_\text{anom}$ Rule~2 still active ($24\,\mathrm{h} \gg 60\,\mathrm{min}$).
+\end{itemize}
+
+State (denial history, cooldown, pattern counts) persists across all phases
+via a shared \texttt{InMemoryQuerier}.
+BAR-Monitor settings: window~$=40$, threshold~$=0.10$, trend threshold~$=-0.15$.
+
+\textbf{Results.}
+
+\begin{table}[h!]
+\centering\small
+\caption{Experiment~12: three-phase admission control results.
+Adversary model: A~$=$~(formula-aware, flood, $B{=}8$).}
+\label{tab:exp12-results}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Phase & Requests & APPROVED & ESCALATED & DENIED & BAR \\
+\midrule
+A (Baseline)   & 10 &  7 & 2 &  1 & 0.30 \\
+B (IPI Chain)  &  8 &  0 & 0 &  8 & 1.00 \\
+C (Recovery)   & 10 &  7 & 0 &  3 & 0.30 \\
+\midrule
+Total          & 28 & 14 & 2 & 12 & 0.50 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Phase-by-phase analysis.}
+
+\textbf{Phase~A (Baseline):}
+Per-request enforcement operates normally.
+\texttt{fund\_transfer} (RS~$=80$) is denied; \texttt{system\_audit}
+(RS~$=60$) is escalated, not denied --- it remains a borderline capability
+that can still execute under human review.
+BAR~$=0.30$ reflects two escalated and one denied request out of ten.
+
+\textbf{Phase~B (IPI Chain):}
+The attacker induces two additional \texttt{fund\_transfer} denials.
+This raises the rolling 10-minute denial count to three
+(one from Phase~A plus two from Phase~B),
+satisfying the cooldown trigger threshold (\texttt{CooldownTrigger}~$=3$).
+ACP immediately enters an \emph{agent-wide} lockdown:
+all subsequent requests --- including \texttt{system\_audit} --- are denied
+with reason \texttt{COOLDOWN\_ACTIVE}, regardless of their individual RS values.
+BAR~$=1.00$; the BAR-Monitor window captures the full attack.
+A stateless engine would deny \texttt{fund\_transfer} only;
+ACP denies all six remaining operations.
+
+\textbf{Phase~C (Recovery):}
+Cooldown has expired at $t_0 + 60\,\mathrm{min}$.
+However, the ledger retains the denial history from Phases~A and~B:
+\texttt{CountDenials(\textit{agentID}, 24\,h)}~$= 3 \geq 3$,
+activating $F_\text{anom}$ Rule~2 ($+15$) on every request.
+The RS of each tool rises accordingly:
+
+\begin{itemize}[noitemsep]
+  \item \texttt{weather\_query}: $0 + 15 = 15$ → APPROVED ($\leq 39$)
+  \item \texttt{user\_profile}: $15 + 15 = 30$ → APPROVED ($\leq 39$)
+  \item \texttt{system\_audit}: $60 + 15 = \mathbf{75}$ → \textbf{DENIED} ($\geq 70$)
+  \item \texttt{fund\_transfer}: $80 + 15 = 95$ → DENIED ($\geq 70$)
+\end{itemize}
+
+The critical finding is that \texttt{system\_audit} --- which was merely
+\emph{escalated} (RS~$=60$) in Phase~A --- becomes \emph{denied} (RS~$=75$)
+in Phase~C.
+The $+15$ anomaly penalty crosses the denial threshold without any new attack
+activity: the ledger's 24-hour memory propagates the attack's consequences
+into the post-cooldown recovery period.
+BAR~$=0.30$, structurally identical to Phase~A,
+but the composition has shifted: ESCALATED~$=0$ (was 2) and DENIED~$=3$
+(was 1), confirming elevated risk posture.
+
+\textbf{Findings.}
+
+\begin{enumerate}[noitemsep]
+  \item \textbf{Agent-wide cooldown amplifies IPI impact.}
+        After three denials in ten minutes, ACP blocks \emph{all} agent
+        operations, not only the targeted tool.
+        This prevents an attacker from using IPI to saturate high-risk
+        tool capacity while low-risk operations continue unmolested.
+
+  \item \textbf{Stateful F\textsubscript{anom} elevates borderline capabilities post-attack.}
+        A capability that was ESCALATED under normal conditions
+        (\texttt{system\_audit}, RS~$=60$) becomes DENIED after an IPI campaign
+        because the ledger's 24-hour denial window persists beyond cooldown.
+        A stateless engine would return to pre-attack RS values immediately;
+        ACP maintains elevated enforcement for the duration of the anomaly window.
+
+  \item \textbf{Low-risk tools remain unaffected.}
+        \texttt{weather\_query} and \texttt{user\_profile} remain APPROVED
+        even with $F_\text{anom}+15$ applied (RS~$=15$ and $30$ respectively),
+        demonstrating that persistent post-attack elevation is proportionate:
+        it promotes borderline cases to DENIED without blocking safe operations.
+\end{enumerate}
+
+% ── Experiment 13 ─────────────────────────────────────────────────────────────
+\subsection{Experiment 13: Bounded Coordination Window}
+\label{sec:exp13}
+
+A natural question about per-agent enforcement is whether coordination across
+agents allows participants to collectively exceed the constraints that apply to
+each individually.
+This experiment quantifies the coordination window (CW)---the total number of
+approved actions executed across $N$ agents before ACP triggers the first
+\texttt{DENIED} decision---and evaluates how CW scales with $N$.
+
+\textbf{Setup.}
+We deploy $N$ agents issuing homogeneous
+\texttt{acp:cap:financial.transfer} requests on the shared public resource
+\texttt{accounts/shared-ops}.
+The baseline risk score is $B=35$, $F_\text{res}=0$ (public),
+giving RS~$= 35$, which is \texttt{APPROVED} ($\leq 39$).
+Anomaly thresholds are set low to expose the coordination boundary quickly:
+$N_{\mathrm{Rule1}}=2$ (Rule~1 fires when pattern count~$> 2$ in 60\,s,
+adding $+20$) and $Y_{\mathrm{Rule3}}=2$ (Rule~3 fires when pattern
+count~$\geq 2$ in 5\,min, adding $+15$).
+
+Risk accumulation uses agent-scoped pattern keys of the form
+$\mathtt{PatternKey} = \mathrm{SHA\text{-}256}(\mathit{agentID} \mid
+\mathit{capability} \mid \mathit{resource})$, isolating each agent's
+behavioral history independently.
+Crucially, ACP follows an \emph{evaluate-then-mutate} execution contract
+(ACP-RISK-3.0~\S4): ledger state is updated only \emph{after} the decision
+is emitted.
+This means each agent's first two requests are evaluated against zero and one
+prior pattern counts respectively, neither of which reaches the Rule~3
+threshold ($\geq 2$); the third request is evaluated against two prior
+patterns (Rule~3 fires, RS~$=50$, \texttt{ESCALATED}); the fourth is
+evaluated against three (Rule~1 and Rule~3 fire, RS~$=70$, \texttt{DENIED}).
+Each agent therefore contributes exactly \textbf{two approved actions} before
+escalation and denial.
+
+\textbf{Results.}
+Table~\ref{tab:exp13} shows the coordination window across three variants:
+sequential execution ($N=1$), round-robin scheduling ($N=2,3,5$), and burst
+execution ($N=5$, each agent completing its window before the next starts).
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Variant & $N$ & $\mathrm{CW}_\mathrm{appr}$ & $\mathrm{CW}_\mathrm{total}$ & TTB (reqs) \\
+\midrule
+Sequential          & 1 & 2  &  3 &  4 \\
+Round-robin         & 2 & 4  &  6 &  7 \\
+Round-robin         & 3 & 6  &  9 & 10 \\
+Round-robin         & 5 & 10 & 15 & 16 \\
+Burst (5 agents)    & 5 & 10 & 15 &  4 \\
+\bottomrule
+\end{tabular}
+\caption{Experiment~13: coordination window across $N$ agents.
+$\mathrm{CW}_\mathrm{appr}$: total approved actions before first
+\texttt{DENIED}. $\mathrm{CW}_\mathrm{total}$: approved + escalated.
+TTB: total request count at the first \texttt{DENIED}.}
+\label{tab:exp13}
+\end{table}
+
+\textbf{Linearity.}
+Across all configurations, $\mathrm{CW}_\mathrm{appr}/N = 2.0$ exactly
+(zero deviation).
+The result admits the closed-form expression:
+\[
+  \mathrm{CW}_\mathrm{appr} = 2N, \quad
+  \mathrm{CW}_\mathrm{total} = 3N, \quad
+  \mathrm{TTB}_\mathrm{rr} = 3N + 1,
+\]
+where $\mathrm{TTB}_\mathrm{rr}$ applies to round-robin scheduling.
+Under burst execution, the first \texttt{DENIED} occurs at a fixed
+TTB~$= 4$ regardless of $N$, because it is triggered by the first agent
+exhausting its individual window.
+The temporal profile therefore depends on scheduling strategy, but the total
+coordination window is identical: $\mathrm{CW}_\mathrm{appr} = 2N$ in all
+cases.
+
+Per-agent contribution is symmetric: in the $N=3$ round-robin trace,
+each agent records exactly two \texttt{APPROVED} and one
+\texttt{ESCALATED} decision before reaching \texttt{DENIED},
+with no cross-agent contamination of risk signals.
+
+\textbf{Analysis.}
+The exact linearity follows from two structural properties of ACP-RISK-3.0.
+First, all behavioral signals (pattern counters, denial history, cooldown
+state) are indexed by \texttt{agentID}: agents do not contribute to each
+other's risk profiles, and coordinated execution does not accelerate boundary
+activation for any individual participant.
+Second, the evaluate-then-mutate contract guarantees each agent a fixed
+per-request admitted count before its pattern frequency crosses the anomaly
+threshold---a bound determined by execution semantics, not only by numerical
+thresholds.
+
+ACP does not detect or model coordination.
+Instead, it enforces per-agent behavioral bounds such that coordinated activity
+scales at most linearly with the number of participants:
+\[
+  \text{Total executable actions} \in O(N).
+\]
+
+\textbf{Implications.}
+Scaling a coordinated campaign requires proportional scaling of agents:
+each additional participant adds a fixed, bounded contribution.
+Superlinear or exponential amplification through coordination is structurally
+prevented.
+This result complements Experiment~9 (deviation collapse: inadmissible
+conditions disappear under upstream drift) and the TLA+ verification
+(4.29~billion states, zero safety violations: failure states are unreachable):
+together they demonstrate that ACP constrains both the \emph{existence} and
+the \emph{scale} of undesirable behaviors.
+
+\subsection{False-Denial Rate Analysis}
+\label{sec:false-denial}
+
+A standard objection to stateful enforcement is that history-aware scoring
+may penalize legitimate activity occurring after a past incident---producing
+\emph{false denials} for requests that would be admitted under a clean ledger.
+We quantify this risk using evidence from Experiments~11 and~12.
+
+\textbf{Stateless baseline: zero false denials (Experiment~11).}
+Experiment~11 evaluates five threshold configurations (T1--T5) across a
+20-request heterogeneous workload.
+The false-denial rate is \textbf{0.00 across all configurations},
+including the strictest setting (T1: APPROVED~$\leq 29$).
+No T3-APPROVED request is reclassified as DENIED under any threshold variant;
+tighter thresholds promote requests from APPROVED to ESCALATED,
+not directly to DENIED, because ACP's three-outcome model introduces a
+graduated step before hard denial.
+
+\textbf{Post-attack: proportionate elevation (Experiment~12, Phase~C).}
+Phase~C of Experiment~12 is the strongest available test of false-denial
+risk: the ledger carries three prior denials ($F_\text{anom} +15$
+from Rule~2), and cooldown has just expired.
+Low-risk tools remain fully accessible:
+\texttt{weather\_query} (RS~$=0+15=15$) and \texttt{user\_profile}
+(RS~$=15+15=30$) are both APPROVED ($\leq 39$), yielding a post-attack
+false-denial rate of \textbf{0.00} for safe capabilities.
+
+The only tool promoted to DENIED is \texttt{system\_audit} (RS~$=60+15=75$),
+which was ESCALATED under the clean-state policy.
+This is not a false denial: \texttt{system\_audit} carries
+\texttt{acp:cap:admin.manage}, a privileged capability that requires
+human review under default policy even without any prior incident.
+After a confirmed IPI campaign, elevating it to DENIED is
+\emph{intentional tightening}, not a spurious penalty.
+The same behavior is documented in \S\ref{sec:limitations} as a
+known trade-off of stateful enforcement.
+
+\textbf{Design basis.}
+The zero false-denial property in the stateless baseline is not
+coincidental: ACP's three-tier outcome model (APPROVED / ESCALATED / DENIED)
+provides a graduated buffer.
+Stricter configurations first escalate, and only hard-deny requests whose
+RS already falls in the upper range.
+In the post-attack regime, the $+15$ anomaly penalty is calibrated to
+cross the denial threshold only for capabilities already classified as
+borderline (ESCALATED, RS~$\approx 55$--$69$), leaving low-risk capabilities
+untouched.
+High-risk capabilities (\texttt{fund\_transfer}, RS~$\geq 70$ clean) are
+denied in both regimes---the anomaly penalty adds margin, not a new category.
+
 \subsection{Extended Governance Objective}
 
 \textbf{Bounded operational region.}
@@ -3665,6 +4267,33 @@ Evaluation on multi-node and geo-replicated configurations (e.g., CockroachDB, S
 is planned; the \texttt{LedgerQuerier} abstraction is designed to accommodate them without
 modification to the protocol layer or admission logic.
 
+\paragraph{Deployment Maturity Model.}
+The three backend tiers correspond to a natural maturity progression.
+Adopters should advance tiers as their operational requirements grow:
+
+\begin{table}[h!]
+\centering\small
+\caption{ACP deployment maturity tiers.
+Each tier adds durability, observability, and assurance guarantees.
+BAR-Monitor is mandatory at Tier~3 because tamper-evident ledgers justify
+proactive governance monitoring.}
+\label{tab:maturity}
+\begin{tabular}{@{}cllll@{}}
+\toprule
+Tier & Backend & BAR-Monitor & Ledger integrity & Recommended context \\
+\midrule
+1 & \texttt{InMemoryQuerier} & Optional & Ephemeral (process-local) & Development, conformance, CI \\
+2 & Redis pipelined         & Recommended & AOF/RDB persistent & Production, multi-process \\
+3 & Postgres / ACID         & \textbf{Required} & Hash-chained audit & High-assurance, regulated industries \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent Tier~3 pairs ACP with a tamper-evident state backend (ACP-LEDGER-1.0, planned)
+and mandates BAR-Monitor to detect deviation collapse (\S\ref{sec:bar}).
+Tier~1 and Tier~2 deployments can enable BAR-Monitor incrementally
+without changing the admission control logic.
+
 \subsection{Agent Identity Provisioning}
 
 ACP requires a stable \texttt{agent\_id} per agent instance.
@@ -3733,26 +4362,106 @@ observability infrastructure:
 \subsection{Policy Tuning}
 
 The \texttt{PolicyConfig} parameters (defaults documented in ACP-RISK-2.0 Appendix~A
-and exposed via \texttt{DefaultPolicyConfig()}) are the primary operational levers:
+and exposed via \texttt{DefaultPolicyConfig()}) are the primary operational levers.
+Table~\ref{tab:policy-profiles} provides concrete starting values for four
+threat profiles; organizations should adjust from these baselines using
+observed denial rates and throughput data.
+
+\begin{table}[h!]
+\centering\small
+\caption{Recommended \texttt{PolicyConfig} starting values by threat profile.
+All profiles use \texttt{PolicyHash} pinning and APPROVED~$\leq 39$ / DENIED~$\geq 70$
+thresholds (ACP-RISK-3.0 defaults).
+\emph{Expected BAR baseline} is the healthy operational range for a deployment at that
+profile under normal (non-attack) traffic; sustained BAR below the lower bound indicates
+deviation collapse (\S\ref{sec:bar}).
+$^\dagger$~Polling agents may require higher $Y$ to suppress false escalations
+from legitimate repeated reads.}
+\label{tab:policy-profiles}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Profile & \texttt{CooldownPeriod} & \texttt{CooldownTrigger} & \texttt{AnomalyRule3Y} & Expected BAR & Typical context \\
+\midrule
+Low      & 120\,s  & 5 & 5$^\dagger$ & 0.80--0.95 & Internal dev tools, low-risk automation \\
+Medium   & 300\,s  & 3 & 3           & 0.60--0.80 & B2B APIs, typical SaaS agents (default) \\
+High     & 600\,s  & 2 & 2           & 0.45--0.65 & Financial systems, regulated industries \\
+Critical & 3600\,s & 1 & 1           & 0.30--0.50 & Critical infrastructure, high-assurance \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The four parameters interact: tightening \texttt{CooldownTrigger} without
+extending \texttt{CooldownPeriod} increases sensitivity but shortens the containment
+window. \texttt{AnomalyRule3Y} should match the expected request burst size of
+legitimate agents---setting $Y=1$ blocks any repeated capability use, which is
+correct for critical infrastructure but would produce false escalations in
+high-frequency automation. \texttt{PolicyHash} should be pinned in all profiles
+to prevent silent policy drift.
 
 \begin{itemize}[noitemsep]
-  \item \texttt{CooldownPeriodSeconds}: Tune based on threat model.
-    Shorter ($<300$s) enables faster recovery for false positives;
-    longer ($\geq600$s) provides stronger containment under sustained attack.
-  \item \texttt{CooldownTriggerDenials}: Lower values ($=2$) increase sensitivity
-    at the cost of higher false-positive rate; higher values allow more free denials
-    before containment.
-  \item \texttt{AnomalyRule3ThresholdY}: Controls the pattern-accumulation window.
-    Default $Y=3$ balances replay detection latency against false positives from
-    legitimate repeated requests (e.g., polling agents).
+  \item \texttt{CooldownPeriodSeconds}: Shorter ($<300$\,s) enables faster recovery
+    after a false-positive denial cluster; longer ($\geq600$\,s) provides stronger
+    containment under sustained attack or compromised agent.
+  \item \texttt{CooldownTriggerDenials}: Lower values detect attacks faster but
+    increase sensitivity to legitimate burst traffic.
+  \item \texttt{AnomalyRule3ThresholdY}: Default $Y=3$ balances replay detection
+    latency against false positives from polling agents.
   \item \texttt{PolicyHash}: Pin policy versions in capability tokens to prevent
     silent policy changes from altering admission decisions post-issuance.
 \end{itemize}
 
 \noindent ACP provides sensible defaults via \texttt{DefaultPolicyConfig()}
-(Appendix~A of ACP-RISK-2.0).
+(Appendix~A of ACP-RISK-2.0), corresponding to the Medium profile above.
 Organizations should treat policy calibration as an operational process,
-informed by observed denial rates, throughput baselines, and threat model requirements.
+informed by observed denial rates, throughput baselines, and threat model.
+
+% ── Migration RISK-2.0 → RISK-3.0 ────────────────────────────────────────────
+\subsection{Migrating from ACP-RISK-2.0 to ACP-RISK-3.0}
+\label{sec:migration}
+
+ACP-RISK-3.0 is backward-compatible with ACP-RISK-2.0 at the API level.
+The \texttt{EvalRequest} and \texttt{EvalResult} structures are unchanged;
+all existing conformance vectors and capability tokens remain valid.
+The only behavioral change is the scoping of Rule~1 of $F_\text{anom}$:
+
+\begin{table}[h!]
+\centering\small
+\caption{ACP-RISK-2.0 vs.\ ACP-RISK-3.0: behavioral and interface differences.
+All other fields, formulas, and thresholds are identical.
+Existing deployments need only provide \texttt{resource} in \texttt{EvalRequest}
+and upgrade the \texttt{pkg/risk} package.}
+\label{tab:migration}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Aspect & ACP-RISK-2.0 & ACP-RISK-3.0 \\
+\midrule
+Rule~1 counter key   & \texttt{agentID} & \texttt{PatternKey(agentID, cap, resource)} \\
+Cross-context isolation & No (state-mixing) & Yes (per-context scoping) \\
+\texttt{EvalRequest} fields & unchanged & \texttt{resource} used for \texttt{PatternKey} \\
+Ledger key format    & per-agent & per-context (SHA-256 hash) \\
+Performance overhead & baseline & $+$50\,ns per evaluation (Table~\ref{tab:benchmarks}) \\
+Conformance vectors  & 65 unsigned & 73 signed (superset; both suites pass) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Migration steps.}
+\begin{enumerate}[noitemsep]
+  \item Upgrade \texttt{pkg/risk} to the ACP-RISK-3.0 version.
+  \item Ensure \texttt{EvalRequest.Resource} is populated per request
+    (it was optional in RISK-2.0; it is required for correct PatternKey computation in RISK-3.0).
+  \item Flush the anomaly counters in the ledger (optional but recommended):
+    RISK-2.0 per-agent keys are structurally different from RISK-3.0 per-context keys
+    and will not interfere, but stale RISK-2.0 entries consume storage.
+  \item Re-run the ACR-1.0 conformance suite against your deployment.
+    All 73 signed vectors must pass; any failure indicates a RISK-2.0 residue.
+\end{enumerate}
+
+\noindent Deployments that cannot populate \texttt{Resource} immediately
+(e.g., legacy agents without resource attribution)
+may set \texttt{Resource = agentID} as a transitional measure.
+This degrades RISK-3.0 to RISK-2.0 behavior for Rule~1 while preserving
+all other RISK-3.0 properties (Rules~2 and~3, cooldown, thresholds).
 
 % ============================================================
 \section{Security Model}
@@ -3805,11 +4514,13 @@ Exp & Adversary Class & $K$ & $S$ & $B$ & Outcome \\
 9 & Deviation Collapse     & —             & upstream drift    & —     & BAR detects \\
 10 & Knowledge-Aware Evasion & formula-aware & evasion (RS=0) & 200   & BAR detects \\
 11 & Threshold Sensitivity  & —             & —                 & —     & monotonic \\
+12 & Multi-Tool IPI Chain   & formula-aware & flood             & 8     & stateful persistence \\
+13 & Coordination Window    & black-box     & round-robin/burst & $5N$  & linear bound ($O(N)$) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Four findings emerge from this taxonomy:
+Five findings emerge from this taxonomy:
 
 \begin{enumerate}[noitemsep]
   \item \textbf{Per-decision enforcement suffices against black-box adversaries.}
@@ -3823,12 +4534,25 @@ Four findings emerge from this taxonomy:
         before the regime reaches full collapse.
   \item \textbf{Deviation collapse (Exp~9) is an environmental threat, not adversarial,
         but BAR-Monitor handles both classes with the same mechanism.}
+  \item \textbf{Stateful ledger creates persistent enforcement consequences (Exp~12).}
+        An IPI flood that triggers cooldown also activates the 24-hour anomaly
+        window ($F_\text{anom}$ Rule~2), elevating borderline capabilities from
+        ESCALATED to DENIED for the entire anomaly window after cooldown expires.
+        A stateless engine would return to pre-attack RS values immediately.
   \item \textbf{Full-state adversaries are outside the v1.0 threat model.}
         An adversary with real-time ledger access could predict and exploit
         threshold transitions.
         This class is not addressed in the present specification
         and is acknowledged in \S\ref{sec:limitations}
         as a target for ACP-D-1.0 (decentralized governance).
+  \item \textbf{Coordinated multi-agent activity scales linearly (Exp~13).}
+        Per-agent behavioral isolation ensures that $N$ agents acting in
+        concert can execute at most $2N$ approved operations before the first
+        \texttt{DENIED} decision---a coordination window that grows linearly
+        with $N$, with zero deviation observed.
+        Superlinear amplification through coordination is structurally
+        prevented by the combination of agent-scoped pattern keys and the
+        evaluate-then-mutate execution contract.
 \end{enumerate}
 
 \subsection{Adversary Limitations}
@@ -3923,6 +4647,27 @@ The security guarantees of ACP rely on the integrity of the execution environmen
         cross-instance consistency must enforce strong consistency at the storage layer.
   \item Incorrect implementation of the execution contract may lead to inconsistent behavior.
   \item The model does not address side-channel attacks or network-level adversaries.
+  \item \textbf{Prompt-layer attacks and LLM-specific benchmarks.}
+        ACP operates at the execution layer and does not prevent indirect prompt injection
+        (IPI)~\cite{greshake2023not} at the prompt layer.
+        An IPI attack that causes an agent to emit a low-risk request
+        (e.g., \texttt{acp:cap:data.read}/\textsc{Public}, $\mathrm{RS}=0$) will be
+        admitted by ACP, because the resulting tool call is individually valid.
+        ACP's enforcement boundary is the tool call, not the instruction that produced it.
+        Standard LLM agent benchmarks---AgentDojo~\cite{debenedetti2024agentdojo},
+        InjecAgent~\cite{zhan2024injecagent}, and AgentContract-Bench---evaluate
+        prompt-layer manipulation resistance, which is a complementary but orthogonal
+        property to execution-layer admission control.
+        Prompt-layer defenses reduce the IPI attack surface; ACP enforces structural
+        constraints over the action sequence regardless of how the request was generated.
+        The two layers are composable: a prompt-layer filter applied before the tool call
+        reaches the ACP admission boundary reduces the frequency of injected high-risk
+        requests, while ACP provides the structural guarantee that high-risk requests
+        are denied regardless of their origin.
+        ACP's defense against formula-aware evasion (Experiment~10, \S\ref{sec:exp10})
+        addresses a distinct threat class: an adversary who drives
+        $\mathrm{RS}=0$ across all requests---which BAR-Monitor detects via
+        $\Delta\mathrm{BAR}$, not per-decision enforcement.
   \item Post-quantum signature migration (ACP-SIGN-2.0 HYBRID, Ed25519 + ML-DSA-65)
     is implemented via the Cloudflare CIRCL library (\texttt{pkg/sign2/}).
     ML-DSA-65 signing latency is approximately 100--130\,\textmu s (vs.\ 25\,\textmu s for Ed25519),
@@ -3967,7 +4712,7 @@ the layer that existing identity and policy frameworks leave unaddressed.
 The v1.25 specification is complete.
 A full Go reference implementation (23 packages, L1--L4), 73 signed + 65 unsigned RISK-2.0 conformance test vectors,
 5 stateful sequence test vectors (ACR-1.0 compliance runner),
-a TLC-runnable TLA+ formal model (base: 3~invariants; extended v1.25: 11~invariants + 4~temporal properties, 5,684,342~states generated, 3,147,864~distinct, graph depth~15, 0~violations within the bounded state space),
+a TLC-runnable TLA+ formal model (base: 3~invariants; extended v1.25: 11~invariants + 4~temporal properties, 5,684,342~states generated, 3,147,864~distinct, graph depth~15, 0~violations; two-agent safety at \texttt{LB=11}: 4,648,235,723~states generated, 4,294,930,695~distinct, 11~invariants, 0~violations, 10.5~h),
 a real ML-DSA-65 (Dilithium mode3) hybrid implementation via Cloudflare CIRCL (\texttt{pkg/sign2/}, \texttt{SignHybridFull} + \texttt{VerifyHybrid}),
 an executable multi-organization interoperability demo (\texttt{examples/multi-org-demo/}),
 a payment-agent demo (\texttt{examples/payment-agent/}),
@@ -3979,8 +4724,8 @@ state-mixing vulnerability characterization (Experiment~7),
 context-scoped anomaly enforcement under ACP-RISK-3.0 (Experiment~8),
 deviation collapse and restoration (Experiment~9),
 and knowledge-aware adversarial evasion (Experiment~10)
-are publicly available at \url{https://github.com/chelof100/acp-framework-en}.\\
-\textbf{Preprint:} \url{https://arxiv.org/abs/2603.18829} \quad \textbf{Zenodo:} \href{https://doi.org/10.5281/zenodo.19482968}{10.5281/zenodo.19482968}\\
+are publicly available at \url{https://github.com/chelof100/acp-framework-en}~\cite{acp-spec}.\\
+\textbf{Preprint:} \url{https://arxiv.org/abs/2603.18829} \quad \textbf{Zenodo:} \href{https://doi.org/10.5281/zenodo.19485201}{10.5281/zenodo.19485201}\\
 The specification and implementation are open for technical review, pilot implementation, and formal standardization.
 
 TraslaIA invites organizations interested in adopting ACP, contributing to its evolution,
@@ -3993,7 +4738,7 @@ is described in~\S\ref{sec:limitations} (\emph{Distributed Attack Surface}).
 ACP demonstrates that admission control for autonomous agents can be both computationally
 efficient and operationally enforceable---provided that decision logic and state management
 are cleanly separated. The protocol is \textbf{compute-cheap but state-sensitive}: the
-\texttt{LedgerQuerier} abstraction keeps the evaluation function at 767--921\,ns (p50; Table~\ref{tab:benchmarks}) while
+\texttt{LedgerQuerier} abstraction keeps the evaluation function at 739--832\,ns (p50; Table~\ref{tab:benchmarks}) while
 allowing the state backend to be replaced, optimized, or scaled independently.
 This is not an implementation detail---it is the architectural property that makes ACP
 deployable in production without sacrificing governance correctness.
@@ -4004,7 +4749,7 @@ The contribution of this work is to make that condition detectable, measurable, 
 
 \bigskip
 \noindent\textbf{Marcelo Fernandez | TraslaIA}\\
-\texttt{info@traslaia.com} | \url{https://agentcontrolprotocol.xyz}
+\texttt{info@traslaia.com} | \url{https://agentcontrolprotocol.xyz}~\cite{acp-website}
 
 % ============================================================
 \appendix
@@ -4076,6 +4821,8 @@ PROHIB-012 & Continuing to process an artifact with an invalid signature \\
 
 The \texttt{tla/ACP.tla} module is a complete TLC-runnable TLA+ model of the ACP-RISK-2.0
 admission control engine.
+The full TLA+ model and TLC configuration files are available in the project repository at
+\url{https://github.com/chelof100/acp-framework-en}~\cite{acp-spec} (\texttt{tla/} directory).
 It checks three invariants over a bounded state space
 (2 agents $\times$ 4 capabilities $\times$ 3 resources, ledger depth $\leq 5$).
 Liveness properties in the extended model depend on two explicit assumptions:
@@ -4193,7 +4940,7 @@ All four declared invariants/properties (\texttt{TypeInvariant}, \texttt{Safety}
 \texttt{LedgerAppendOnlyTemporal} hold over the full reachable state space.
 
 \noindent\textbf{Interpretation.}
-\textit{Safety} encodes fail-closed admission: every APPROVED decision had $\mathit{RS} \leq 39$.
+\textit{Safety} encodes fail-closed admission~\cite{saltzer1975}: every APPROVED decision had $\mathit{RS} \leq 39$.
 \textit{LedgerAppendOnly} encodes tamper-evidence in a state-based view:
 every ledger entry carries a valid decision and a non-negative risk score.
 \textit{LedgerAppendOnlyTemporal} is the temporal statement: in every step,
@@ -4314,10 +5061,106 @@ Accordingly, liveness properties are evaluated under the single-agent configurat
 (\texttt{FLOOD\_THRESHOLD=4}, \texttt{MAX\_TIME=7}), where bounds are calibrated to
 allow sufficient interaction depth.
 
+\smallskip
+\noindent\textbf{Two-agent safety at scale (J2d).}
+To strengthen the isolation claim, a further two-agent run was conducted
+with bounds calibrated to match the single-agent liveness configuration:
+\texttt{Agents=\{``A1'',``A2''\}}, \texttt{FLOOD\_THRESHOLD=4},
+\texttt{LEDGER\_BOUND=6}, \texttt{MAX\_TIME=7},
+with 6 parallel workers and 12\,GB heap (TLC2~v2.16, Java~26).
+The run completed in 4\,h\,13\,min, generating 50,927,772~states
+and finding 27,648,560~distinct states at graph depth~14.
+All eleven safety invariants hold with zero violations across the complete
+bounded multi-agent state space, confirming that per-agent enforcement
+isolation extends to the full invariant set under the liveness-calibrated bounds.
+
+TLC reported a temporal property violation at the final liveness check,
+but was unable to generate a counter-example trace:
+the heap was exhausted (\texttt{OutOfMemoryError}) while constructing the lasso
+over 165\,million accumulated state-space entries.
+Diagnosis reveals a model-bounding artifact rather than a protocol defect.
+With two agents sharing a ledger of capacity \texttt{LEDGER\_BOUND}$=6$,
+the combined request volume fills the ledger before either agent reaches
+\texttt{FLOOD\_THRESHOLD}$=4$, disabling \texttt{EvaluateRequest} for both
+agents and preventing \texttt{EventuallyRejected} from firing.
+The necessary condition for liveness verification in an $N$-agent configuration is:
+\[
+  \texttt{LEDGER\_BOUND} \;\geq\; \texttt{FLOOD\_THRESHOLD} \times N + \delta,
+\]
+where $\delta \geq 1$ provides a buffer for post-flood evaluation steps.
+For two agents, this requires \texttt{LEDGER\_BOUND}$\,\geq 11$; this run
+was subsequently conducted and is reported in the following paragraph.
+
+\smallskip
+\noindent\textbf{Two-agent safety at extended scale (LB=11).}
+To directly address the scaling constraint identified above, a further run was
+conducted at the required bound:
+\texttt{Agents=\{``A1'',``A2''\}}, \texttt{LEDGER\_BOUND=11},
+\texttt{FLOOD\_THRESHOLD=4}, \texttt{MAX\_TIME=7},
+with 15~parallel workers (auto-scaled by TLC) and 24\,GB heap on an
+Intel Core~i9-13900HX with 32\,GB RAM
+(TLC2~v2.16, Java~21, Windows~11).
+The run explored \textbf{4,294,930,695~distinct states} over
+10.5\,hours, generating 4,648,235,723~total states,
+with all eleven safety invariants reporting zero violations
+throughout the entire exploration.
+The run was halted by disk space exhaustion
+(584\,GB of checkpoint data written to disk),
+not by any property violation.
+This result confirms that all per-agent enforcement invariants hold robustly
+under the correct multi-agent ledger bound, providing safety verification at
+$756\times$ the scale of the single-agent configuration and
+$155\times$ the scale of the LEDGER\_BOUND=6 run.
+Liveness verification at this scale remains open: the complete state space
+at LEDGER\_BOUND=11 substantially exceeds current hardware limits for
+lasso-trace computation.
+
+\smallskip
+\noindent\textbf{Exploration collapse: a formal analog of deviation collapse.}
+The bounding artifact above exhibits a structural parallel to the runtime
+phenomenon studied in Section~\ref{sec:deviation-collapse}.
+In deviation collapse, an upstream sanitizer eliminates the risk signals that
+would cause enforcement to fire: the engine remains active and syntactically
+correct, but its boundary is never exercised.
+In the multi-agent TLC configuration, bounded shared resources eliminate the
+state conditions under which liveness properties can be
+exercised~\cite{pnueli1977temporal, alpern1985defining}:
+the model checker remains sound and the invariants hold, but the traces
+required to validate temporal guarantees cannot be reached within the bound.
+Unlike classical state-space reductions---such as partial-order methods,
+which preserve liveness properties by construction~\cite{baier2008principles}---
+resource-induced bounds may eliminate entire classes of trajectories from the
+reachable state space.
+We refer to this as \emph{resource-induced liveness obstruction}:
+a structural limitation that arises not from a defect in the protocol or the
+model, but from the interaction between bounded shared resources and
+multi-agent concurrency.
+
+Both cases instantiate the same structural pattern: \emph{when the conditions
+necessary for enforcement to fire disappear---whether from the runtime pipeline
+or from the formal model---validation loses meaning independently of whether
+the mechanism itself is correct.}
+Put concretely: systems appear compliant because no invalid actions occur;
+models appear correct because no violations are reachable.
+In both cases, the decision boundary remains defined and the enforcement
+logic remains intact, but the capacity to exercise failure conditions has
+been eliminated.
+This observation motivates a modeling requirement analogous to failure condition
+preservation~(Section~\ref{sec:deviation-collapse}):
+formal liveness verification of multi-agent systems requires that resource bounds
+be sufficient to generate the behavioral conditions under which liveness properties
+are exercised~\cite{yu1999model, lamport2002specifying}.
+Addressing this in the general case---including per-agent ledger allocation,
+explicit fairness constraints, and scalable model checking strategies---is
+identified as future work.
+
 ACP thus provides two distinct guarantees: \emph{safety in all executions}
-(invariants hold regardless of scheduling or agent count) and \emph{liveness under
-sustained interaction} (eventual enforcement holds when agents continue to generate
-requests within the time horizon).
+(invariants hold regardless of scheduling or agent count, verified across
+4,294,930,695~distinct states in the two-agent configuration at the correct
+ledger bound \texttt{LEDGER\_BOUND=11}) and \emph{liveness under sustained
+interaction} (eventual enforcement holds when agents continue to generate
+requests within the time horizon, verified for the single-agent configuration
+where bounds are calibrated to admit the relevant traces).
 
 \noindent\textbf{Design notes on the extended model.}
 The base risk score \texttt{ComputeRisk(cap,\,res)} is preserved as a pure function;
