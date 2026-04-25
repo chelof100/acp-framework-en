@@ -21,18 +21,18 @@ DOI: [10.5281/zenodo.19672575](https://doi.org/10.5281/zenodo.19672575) &nbsp;·
 
 ## Research Series
 
-ACP is the published foundation of a six-paper series on formal agent governance. Each paper addresses a distinct layer of the governance stack.
+ACP is the published foundation of a seven-paper series on formal agent governance. Each paper addresses a distinct layer of the governance stack.
 
 | Paper | Title | Repo | Status |
 |---|---|---|---|
 | **Paper 0** | Atomic Decision Boundaries | [decision-boundary-model](https://github.com/chelof100/decision-boundary-model) | [Zenodo](https://doi.org/10.5281/zenodo.19670649) · [arXiv:2604.17511](https://arxiv.org/abs/2604.17511) |
 | **Paper 1** | Agent Control Protocol (ACP) — this repo | [acp-framework-en](https://github.com/chelof100/acp-framework-en) | [Zenodo](https://doi.org/10.5281/zenodo.19672575) · [arXiv:2603.18829](https://arxiv.org/abs/2603.18829) |
 | **Paper 2** | From Admission to Invariants (IML) | [iml-benchmark](https://github.com/chelof100/iml-benchmark) | [Zenodo](https://doi.org/10.5281/zenodo.19672589) · [arXiv:2604.17517](https://arxiv.org/abs/2604.17517) |
-| **Paper 3** | Fair Atomic Governance | [fair-atomic-governance](https://github.com/chelof100/fair-atomic-governance) | [Zenodo](https://doi.org/10.5281/zenodo.19672597) · arXiv: under review |
-| **Paper 4** | Irreducible Multi-Scale Governance | [compositional-governance](https://github.com/chelof100/compositional-governance) | [Zenodo](https://doi.org/10.5281/zenodo.19672608) · arXiv: under review |
+| **Paper 3/4** | Irreducible Governance Structure | [governance-structure](https://github.com/chelof100/governance-structure) | [Zenodo](https://doi.org/10.5281/zenodo.19708496) · arXiv: under review |
 | **Paper 5** | Reconstructive Authority Model (RAM) | [reconstructive-authority-model](https://github.com/chelof100/reconstructive-authority-model) | [Zenodo](https://doi.org/10.5281/zenodo.19669430) · arXiv: under review |
+| **Paper 6** | Operationalizing Reconstructive Authority | [operationalizing-ram](https://github.com/chelof100/operationalizing-ram) | [Zenodo](https://doi.org/10.5281/zenodo.19699460) · arXiv: under review |
 
-**Series logic:** Paper 0 proves *when* admissibility can be guaranteed → Paper 1 (ACP) builds the protocol → Paper 2 detects drift invisible to enforcement → Paper 3 proves correct enforcement ≠ fair allocation → Paper 4 composes all layers and proves their joint necessity → Paper 5 (RAM) provides operational closure: when to execute under partial observability.
+**Series logic:** Paper 0 proves *when* admissibility can be guaranteed → Paper 1 (ACP) builds the protocol → Paper 2 detects drift invisible to enforcement → Paper 3/4 proves correct enforcement ≠ fair allocation and the four-layer architecture is irreducible → Paper 5 (RAM) provides operational closure: when to execute under partial observability → Paper 6 operationalizes RAM as a runtime enforcement protocol.
 
 ---
 
