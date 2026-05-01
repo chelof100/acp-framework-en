@@ -21,7 +21,7 @@ DOI: [10.5281/zenodo.19672575](https://doi.org/10.5281/zenodo.19672575) &nbsp;·
 
 ## Research Series
 
-ACP is the published foundation of a six-paper series on formal agent governance. Each paper addresses a distinct layer of the governance stack.
+ACP is the published foundation of a seven-paper series on formal agent governance. Each paper addresses a distinct layer of the governance stack.
 
 | Paper | Title | Repo | Status |
 |---|---|---|---|
