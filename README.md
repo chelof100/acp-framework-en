@@ -21,19 +21,22 @@ DOI: [10.5281/zenodo.19672575](https://doi.org/10.5281/zenodo.19672575) &nbsp;·
 
 ## Research Series
 
-ACP is the published foundation of a seven-paper series on formal agent governance. Each paper addresses a distinct layer of the governance stack.
+ACP is the published foundation of a ten-paper series on formal agent governance. Each paper addresses a distinct layer of the governance stack.
 
 | Paper | Title | Repo | Status |
 |---|---|---|---|
 | **Paper 0** | Atomic Decision Boundaries | [decision-boundary-model](https://github.com/chelof100/decision-boundary-model) | [Zenodo](https://doi.org/10.5281/zenodo.19670649) · [arXiv:2604.17511](https://arxiv.org/abs/2604.17511) |
 | **Paper 1** | Agent Control Protocol (ACP) — this repo | [acp-framework-en](https://github.com/chelof100/acp-framework-en) | [Zenodo](https://doi.org/10.5281/zenodo.19672575) · [arXiv:2603.18829](https://arxiv.org/abs/2603.18829) |
 | **Paper 2** | From Admission to Invariants (IML) | [iml-benchmark](https://github.com/chelof100/iml-benchmark) | [Zenodo](https://doi.org/10.5281/zenodo.19672589) · [arXiv:2604.17517](https://arxiv.org/abs/2604.17517) |
-| **Paper 3/4** | Irreducible Governance Structure | [governance-structure](https://github.com/chelof100/governance-structure) | [Zenodo](https://doi.org/10.5281/zenodo.19708496) · arXiv: pending |
+| **Paper 3/4** | Irreducible Governance Structure | [governance-structure](https://github.com/chelof100/governance-structure) | [Zenodo](https://doi.org/10.5281/zenodo.19708496) · arXiv: on appeal |
 | **Paper 5** | Reconstructive Authority Model (RAM) | [reconstructive-authority-model](https://github.com/chelof100/reconstructive-authority-model) | [Zenodo](https://doi.org/10.5281/zenodo.19669430) · [arXiv:2604.22898](https://arxiv.org/abs/2604.22898) |
-| **Paper 6** | Operationalizing Reconstructive Authority | [operationalizing-ram](https://github.com/chelof100/operationalizing-ram) | [Zenodo](https://doi.org/10.5281/zenodo.19699460) · arXiv: pending |
-| **Paper 7** | Closing the Execution Gap (Empirical) | [agent-governance-applied](https://github.com/chelof100/agent-governance-applied) | [Zenodo](https://doi.org/10.5281/zenodo.19929771) · arXiv: pending |
+| **Paper 6** | Operationalizing Reconstructive Authority | [operationalizing-ram](https://github.com/chelof100/operationalizing-ram) | [Zenodo](https://doi.org/10.5281/zenodo.19699460) · [arXiv:2605.23935](https://arxiv.org/abs/2605.23935) |
+| **Paper 7** | Closing the Execution Gap (Empirical) | [agent-governance-applied](https://github.com/chelof100/agent-governance-applied) | [Zenodo](https://doi.org/10.5281/zenodo.19929771) · arXiv: on appeal |
+| **Paper 8** | Identity-Bound Governance (APB) | [identity-bound-governance](https://github.com/chelof100/identity-bound-governance) | [Zenodo](https://doi.org/10.5281/zenodo.20157139) · arXiv: on appeal |
+| **Paper 9** | MCP-Native Governance | [mcp-governed-agents](https://github.com/chelof100/mcp-governed-agents) | [Zenodo](https://doi.org/10.5281/zenodo.20162878) · arXiv: pending |
+| **Paper 10** | Non-Blocking Governance | [non-blocking-governance](https://github.com/chelof100/non-blocking-governance) | [Zenodo](https://doi.org/10.5281/zenodo.20214654) · arXiv: pending |
 
-**Series logic:** Paper 0 proves *when* admissibility can be guaranteed → Paper 1 (ACP) builds the protocol → Paper 2 detects drift invisible to enforcement → Paper 3/4 proves correct enforcement ≠ fair allocation and establishes the irreducibility of the four-layer architecture → Paper 5 (RAM) provides operational closure: when to execute under partial observability → Paper 6 operationalizes RAM as a runtime Recovery Loop → Paper 7 provides the first empirical validation of the full stack on real LangGraph agents.
+**Series logic:** Paper 0 proves *when* admissibility can be guaranteed → Paper 1 (ACP) builds the protocol → Paper 2 detects drift invisible to enforcement → Paper 3/4 proves correct enforcement ≠ fair allocation and establishes the irreducibility of the four-layer architecture → Paper 5 (RAM) provides operational closure: when to execute under partial observability → Paper 6 operationalizes RAM as a runtime Recovery Loop → Paper 7 provides the first empirical validation of the full stack on real LangGraph agents → Paper 8 establishes identity-bound accountability for halted agents (Phase II: governance of governance) → Paper 9 deploys that governance transparently at the MCP protocol layer → Paper 10 makes it non-blocking via escrow-based asynchronous human oversight.
 
 ---
 
